@@ -260,7 +260,7 @@
           <p-button
             [label]="(isEditMode() ? 'COURSES.FORM.UPDATE_COURSE' : 'COURSES.FORM.CREATE_COURSE') | translate"
             type="submit"
-            [loading]="loading()"
+            [loading]="loading() || checkingImpact()"
             [disabled]="courseForm.invalid"
           ></p-button>
         </div>
@@ -268,3 +268,92 @@
     </p-card>
   </div>
 </div>
+
+<!-- A recurring course keeps charging its price long after it is set, so a change
+     is confirmed with the real numbers before it saves. -->
+<p-dialog
+  [header]="'COURSES.PRICE_CHANGE.TITLE' | translate"
+  [visible]="priceDialogVisible()"
+  (visibleChange)="!$event && cancelPriceDialog()"
+  [modal]="true"
+  [draggable]="false"
+  [dismissableMask]="true"
+  [style]="{ width: '32rem', maxWidth: '95vw' }"
+>
+  @if (priceImpact(); as impact) {
+    <div class="flex flex-col gap-4">
+      <div class="flex items-center justify-center gap-3 text-lg font-semibold">
+        <span class="text-surface-500 line-through">{{ impact.currentPrice | number:'1.0-2' }}</span>
+        <i class="pi pi-arrow-right text-surface-400 text-sm"></i>
+        <span class="text-primary">{{ impact.newPrice | number:'1.0-2' }}</span>
+      </div>
+
+      <!-- What always happens. -->
+      <div class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800 flex gap-2">
+        <i class="pi pi-exclamation-triangle mt-0.5"></i>
+        <span>
+          {{ (impact.paymentType === 'MONTHLY_SUBSCRIPTION'
+                ? 'COURSES.PRICE_CHANGE.WARN_MONTHLY'
+                : 'COURSES.PRICE_CHANGE.WARN_SESSION')
+             | translate:{ students: impact.studentsOnListPrice } }}
+        </span>
+      </div>
+
+      @if (impact.studentsOnOwnPrice > 0) {
+        <p class="text-sm text-surface-600 m-0">
+          {{ 'COURSES.PRICE_CHANGE.KEEPS_OWN_PRICE' | translate:{ count: impact.studentsOnOwnPrice } }}
+        </p>
+      }
+
+      <!-- The optional half: rewriting what students have already been told they owe. -->
+      @if (impact.openCount > 0) {
+        <div class="border rounded-lg p-3 flex flex-col gap-2">
+          <div class="flex items-start gap-2">
+            <p-checkbox
+              inputId="applyToCurrentUnpaid"
+              [binary]="true"
+              [ngModel]="applyToCurrentUnpaid()"
+              (ngModelChange)="applyToCurrentUnpaid.set($event)"
+            ></p-checkbox>
+            <label for="applyToCurrentUnpaid" class="text-sm cursor-pointer">
+              {{ (impact.paymentType === 'MONTHLY_SUBSCRIPTION'
+                    ? 'COURSES.PRICE_CHANGE.APPLY_CURRENT_MONTH'
+                    : 'COURSES.PRICE_CHANGE.APPLY_UNPAID_SESSIONS')
+                 | translate:{ count: impact.openCount } }}
+            </label>
+          </div>
+          @if (applyToCurrentUnpaid() && impact.openDelta !== 0) {
+            <p class="text-xs text-surface-600 m-0 ms-6">
+              {{ (impact.openDelta > 0
+                    ? 'COURSES.PRICE_CHANGE.DELTA_UP'
+                    : 'COURSES.PRICE_CHANGE.DELTA_DOWN')
+                 | translate:{ amount: (impact.openDelta < 0 ? -impact.openDelta : impact.openDelta) | number:'1.0-2' } }}
+            </p>
+          }
+        </div>
+      }
+
+      @if (impact.settledCount > 0) {
+        <p class="text-sm text-surface-600 m-0">
+          {{ 'COURSES.PRICE_CHANGE.SETTLED_UNTOUCHED' | translate:{ count: impact.settledCount } }}
+        </p>
+      }
+    </div>
+  }
+
+  <ng-template pTemplate="footer">
+    <p-button
+      [label]="'COURSES.FORM.CANCEL' | translate"
+      severity="secondary"
+      [outlined]="true"
+      (onClick)="cancelPriceDialog()"
+      type="button"
+    ></p-button>
+    <p-button
+      [label]="'COURSES.PRICE_CHANGE.CONFIRM' | translate"
+      (onClick)="confirmPriceDialog()"
+      [loading]="loading()"
+      type="button"
+    ></p-button>
+  </ng-template>
+</p-dialog>

@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
-import { Course, CourseCreateDto, CourseUpdateDto, CourseWithEnrollmentCount } from '@shared/interfaces/course.interface';
+import { Course, CourseCreateDto, CourseUpdateDto, CoursePriceImpact, CourseWithEnrollmentCount } from '@shared/interfaces/course.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -35,6 +35,11 @@ export class CourseService {
 
   updateCourse(id: string, course: CourseUpdateDto): Observable<Course> {
     return this.api.patch<Course>(`courses/${id}`, course);
+  }
+
+  /** What changing this course's price would do, for the confirmation shown first. */
+  getPriceImpact(id: string, price: number): Observable<CoursePriceImpact> {
+    return this.api.get<CoursePriceImpact>(`courses/${id}/price-impact`, { price: String(price) });
   }
 
   deleteCourse(id: string): Observable<Course> {

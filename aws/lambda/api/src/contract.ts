@@ -577,7 +577,32 @@ const CreateCourseSchema = z.object({
   chargeAbsentSessions: z.boolean().optional(),
 });
 
-const UpdateCourseSchema = CreateCourseSchema.partial();
+const UpdateCourseSchema = CreateCourseSchema.partial().extend({
+  /**
+   * Also restate what has already been raised at the new price — the current
+   * month's unpaid bills for a subscription, the unpaid charges for sessions
+   * already held for per-session. Off by default: a new price always applies to
+   * what is billed from here on, but rewriting a figure a student has already
+   * been told they owe is a decision staff make deliberately.
+   */
+  applyToCurrentUnpaid: z.boolean().optional(),
+});
+
+/** What a course price change would do, for the confirmation shown before it runs. */
+const CoursePriceImpactSchema = z.object({
+  paymentType: CoursePaymentTypeSchema,
+  currentPrice: z.number(),
+  newPrice: z.number(),
+  /** Students on the list price — these move with it. */
+  studentsOnListPrice: z.number(),
+  /** Students on their own agreed fee — these keep it. */
+  studentsOnOwnPrice: z.number(),
+  /** Already-raised rows `applyToCurrentUnpaid` would restate, and by how much. */
+  openCount: z.number(),
+  openDelta: z.number(),
+  /** Settled or refunded rows, which are never rewritten. */
+  settledCount: z.number(),
+});
 
 // =============================================
 // Master Course Schemas
@@ -2377,6 +2402,20 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: {
         200: z.array(z.any()),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    // Above `getById` for the same reason `getEnrollments` is: a nested GET has to
+    // be registered before `/courses/:id` or the router swallows it as an id.
+    priceImpact: {
+      method: 'GET',
+      path: '/api/courses/:id/price-impact',
+      pathParams: z.object({ id: UUIDSchema }),
+      query: z.object({ price: z.string() }),
+      responses: {
+        200: CoursePriceImpactSchema,
+        400: ApiErrorSchema,
         403: ApiErrorSchema,
         404: ApiErrorSchema,
       },

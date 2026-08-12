@@ -286,6 +286,7 @@
     },
     "COURSES": {
       "NOT_FOUND": "Course not found",
+      "INVALID_PRICE": "Invalid price",
       "ACCESS_DENIED": "Access denied to this course",
       "ACCESS_DENIED_UPDATE": "Access denied to update this course",
       "ACCESS_DENIED_DELETE": "Access denied to delete this course",
@@ -2420,6 +2421,18 @@
       "PAYMENT_TYPE_LOCKED": "Payment type cannot be changed after the course is created"
     },
     "DELETED": "Course deleted successfully",
+    "PRICE_CHANGE": {
+        "TITLE": "Change the price?",
+        "WARN_MONTHLY": "This becomes the monthly fee for {{students}} student(s) on this course, and every bill from next month onwards will be raised at it.",
+        "WARN_SESSION": "This becomes the per-session fee for {{students}} student(s) on this course, and every session charged from now on will use it.",
+        "KEEPS_OWN_PRICE": "{{count}} student(s) are on their own agreed fee and will keep it.",
+        "APPLY_CURRENT_MONTH": "Also update this month's {{count}} unpaid bill(s)",
+        "APPLY_UNPAID_SESSIONS": "Also update {{count}} unpaid session charge(s) already raised",
+        "DELTA_UP": "Students will owe {{amount}} more in total.",
+        "DELTA_DOWN": "Students will owe {{amount}} less in total.",
+        "SETTLED_UNTOUCHED": "{{count}} already-paid item(s) stay as they are.",
+        "CONFIRM": "Save the new price"
+    },
     "PRICE_OVERRIDES": {
       "TITLE": "Monthly price overrides",
       "SUBTITLE": "Adjust the price for specific months",

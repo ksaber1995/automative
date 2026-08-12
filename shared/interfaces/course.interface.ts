@@ -62,4 +62,26 @@ export interface CourseUpdateDto {
   sessionPackageSize?: number | null;
   sessionPackagePrice?: number | null;
   chargeAbsentSessions?: boolean;
+  /**
+   * Also restate what has already been raised at the new price — the current
+   * month's unpaid bills, or the unpaid charges for sessions already held. A new
+   * price always applies from here on; this is the opt-in for what came before.
+   */
+  applyToCurrentUnpaid?: boolean;
+}
+
+/** What changing a course's price would do. See GET /courses/:id/price-impact. */
+export interface CoursePriceImpact {
+  paymentType: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION';
+  currentPrice: number;
+  newPrice: number;
+  /** Students on the list price — these move with it. */
+  studentsOnListPrice: number;
+  /** Students on their own agreed fee — these keep it. */
+  studentsOnOwnPrice: number;
+  /** Already-raised bills/charges the opt-in would restate, and by how much. */
+  openCount: number;
+  openDelta: number;
+  /** Settled or refunded rows, which are never rewritten. */
+  settledCount: number;
 }

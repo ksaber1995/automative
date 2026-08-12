@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { CardModule } from 'primeng/card';
 import { ButtonModule } from 'primeng/button';
@@ -9,13 +9,15 @@ import { TextareaModule } from 'primeng/textarea';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { SelectModule } from 'primeng/select';
 import { MultiSelectModule } from 'primeng/multiselect';
+import { DialogModule } from 'primeng/dialog';
+import { CheckboxModule } from 'primeng/checkbox';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { CourseService } from '../services/course.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
-import { Course } from '@shared/interfaces/course.interface';
+import { Course, CoursePriceImpact } from '@shared/interfaces/course.interface';
 
 @Component({
   selector: 'app-course-form',
@@ -23,6 +25,7 @@ import { Course } from '@shared/interfaces/course.interface';
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    FormsModule,
     CardModule,
     ButtonModule,
     InputTextModule,
@@ -30,6 +33,8 @@ import { Course } from '@shared/interfaces/course.interface';
     InputNumberModule,
     SelectModule,
     MultiSelectModule,
+    DialogModule,
+    CheckboxModule,
     TranslateModule
   ],
   templateUrl: './course-form.component.html'
@@ -54,6 +59,14 @@ export class CourseFormComponent implements OnInit {
   rooms = signal<LookupOption[]>([]);
   levels = signal<LookupOption[]>([]);
   subjects = signal<LookupOption[]>([]);
+
+  // Price-change confirmation. A recurring course keeps charging its price long
+  // after it is set, so staff are shown what moves before the save goes through.
+  private loadedPrice: number | null = null;
+  priceImpact = signal<CoursePriceImpact | null>(null);
+  priceDialogVisible = signal(false);
+  applyToCurrentUnpaid = signal(false);
+  checkingImpact = signal(false);
 
   constructor() {
     this.courseForm = this.fb.group({
@@ -172,6 +185,8 @@ export class CourseFormComponent implements OnInit {
         });
         // Payment type is fixed once a course is created — lock it in edit mode.
         this.courseForm.get('paymentType')?.disable();
+        // Remember what the price was, to tell a real change from a re-save.
+        this.loadedPrice = Number(course.price);
         // Load rooms for the selected branch
         if (course.branchId) this.loadRooms(course.branchId);
         this.loading.set(false);
@@ -190,6 +205,53 @@ export class CourseFormComponent implements OnInit {
       return;
     }
 
+    // A price change on a recurring course reaches students who are already on it,
+    // so confirm it before saving rather than after. Everything else saves straight
+    // through, and so does the price on a one-time course — that only ever applies
+    // to the next student to sign up.
+    if (this.isEditMode() && this.courseId && this.priceChangeNeedsConfirming()) {
+      this.confirmPriceChange();
+      return;
+    }
+
+    this.save();
+  }
+
+  /** Has the price actually moved, on a course whose price keeps being charged? */
+  private priceChangeNeedsConfirming(): boolean {
+    const { price, paymentType } = this.courseForm.getRawValue();
+    const recurring = paymentType === 'MONTHLY_SUBSCRIPTION' || paymentType === 'PER_SESSION';
+    return recurring && this.loadedPrice !== null && Number(price) !== this.loadedPrice;
+  }
+
+  /** Fetch what the change would do, then show it for confirmation. */
+  private confirmPriceChange() {
+    this.checkingImpact.set(true);
+    this.applyToCurrentUnpaid.set(false);
+    this.courseService.getPriceImpact(this.courseId!, Number(this.courseForm.getRawValue().price)).subscribe({
+      next: (impact) => {
+        this.checkingImpact.set(false);
+        this.priceImpact.set(impact);
+        this.priceDialogVisible.set(true);
+      },
+      error: () => {
+        // Interceptor toasted the translated error. Without the numbers there is
+        // nothing meaningful to confirm against, so leave the form as it is.
+        this.checkingImpact.set(false);
+      }
+    });
+  }
+
+  confirmPriceDialog() {
+    this.priceDialogVisible.set(false);
+    this.save(this.applyToCurrentUnpaid());
+  }
+
+  cancelPriceDialog() {
+    this.priceDialogVisible.set(false);
+  }
+
+  private save(applyToCurrentUnpaid = false) {
     this.loading.set(true);
     // getRawValue() so the disabled paymentType control is still included on edit.
     const formValue = this.courseForm.getRawValue();
@@ -199,6 +261,7 @@ export class CourseFormComponent implements OnInit {
       ...formValue,
       description: formValue.description?.trim() || undefined,
       instructorId: formValue.instructorId || undefined,
+      ...(applyToCurrentUnpaid ? { applyToCurrentUnpaid: true } : {}),
     };
 
     if (this.isEditMode() && this.courseId) {
