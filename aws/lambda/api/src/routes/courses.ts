@@ -27,13 +27,28 @@ const SUBJECTS_SUBQUERY = `COALESCE((
 const RECURRING_PAYMENT_TYPES = ['MONTHLY_SUBSCRIPTION', 'PER_SESSION'];
 
 /**
+ * Which enrolments a course price change moves.
+ *
+ * Not "whoever currently sits on the list price": an enrolment's fee is frozen at
+ * enrolment, so any course whose price changed before this cascade existed has
+ * students stranded on the old figure. Matching against today's list price would
+ * classify all of them as individually negotiated and move nobody — a no-op for
+ * exactly the courses that need it.
+ *
+ * A deliberate discount is what the enrolment actually records, so that is what is
+ * read. No discount means the student is on whatever the course charges and follows
+ * it; a recorded discount is a figure agreed with them and is left alone.
+ */
+const UNDISCOUNTED = `COALESCE(e.discount_amount, 0) = 0 AND COALESCE(e.discount_percent, 0) = 0`;
+
+/**
  * What a price change is about to do, so staff can be told before they commit.
  *
- * Two groups of students, and they are not treated alike: whoever sits on the list
- * price moves with it, whoever was put on their own agreed fee keeps that fee. And
- * two horizons — what is charged from here on, which always follows the new price,
- * against what has already been raised, which is money the student has been told
- * they owe and so is left to an explicit choice.
+ * Keyed off the COURSE's payment type, never `enrollments.payment_type`. That
+ * column is a denormalised copy added with a DEFAULT and never back-filled, so it
+ * drifts — there are monthly courses whose enrolments all still read ONE_TIME.
+ * `ensureBillsForMonth` bills on the course's type, so anything reasoning about
+ * those bills has to agree with it or it silently matches nothing.
  */
 async function priceChangeImpact(
   companyId: string,
@@ -43,12 +58,13 @@ async function priceChangeImpact(
   newPrice: number,
 ) {
   const enrolled = await queryOne<any>(
-    `SELECT COUNT(*) FILTER (WHERE final_price = $3)  AS on_list_price,
-            COUNT(*) FILTER (WHERE final_price <> $3) AS on_own_price
-       FROM enrollments
-      WHERE company_id = $1 AND course_id = $2 AND payment_type = $4
-        AND status NOT IN ('DROPPED', 'CANCELLED')`,
-    [companyId, courseId, oldPrice, paymentType],
+    `SELECT COUNT(*) FILTER (WHERE ${UNDISCOUNTED})     AS moves,
+            COUNT(*) FILTER (WHERE NOT (${UNDISCOUNTED})) AS keeps_own
+       FROM enrollments e
+       JOIN courses c ON c.id = e.course_id
+      WHERE e.company_id = $1 AND e.course_id = $2 AND c.payment_type = $3
+        AND e.status NOT IN ('DROPPED', 'CANCELLED')`,
+    [companyId, courseId, paymentType],
   );
 
   // Already-raised rows that the optional half of the change would rewrite, and the
@@ -56,33 +72,33 @@ async function priceChangeImpact(
   const raised = paymentType === 'MONTHLY_SUBSCRIPTION'
     ? await queryOne<any>(
         `SELECT COUNT(*) FILTER (WHERE b.payment_status NOT IN ('PAID', 'REFUNDED')) AS open_count,
-                COALESCE(SUM($4::numeric - b.amount_due)
+                COALESCE(SUM($3::numeric - b.amount_due)
                          FILTER (WHERE b.payment_status NOT IN ('PAID', 'REFUNDED')), 0) AS open_delta,
                 COUNT(*) FILTER (WHERE b.payment_status IN ('PAID', 'REFUNDED')) AS settled_count
            FROM monthly_subscription_payments b
            JOIN enrollments e ON e.id = b.enrollment_id
-          WHERE b.company_id = $1 AND b.course_id = $2 AND e.final_price = $3
+          WHERE b.company_id = $1 AND b.course_id = $2 AND ${UNDISCOUNTED}
             AND b.billing_year  = EXTRACT(YEAR  FROM CURRENT_DATE)::int
             AND b.billing_month = EXTRACT(MONTH FROM CURRENT_DATE)::int`,
-        [companyId, courseId, oldPrice, newPrice],
+        [companyId, courseId, newPrice],
       )
     : await queryOne<any>(
         `SELECT COUNT(*) FILTER (WHERE sp.payment_status = 'PENDING') AS open_count,
-                COALESCE(SUM($4::numeric - sp.amount_due)
+                COALESCE(SUM($3::numeric - sp.amount_due)
                          FILTER (WHERE sp.payment_status = 'PENDING'), 0) AS open_delta,
                 COUNT(*) FILTER (WHERE sp.payment_status <> 'PENDING') AS settled_count
            FROM session_payments sp
            JOIN enrollments e ON e.id = sp.enrollment_id
-          WHERE sp.company_id = $1 AND sp.course_id = $2 AND e.final_price = $3`,
-        [companyId, courseId, oldPrice, newPrice],
+          WHERE sp.company_id = $1 AND sp.course_id = $2 AND ${UNDISCOUNTED}`,
+        [companyId, courseId, newPrice],
       );
 
   return {
     paymentType,
     currentPrice: oldPrice,
     newPrice,
-    studentsOnListPrice: Number(enrolled?.on_list_price ?? 0),
-    studentsOnOwnPrice: Number(enrolled?.on_own_price ?? 0),
+    studentsOnListPrice: Number(enrolled?.moves ?? 0),
+    studentsOnOwnPrice: Number(enrolled?.keeps_own ?? 0),
     openCount: Number(raised?.open_count ?? 0),
     openDelta: Math.round(parseFloat(raised?.open_delta ?? 0) * 100) / 100,
     settledCount: Number(raised?.settled_count ?? 0),
@@ -99,9 +115,9 @@ async function priceChangeImpact(
  * refuses to raise a bill for a month that has not started, so every future month is
  * still unwritten), and for per-session the charges not yet raised against a session.
  *
- * Only students who were on the list price move. Someone on a negotiated fee keeps
- * it — that number was agreed with them rather than derived from the course — and
- * staff can still reprice them one at a time from the enrolment.
+ * Students without a recorded discount move; a discounted enrolment keeps its
+ * agreed fee, and staff can still reprice that one from the enrolment. See
+ * `UNDISCOUNTED` for why the discount is read rather than the current fee.
  *
  * What has already been raised is a separate decision, which is why
  * `applyToCurrentUnpaid` is passed in rather than assumed: the current month's bill
@@ -115,24 +131,27 @@ async function cascadeCoursePrice(
   companyId: string,
   courseId: string,
   paymentType: string,
-  oldPrice: number,
   newPrice: number,
   applyToCurrentUnpaid: boolean,
 ): Promise<{ studentsRepriced: number; openRepriced: number }> {
   const moved = await query(
-    `UPDATE enrollments
-        SET final_price = $4, original_price = $4,
-            discount_amount = 0, discount_percent = 0, updated_at = NOW()
-      WHERE company_id = $1 AND course_id = $2 AND payment_type = $5
-        AND final_price = $3
-      RETURNING id`,
-    [companyId, courseId, oldPrice, newPrice, paymentType],
+    `UPDATE enrollments e
+        SET final_price = $3, original_price = $3, updated_at = NOW()
+       FROM courses c
+      WHERE c.id = e.course_id
+        AND e.company_id = $1 AND e.course_id = $2 AND c.payment_type = $4
+        AND e.status NOT IN ('DROPPED', 'CANCELLED')
+        AND ${UNDISCOUNTED}
+      RETURNING e.id`,
+    [companyId, courseId, newPrice, paymentType],
   );
   const studentsRepriced = (moved as any[]).length;
 
   if (!applyToCurrentUnpaid) return { studentsRepriced, openRepriced: 0 };
 
-  // From here `e.final_price` is already the new fee, so the bills are matched on it.
+  // Matched on the same undiscounted set the enrolments were moved by, not on the
+  // fee — a student who was already sitting on the new figure still gets their
+  // open row restated, and a discounted one is still passed over.
   const openRepriced = paymentType === 'MONTHLY_SUBSCRIPTION'
     ? (await query(
         `UPDATE monthly_subscription_payments msp
@@ -161,14 +180,14 @@ async function cascadeCoursePrice(
                  ON ov.course_id = e.course_id
                 AND ov.billing_year = b.billing_year
                 AND ov.billing_month = b.billing_month
-              WHERE b.company_id = $1 AND b.course_id = $2 AND e.final_price = $3
+              WHERE b.company_id = $1 AND b.course_id = $2 AND ${UNDISCOUNTED}
                 AND b.payment_status NOT IN ('PAID', 'REFUNDED')
                 AND b.billing_year  = EXTRACT(YEAR  FROM CURRENT_DATE)::int
                 AND b.billing_month = EXTRACT(MONTH FROM CURRENT_DATE)::int
            ) sub
           WHERE msp.id = sub.id
           RETURNING msp.id`,
-        [companyId, courseId, newPrice],
+        [companyId, courseId],
       ) as any[]).length
     // A charge covered by a prepaid package, waived, or already settled keeps its
     // figure: only what the student still owes in cash is restated.
@@ -183,7 +202,7 @@ async function cascadeCoursePrice(
            FROM enrollments e
           WHERE e.id = sp.enrollment_id
             AND sp.company_id = $1 AND sp.course_id = $2
-            AND e.final_price = $3 AND sp.payment_status = 'PENDING'
+            AND ${UNDISCOUNTED} AND sp.payment_status = 'PENDING'
           RETURNING sp.id`,
         [companyId, courseId, newPrice],
       ) as any[]).length;
@@ -622,7 +641,7 @@ export const coursesRoutes = {
         const newPrice = Number(updateData.price);
         if (Number.isFinite(newPrice) && Number.isFinite(oldPrice) && newPrice !== oldPrice) {
           await cascadeCoursePrice(
-            context.companyId, params.id, paymentType, oldPrice, newPrice,
+            context.companyId, params.id, paymentType, newPrice,
             body.applyToCurrentUnpaid === true,
           );
         }

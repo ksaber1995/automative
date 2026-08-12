@@ -305,33 +305,43 @@
         </p>
       }
 
-      <!-- The optional half: rewriting what students have already been told they owe. -->
-      @if (impact.openCount > 0) {
-        <div class="border rounded-lg p-3 flex flex-col gap-2">
-          <div class="flex items-start gap-2">
-            <p-checkbox
-              inputId="applyToCurrentUnpaid"
-              [binary]="true"
-              [ngModel]="applyToCurrentUnpaid()"
-              (ngModelChange)="applyToCurrentUnpaid.set($event)"
-            ></p-checkbox>
-            <label for="applyToCurrentUnpaid" class="text-sm cursor-pointer">
-              {{ (impact.paymentType === 'MONTHLY_SUBSCRIPTION'
-                    ? 'COURSES.PRICE_CHANGE.APPLY_CURRENT_MONTH'
-                    : 'COURSES.PRICE_CHANGE.APPLY_UNPAID_SESSIONS')
-                 | translate:{ count: impact.openCount } }}
-            </label>
-          </div>
-          @if (applyToCurrentUnpaid() && impact.openDelta !== 0) {
-            <p class="text-xs text-surface-600 m-0 ms-6">
-              {{ (impact.openDelta > 0
-                    ? 'COURSES.PRICE_CHANGE.DELTA_UP'
-                    : 'COURSES.PRICE_CHANGE.DELTA_DOWN')
-                 | translate:{ amount: (impact.openDelta < 0 ? -impact.openDelta : impact.openDelta) | number:'1.0-2' } }}
-            </p>
-          }
+      <!-- The optional half: rewriting what students have already been told they owe.
+           Always rendered, disabled when there is nothing open — a missing checkbox
+           reads as a missing feature rather than as "no bills to update". -->
+      <div class="border rounded-lg p-3 flex flex-col gap-2">
+        <div class="flex items-start gap-2">
+          <p-checkbox
+            inputId="applyToCurrentUnpaid"
+            [binary]="true"
+            [disabled]="impact.openCount === 0"
+            [ngModel]="applyToCurrentUnpaid()"
+            (ngModelChange)="applyToCurrentUnpaid.set($event)"
+          ></p-checkbox>
+          <label
+            for="applyToCurrentUnpaid"
+            class="text-sm"
+            [class.cursor-pointer]="impact.openCount > 0"
+            [class.text-surface-400]="impact.openCount === 0"
+          >
+            {{ (impact.paymentType === 'MONTHLY_SUBSCRIPTION'
+                  ? 'COURSES.PRICE_CHANGE.APPLY_CURRENT_MONTH'
+                  : 'COURSES.PRICE_CHANGE.APPLY_UNPAID_SESSIONS')
+               | translate:{ count: impact.openCount } }}
+          </label>
         </div>
-      }
+        @if (impact.openCount === 0) {
+          <p class="text-xs text-surface-500 m-0 ms-6">
+            {{ 'COURSES.PRICE_CHANGE.NOTHING_OPEN' | translate }}
+          </p>
+        } @else if (applyToCurrentUnpaid() && impact.openDelta !== 0) {
+          <p class="text-xs text-surface-600 m-0 ms-6">
+            {{ (impact.openDelta > 0
+                  ? 'COURSES.PRICE_CHANGE.DELTA_UP'
+                  : 'COURSES.PRICE_CHANGE.DELTA_DOWN')
+               | translate:{ amount: (impact.openDelta < 0 ? -impact.openDelta : impact.openDelta) | number:'1.0-2' } }}
+          </p>
+        }
+      </div>
 
       @if (impact.settledCount > 0) {
         <p class="text-sm text-surface-600 m-0">
