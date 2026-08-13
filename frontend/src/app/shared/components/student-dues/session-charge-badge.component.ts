@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
+import { Component, EventEmitter, Input, Output, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
@@ -44,19 +44,30 @@ export interface SessionChargeInfo {
           <span class="text-[11px] font-semibold">{{ ('SESSION_ATTENDANCE.CHARGE_' + charge.status) | translate }}</span>
         </div>
       } @else if (editing()) {
-        <div class="mt-2 flex items-center gap-2 rounded-md border border-indigo-300 bg-indigo-50 px-2.5 py-1.5">
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            class="w-24 border border-indigo-200 rounded px-2 py-1 text-xs"
-            [ngModel]="editAmount()"
-            (ngModelChange)="editAmount.set($event)"
-          />
-          <p-button icon="pi pi-check" size="small" severity="success" [rounded]="true" [text]="true"
-            [loading]="busy()" [pTooltip]="'SESSION_ATTENDANCE.CHARGE_SAVE' | translate" (onClick)="saveEdit()"></p-button>
-          <p-button icon="pi pi-times" size="small" severity="secondary" [rounded]="true" [text]="true"
-            [disabled]="busy()" [pTooltip]="'SESSION_ATTENDANCE.CHARGE_CANCEL' | translate" (onClick)="cancelEdit()"></p-button>
+        <div class="mt-2 rounded-md border border-indigo-300 bg-indigo-50 px-2.5 py-1.5">
+          <div class="flex items-center gap-2">
+            <input
+              type="number"
+              min="0"
+              [max]="charge.amountDue"
+              step="0.01"
+              class="w-24 border rounded px-2 py-1 text-xs"
+              [class.border-red-400]="editAmountTooHigh()"
+              [class.border-indigo-200]="!editAmountTooHigh()"
+              [ngModel]="editAmount()"
+              (ngModelChange)="editAmount.set($event)"
+            />
+            <span class="text-[11px] text-gray-500">/ {{ charge.amountDue | amount }}</span>
+            <p-button icon="pi pi-check" size="small" severity="success" [rounded]="true" [text]="true"
+              [disabled]="editAmountTooHigh()" [loading]="busy()"
+              [pTooltip]="'SESSION_ATTENDANCE.CHARGE_SAVE' | translate" (onClick)="saveEdit()"></p-button>
+            <p-button icon="pi pi-times" size="small" severity="secondary" [rounded]="true" [text]="true"
+              [disabled]="busy()" [pTooltip]="'SESSION_ATTENDANCE.CHARGE_CANCEL' | translate" (onClick)="cancelEdit()"></p-button>
+          </div>
+          <!-- A session bill is a fixed fee — this can never exceed it. -->
+          @if (editAmountTooHigh()) {
+            <div class="text-[11px] text-red-600 mt-1">{{ 'SESSION_ATTENDANCE.CHARGE_EXCEEDS_DUE' | translate }}</div>
+          }
         </div>
       } @else if (charge.status === 'PAID' || (charge.amountPaid || 0) > 0) {
         <div class="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-green-300 bg-green-50 px-2.5 py-1.5">
@@ -108,6 +119,8 @@ export class SessionChargeBadgeComponent {
   busy = signal(false);
   editing = signal(false);
   editAmount = signal<number>(0);
+  /** A session bill is a fixed fee — the edit can never book more than that. */
+  editAmountTooHigh = computed(() => Number(this.editAmount()) > (this.charge?.amountDue ?? 0) + 0.009);
 
   /** Today as YYYY-MM-DD in the browser's own timezone. */
   private today(): string {
@@ -142,9 +155,9 @@ export class SessionChargeBadgeComponent {
    * Composes two existing endpoints rather than needing a third.
    */
   saveEdit(): void {
-    if (!this.charge || this.busy()) return;
+    if (!this.charge || this.busy() || this.editAmountTooHigh()) return;
     const id = this.charge.id;
-    const amount = Math.max(0, Number(this.editAmount()) || 0);
+    const amount = Math.min(this.charge.amountDue, Math.max(0, Number(this.editAmount()) || 0));
     this.busy.set(true);
     this.sessionPayments.voidPayment(id).subscribe({
       next: () => {

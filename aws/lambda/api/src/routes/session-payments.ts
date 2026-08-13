@@ -919,6 +919,11 @@ export const sessionPaymentsRoutes = {
         return apiError(400, 'ERRORS.SESSION_PAYMENTS.INVALID_AMOUNT', 'Amount must be greater than zero');
       }
       const newPaid = parseFloat(row.amount_paid || 0) + pay;
+      // A session bill is a fixed fee — paying past it isn't a tip, it's a typo.
+      // Rejected here so it can never happen regardless of which screen submits it.
+      if (newPaid - amountDue > 0.009) {
+        return apiError(400, 'ERRORS.SESSION_PAYMENTS.PAYMENT_EXCEEDS_DUE', 'Payment cannot exceed the amount due for this session');
+      }
       const newStatus = newPaid >= amountDue ? 'PAID' : 'PENDING';
       // paid_date is now only "when was this charge last paid" for display —
       // revenue comes from the installment rows, each on its own date. Stamped for
