@@ -82,6 +82,32 @@
     </div>
   </div>
 
+  <!-- Auto-confirm per-session payments: the same company-wide switch as
+       Settings, surfaced here so an admin taking attendance doesn't have to
+       leave the page to turn it on for a big class. PER_SESSION courses only —
+       there is nothing to auto-confirm on any other billing type. -->
+  @if (duesPaymentType() === 'PER_SESSION' && canToggleAutoConfirm()) {
+    <div class="mb-4 flex items-center justify-between gap-3 rounded-lg border px-4 py-2.5 transition-colors"
+      [class.border-blue-300]="autoConfirmSessionPayments()"
+      [class.bg-blue-50]="autoConfirmSessionPayments()"
+      [class.border-gray-200]="!autoConfirmSessionPayments()">
+      <label for="autoConfirmToggle" class="flex items-center gap-2.5 cursor-pointer text-sm">
+        <p-checkbox
+          [ngModel]="autoConfirmSessionPayments()"
+          (ngModelChange)="toggleAutoConfirm($event)"
+          [binary]="true"
+          [disabled]="savingAutoConfirm()"
+          inputId="autoConfirmToggle">
+        </p-checkbox>
+        <span class="font-semibold text-gray-800">{{ 'SESSION_ATTENDANCE.AUTO_CONFIRM_LABEL' | translate }}</span>
+        <span class="text-gray-500">{{ 'SESSION_ATTENDANCE.AUTO_CONFIRM_HINT' | translate }}</span>
+      </label>
+      @if (savingAutoConfirm()) {
+        <i class="pi pi-spin pi-spinner text-gray-400"></i>
+      }
+    </div>
+  }
+
   <!-- Absent-streak warning: flashes for a few seconds when the roster loads with
        students who have missed the last few sessions in a row. The inline ⚠ marks
        beside those students stay after this dismisses. -->
@@ -377,6 +403,13 @@
                 [dues]="dues(student.studentId)"
                 (pay)="openCollect(student)"
               ></app-student-dues-badge>
+
+              <!-- PER_SESSION charge for this session, when one exists: paid/partial/
+                   unpaid at a glance, with confirm/edit/void right here. -->
+              <app-session-charge-badge
+                [charge]="student.charge ?? null"
+                (changed)="loadStudents()"
+              ></app-session-charge-badge>
               </div>
             }
           </div>

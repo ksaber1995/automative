@@ -54,7 +54,15 @@ export interface LinkedCourseSummary {
   branchId: string | null;
   branchName: string | null;
   name: string;
+  /** Per-session fee when paymentType is PER_SESSION; otherwise the course price. */
   price: number;
+  paymentType: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION';
+  /**
+   * How often the course meets, from its running classes' schedules. What turns
+   * a per-session fee into a monthly figure comparable to the bundle price.
+   * Null when no class is scheduled yet — no honest estimate exists then.
+   */
+  sessionsPerWeek: number | null;
   isActive: boolean;
 }
 

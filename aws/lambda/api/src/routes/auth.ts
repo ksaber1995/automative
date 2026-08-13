@@ -170,6 +170,18 @@ export const authRoutes = {
         return apiError(401, 'ERRORS.AUTH.SUBSCRIPTION_INACTIVE', 'Company subscription is not active. Please contact support.');
       }
 
+      // A tenant parked from the admin console lives in the subscriptions
+      // table, not on the companies row the checks above read. Without this,
+      // a deactivated tenant still gets a fresh session and only finds out
+      // when every API call rejects it.
+      const parkedSub = await queryOne<any>(
+        'SELECT status FROM subscriptions WHERE company_id = $1',
+        [user.company_id]
+      );
+      if (parkedSub?.status === 'EXPIRED') {
+        return apiError(401, 'ERRORS.AUTH.SUBSCRIPTION_INACTIVE', 'Company subscription is not active. Please contact support.');
+      }
+
       if (!user.is_active) {
         return apiError(401, 'ERRORS.AUTH.USER_INACTIVE', 'User account is inactive');
       }

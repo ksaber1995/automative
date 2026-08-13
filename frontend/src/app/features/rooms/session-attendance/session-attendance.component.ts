@@ -18,6 +18,7 @@ import { SessionService, Session } from '../services/session.service';
 import { AttendanceService, SessionAttendanceStudent, AttendanceType, StudentSessionDues } from '../services/attendance.service';
 import { StudentDuesBadgeComponent } from '../../../shared/components/student-dues/student-dues-badge.component';
 import { StudentAbsenceBadgeComponent } from '../../../shared/components/student-dues/student-absence-badge.component';
+import { SessionChargeBadgeComponent } from '../../../shared/components/student-dues/session-charge-badge.component';
 import { DuesCollectDialogComponent } from '../../../shared/components/student-dues/dues-collect-dialog.component';
 import { StudentService } from '../../students/services/student.service';
 import { TeacherAttendanceService, SessionTeacherAttendanceRow } from '../../attendance/services/teacher-attendance.service';
@@ -32,6 +33,7 @@ import { toLocalYmd } from '../../../core/utils/date.util';
 import { CameraScanDialogComponent } from '../../../shared/components/camera-scan/camera-scan-dialog.component';
 import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
 import { SessionHomeworkPanelComponent } from '../session-homework/session-homework-panel.component';
+import { CompanyService } from '../../../core/services/company.service';
 
 interface TeacherRow {
   employeeId: string;
@@ -67,7 +69,7 @@ function endTimeAfterStartValidator(startDate: string) {
 @Component({
   selector: 'app-session-attendance',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, ConfirmDialogModule, TextareaModule, TooltipModule, TranslateModule, CameraScanDialogComponent, StudentDuesBadgeComponent, StudentAbsenceBadgeComponent, DuesCollectDialogComponent, SessionPayDialogComponent, SessionHomeworkPanelComponent],
+  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, ConfirmDialogModule, TextareaModule, TooltipModule, TranslateModule, CameraScanDialogComponent, StudentDuesBadgeComponent, StudentAbsenceBadgeComponent, SessionChargeBadgeComponent, DuesCollectDialogComponent, SessionPayDialogComponent, SessionHomeworkPanelComponent],
   providers: [ConfirmationService],
   templateUrl: './session-attendance.component.html',
 })
@@ -95,6 +97,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   private fb = inject(FormBuilder);
   private auth = inject(AuthService);
   private templatesSvc = inject(WhatsappTemplatesService);
+  private companyService = inject(CompanyService);
   private globalScan = inject(GlobalScanService);
   // Stable reference so the app-wide scan handler can be unregistered on destroy.
   // Only ONE global scan handler can be registered at a time, so this page keeps
@@ -202,6 +205,41 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   duesPaymentType = signal<string>('');
   loadingDues = signal(false);
 
+  // ── Auto-confirm per-session payments — company-wide toggle, surfaced here
+  // too so an admin taking attendance doesn't have to leave for Settings. Only
+  // shown for a PER_SESSION course, and only to admins (mirrors the server's
+  // own ADMIN/GLOBAL_ADMIN gate on updateSettings).
+  autoConfirmSessionPayments = signal(false);
+  savingAutoConfirm = signal(false);
+  canToggleAutoConfirm = computed(() => this.auth.isGlobalAdmin());
+
+  loadAutoConfirmSetting(): void {
+    if (!this.canToggleAutoConfirm()) return;
+    this.companyService.getSettings().subscribe({
+      next: (settings) => this.autoConfirmSessionPayments.set(settings.autoConfirmSessionPayments === true),
+      error: () => {},
+    });
+  }
+
+  toggleAutoConfirm(next: boolean): void {
+    if (this.savingAutoConfirm()) return;
+    const previous = this.autoConfirmSessionPayments();
+    this.autoConfirmSessionPayments.set(next);
+    this.savingAutoConfirm.set(true);
+    this.companyService.updateSettings({ autoConfirmSessionPayments: next }).subscribe({
+      next: () => {
+        this.savingAutoConfirm.set(false);
+        this.notificationService.success(this.translate.instant(
+          next ? 'SESSION_ATTENDANCE.AUTO_CONFIRM_ON' : 'SESSION_ATTENDANCE.AUTO_CONFIRM_OFF'
+        ));
+      },
+      error: () => {
+        this.autoConfirmSessionPayments.set(previous);
+        this.savingAutoConfirm.set(false);
+      },
+    });
+  }
+
   /** Undefined for a student the endpoint can't speak for — the badge then
    *  renders nothing rather than an unverified green. */
   dues = (studentId: string): StudentSessionDues | undefined => this.duesByStudent().get(studentId);
@@ -292,6 +330,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
     this.loadStudents();
     this.loadDues();
     this.loadEmployees();
+    this.loadAutoConfirmSetting();
     // Warm the click-to-chat templates cache (fire-and-forget).
     this.templatesSvc.load().subscribe({ error: () => {} });
 
@@ -464,13 +503,30 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.saveState.set('saved');
         this.savedClearTimer = setTimeout(() => this.saveState.set(undefined), 2000);
-        // PER_SESSION courses: prompt to collect any newly-created dues.
-        if (res.sessionCharges?.length) this.payDialog?.enqueue(res.sessionCharges);
+        // PER_SESSION courses: every charge this save just created — PENDING ones
+        // prompt to collect, PAID/COVERED ones (auto-confirm, or a package) need
+        // reflecting on the roster right away, or the badge stays blank until a
+        // full page reload.
+        if (res.sessionCharges?.length) {
+          this.payDialog?.enqueue(res.sessionCharges);
+          this.mergeCharges(res.sessionCharges);
+        }
         // Marking someone present can raise (or un-checking can drop) a charge.
         this.loadDues();
       },
       error: () => this.saveState.set('error'),
     });
+  }
+
+  /** Reflect freshly-created/updated session charges on the roster without a
+   *  full reload — otherwise an auto-confirmed PAID charge shows nothing until
+   *  the page is refreshed. */
+  private mergeCharges(charges: { id: string; studentId: string; paymentStatus: string; amountDue: number; amountPaid: number }[]): void {
+    const byStudent = new Map(charges.map((c) => [c.studentId, c]));
+    this.students.update((list) => list.map((s) => {
+      const c = byStudent.get(s.studentId);
+      return c ? { ...s, charge: { id: c.id, status: c.paymentStatus, amountDue: c.amountDue, amountPaid: c.amountPaid } } : s;
+    }));
   }
 
   // ============================================================
@@ -776,8 +832,12 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
         } else {
           this.notificationService.success(this.translate.instant('SESSION_QR.CHECKED_IN', { name }));
         }
-        // PER_SESSION courses: prompt to collect this check-in's charge (fresh only).
-        if (!res.alreadyPresent && res.sessionCharge) this.payDialog?.enqueue([res.sessionCharge]);
+        // PER_SESSION courses: prompt to collect this check-in's charge (fresh
+        // only), and reflect it on the roster immediately whatever its status.
+        if (!res.alreadyPresent && res.sessionCharge) {
+          this.payDialog?.enqueue([res.sessionCharge]);
+          this.mergeCharges([res.sessionCharge]);
+        }
         if (!res.alreadyPresent) this.loadDues();
       },
       error: () => {

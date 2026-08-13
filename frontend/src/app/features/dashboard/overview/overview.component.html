@@ -439,8 +439,9 @@
     </div>
     }
 
-    <!-- Top Performing Branches -->
-    @if (!isTeacher()) {
+    <!-- Top Performing Branches — a ranking of one is no ranking, so a
+         single-branch company doesn't get shown a podium with one seat. -->
+    @if (!isTeacher() && (data.topPerformingBranches?.length || 0) > 1) {
     <div class="mt-8">
       <p-card>
         <ng-template pTemplate="header">

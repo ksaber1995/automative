@@ -34,6 +34,11 @@ CREATE TABLE companies (
     locale VARCHAR(10) DEFAULT 'en-US',
     -- How global (branch_id IS NULL) expenses are allocated to branches for P&L.
     global_expense_allocation VARCHAR(20) DEFAULT 'OVERHEAD' CHECK (global_expense_allocation IN ('PROPORTIONAL', 'EQUAL', 'OVERHEAD')),
+    -- Opt-in (migration 092): a PER_SESSION charge created while marking attendance
+    -- is confirmed PAID immediately, in full, instead of sitting PENDING for a
+    -- staff member to click through one by one. Off by default — sticky once
+    -- toggled, in either direction, until an admin changes it again.
+    auto_confirm_session_payments BOOLEAN NOT NULL DEFAULT FALSE,
     is_active BOOLEAN DEFAULT true,
     onboarding_completed BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

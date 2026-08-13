@@ -228,34 +228,18 @@
               <p class="text-gray-500 mt-1">{{ getAge(s.dateOfBirth) }} {{ 'STUDENTS.DETAIL.YEARS_OLD' | translate }}</p>
             }
           </div>
-          <div class="flex gap-2">
+          <!-- Everyday actions stay visible; the rest live behind the "more"
+               menu (see headerMenuItems for why each entry sits there). -->
+          <div class="flex gap-2 flex-wrap justify-end">
+            <button pButton [label]="'STUDENT_QR.SEND_FOLLOWUP_PARENT' | translate" icon="pi pi-whatsapp"
+              class="p-button-outlined p-button-success"
+              (click)="sendFollowupToParent()"></button>
             <button pButton [label]="'STUDENT_QR.BUTTON' | translate" icon="pi pi-qrcode" class="p-button-outlined" (click)="showQrDialog.set(true)"></button>
-            <!-- Always offered. qrCardsEnabled decides whether a tenant may CREATE a
-                 pool, not whether they may use one: an admin can hand cards to a
-                 teacher who cannot generate their own, and those cards are worthless
-                 if there is no way to link them. The API scopes the lookup to the
-                 caller's company, so only their own cards can ever be linked. -->
-            <button pButton [label]="'QR_CARDS.LINK_BUTTON' | translate" icon="pi pi-id-card" class="p-button-outlined"
-              [pTooltip]="'QR_CARDS.LINK_TOOLTIP' | translate" (click)="openLinkCard()"></button>
-            <button pButton [label]="'STUDENTS.DETAIL.SEND_NOTES' | translate" icon="pi pi-whatsapp" class="p-button-outlined"
-              [pTooltip]="'STUDENTS.DETAIL.SEND_NOTES_TOOLTIP' | translate"
-              (click)="openNotesDialog()"></button>
             <button pButton [label]="'STUDENTS.DETAIL.EDIT' | translate" icon="pi pi-pencil" (click)="editStudent()"></button>
-            <!-- Leaving the academy is reversible and keeps every record; the
-                 trash next to it does not. Only offered while they are still
-                 active — an inactive student is brought back from the list. -->
-            @if (canDeleteStudents() && student()?.isActive) {
-              <button pButton [label]="'STUDENTS.DETAIL.MARK_LEFT' | translate" icon="pi pi-sign-out"
-                class="p-button-outlined p-button-warning"
-                [pTooltip]="'STUDENTS.DETAIL.MARK_LEFT_TOOLTIP' | translate"
-                (click)="markStudentLeft()"></button>
-            }
-            @if (canDeleteStudents()) {
-              <button pButton [label]="'STUDENTS.DETAIL.HARD_DELETE' | translate" icon="pi pi-trash"
-                class="p-button-outlined p-button-danger"
-                [pTooltip]="'STUDENTS.DETAIL.HARD_DELETE_TOOLTIP' | translate"
-                (click)="openHardDelete()"></button>
-            }
+            <button pButton icon="pi pi-ellipsis-v" class="p-button-outlined"
+              [pTooltip]="'STUDENTS.DETAIL.MORE_ACTIONS' | translate"
+              (click)="headerMenu.toggle($event)"></button>
+            <p-menu #headerMenu [model]="headerMenuItems()" [popup]="true" appendTo="body"></p-menu>
             <button pButton [label]="'STUDENTS.DETAIL.BACK' | translate" icon="pi pi-arrow-left" class="p-button-outlined" (click)="backToList()"></button>
           </div>
         </div>
@@ -358,6 +342,9 @@
             <p-tab value="finished-master">
               <i class="pi pi-check-circle mr-2"></i>{{ 'STUDENTS.DETAIL.TAB_FINISHED' | translate }} ({{ finishedMasterEnrollments().length }})
             </p-tab>
+            <p-tab value="cancelled-master">
+              <i class="pi pi-ban mr-2"></i>{{ 'STUDENTS.DETAIL.TAB_CANCELLED' | translate }} ({{ cancelledMasterEnrollments().length }})
+            </p-tab>
           </p-tablist>
           <p-tabpanels>
             <p-tabpanel value="active-master">
@@ -369,8 +356,16 @@
               <th style="width: 3rem"></th>
               <th pSortableColumn="masterCourseName">{{ 'STUDENTS.DETAIL.COL_MASTER_COURSE' | translate }} <p-sortIcon field="masterCourseName"></p-sortIcon></th>
               <th pSortableColumn="enrollmentDate">{{ 'STUDENTS.DETAIL.COL_ENROLLMENT_DATE' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
-              <th pSortableColumn="amountPaid" class="text-right">{{ 'STUDENTS.DETAIL.COL_AMOUNT_PAID' | translate }} <p-sortIcon field="amountPaid"></p-sortIcon></th>
-              <th pSortableColumn="completedCourses">{{ 'STUDENTS.DETAIL.COL_PROGRESS' | translate }} <p-sortIcon field="completedCourses"></p-sortIcon></th>
+              <!-- A per-month bundle has no up-front amount to have "paid" and no
+                   one-off progress toward it — its money is the monthly bills. When
+                   every row is monthly, say so in the headers. -->
+              @if (activeMastersAllMonthly()) {
+                <th class="text-right">{{ 'STUDENTS.DETAIL.COL_MONTHLY_FEE' | translate }}</th>
+                <th>{{ 'STUDENTS.DETAIL.COL_MONTHLY_PAYMENTS' | translate }}</th>
+              } @else {
+                <th pSortableColumn="amountPaid" class="text-right">{{ 'STUDENTS.DETAIL.COL_AMOUNT_PAID' | translate }} <p-sortIcon field="amountPaid"></p-sortIcon></th>
+                <th pSortableColumn="completedCourses">{{ 'STUDENTS.DETAIL.COL_PROGRESS' | translate }} <p-sortIcon field="completedCourses"></p-sortIcon></th>
+              }
               <th pSortableColumn="status">{{ 'STUDENTS.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
               <th>{{ 'STUDENTS.DETAIL.COL_ACTIONS' | translate }}</th>
             </tr>
@@ -405,19 +400,37 @@
                 }
               </td>
               <td>
-                <div class="flex items-center gap-2">
-                  <p-progressBar
-                    [value]="me.totalCourses > 0 ? (me.completedCourses / me.totalCourses) * 100 : 0"
-                    [style]="{ height: '6px', width: '140px' }"
-                    [showValue]="false"
-                  ></p-progressBar>
-                  <span class="text-sm whitespace-nowrap">
-                    {{ me.completedCourses }} / {{ me.totalCourses }}
-                  </span>
-                </div>
-                <div class="text-xs text-gray-500 mt-1">
-                  {{ 'STUDENTS.DETAIL.ACTIVE' | translate }}: {{ me.activeCourses }}
-                </div>
+                @if (isMonthlyMaster(me)) {
+                  <!-- Monthly payments at a glance; the bills themselves are in
+                       the expanded row below, same as a monthly course. -->
+                  @if (getMasterMonthlyPayments(me.id).length === 0) {
+                    <span class="text-sm text-gray-400">{{ 'STUDENTS.DETAIL.NO_MONTHLY_BILLS' | translate }}</span>
+                  } @else {
+                    <p-tag
+                      [value]="'STUDENTS.DETAIL.MONTHS_PAID_OF' | translate: { paid: masterMonthsPaid(me.id), total: getMasterMonthlyPayments(me.id).length }"
+                      [severity]="masterMonthsDue(me.id) > 0 ? 'warn' : 'success'"
+                    ></p-tag>
+                    @if (masterMonthsDue(me.id) > 0) {
+                      <div class="text-xs text-red-600 mt-1">
+                        {{ 'STUDENTS.DETAIL.MONTHS_UNPAID' | translate: { count: masterMonthsDue(me.id) } }}
+                      </div>
+                    }
+                  }
+                } @else {
+                  <div class="flex items-center gap-2">
+                    <p-progressBar
+                      [value]="me.totalCourses > 0 ? (me.completedCourses / me.totalCourses) * 100 : 0"
+                      [style]="{ height: '6px', width: '140px' }"
+                      [showValue]="false"
+                    ></p-progressBar>
+                    <span class="text-sm whitespace-nowrap">
+                      {{ me.completedCourses }} / {{ me.totalCourses }}
+                    </span>
+                  </div>
+                  <div class="text-xs text-gray-500 mt-1">
+                    {{ 'STUDENTS.DETAIL.ACTIVE' | translate }}: {{ me.activeCourses }}
+                  </div>
+                }
               </td>
               <td>
                 <p-tag
@@ -666,8 +679,13 @@
                     <tr>
                       <th pSortableColumn="masterCourseName">{{ 'STUDENTS.DETAIL.COL_MASTER_COURSE' | translate }} <p-sortIcon field="masterCourseName"></p-sortIcon></th>
                       <th pSortableColumn="enrollmentDate">{{ 'STUDENTS.DETAIL.COL_ENROLLMENT_DATE' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
-                      <th pSortableColumn="amountPaid" class="text-right">{{ 'STUDENTS.DETAIL.COL_AMOUNT_PAID' | translate }} <p-sortIcon field="amountPaid"></p-sortIcon></th>
-                      <th pSortableColumn="completedCourses" class="text-center">{{ 'STUDENTS.DETAIL.COL_PROGRESS' | translate }} <p-sortIcon field="completedCourses"></p-sortIcon></th>
+                      @if (finishedMastersAllMonthly()) {
+                        <th class="text-right">{{ 'STUDENTS.DETAIL.COL_MONTHLY_FEE' | translate }}</th>
+                        <th class="text-center">{{ 'STUDENTS.DETAIL.COL_MONTHLY_PAYMENTS' | translate }}</th>
+                      } @else {
+                        <th pSortableColumn="amountPaid" class="text-right">{{ 'STUDENTS.DETAIL.COL_AMOUNT_PAID' | translate }} <p-sortIcon field="amountPaid"></p-sortIcon></th>
+                        <th pSortableColumn="completedCourses" class="text-center">{{ 'STUDENTS.DETAIL.COL_PROGRESS' | translate }} <p-sortIcon field="completedCourses"></p-sortIcon></th>
+                      }
                       <th pSortableColumn="status">{{ 'STUDENTS.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
                       <th>{{ 'STUDENTS.DETAIL.COL_ACTIONS' | translate }}</th>
                     </tr>
@@ -685,20 +703,35 @@
                 } @else {
                   <div class="font-semibold">{{ me.amountPaid | amount }} / {{ me.finalPrice | amount }}</div>
                 }
-                        @if ((me.amountPaid || 0) < me.finalPrice && (me.totalRefunded || 0) === 0) {
+                        <!-- finalPrice on a monthly bundle is the monthly fee, not a
+                             balance — "remaining" only means something one-time. -->
+                        @if (!isMonthlyMaster(me) && (me.amountPaid || 0) < me.finalPrice && (me.totalRefunded || 0) === 0) {
                           <div class="text-xs text-red-600 font-medium">
                             -{{ (me.finalPrice - me.amountPaid) | amount }} {{ 'STUDENTS.DETAIL.REMAINING' | translate }}
                           </div>
                         }
                       </td>
                       <td class="text-center">
-                        <p-tag [value]="me.completedCourses + ' / ' + me.totalCourses" severity="success"></p-tag>
+                        @if (isMonthlyMaster(me)) {
+                          @if (getMasterMonthlyPayments(me.id).length === 0) {
+                            <span class="text-sm text-gray-400">{{ 'STUDENTS.DETAIL.NO_MONTHLY_BILLS' | translate }}</span>
+                          } @else {
+                            <p-tag
+                              [value]="'STUDENTS.DETAIL.MONTHS_PAID_OF' | translate: { paid: masterMonthsPaid(me.id), total: getMasterMonthlyPayments(me.id).length }"
+                              [severity]="masterMonthsDue(me.id) > 0 ? 'warn' : 'success'"
+                            ></p-tag>
+                          }
+                        } @else {
+                          <p-tag [value]="me.completedCourses + ' / ' + me.totalCourses" severity="success"></p-tag>
+                        }
                       </td>
                       <td>
                         <p-tag [value]="statusLabel(me.status)" severity="info"></p-tag>
                       </td>
                       <td>
-                        @if ((me.amountPaid || 0) < me.finalPrice && (me.totalRefunded || 0) === 0) {
+                        <!-- A per-month bundle is paid through its monthly bills,
+                             never through the one-time payment dialog. -->
+                        @if (!isMonthlyMaster(me) && (me.amountPaid || 0) < me.finalPrice && (me.totalRefunded || 0) === 0) {
                           <p-button
                             icon="pi pi-wallet"
                             [rounded]="true"
@@ -708,6 +741,66 @@
                             pTooltip="Record payment"
                           ></p-button>
                         }
+                      </td>
+                    </tr>
+                  </ng-template>
+                </p-table>
+              }
+            </p-tabpanel>
+            <p-tabpanel value="cancelled-master">
+              @if (cancelledMasterEnrollments().length === 0) {
+                <div class="text-center py-6 text-gray-500">{{ 'STUDENTS.DETAIL.NO_CANCELLED_MASTER' | translate }}</div>
+              } @else {
+                <p-table [value]="cancelledMasterEnrollments()" responsiveLayout="scroll" dataKey="id">
+                  <ng-template pTemplate="header">
+                    <tr>
+                      <th pSortableColumn="masterCourseName">{{ 'STUDENTS.DETAIL.COL_MASTER_COURSE' | translate }} <p-sortIcon field="masterCourseName"></p-sortIcon></th>
+                      <th pSortableColumn="enrollmentDate">{{ 'STUDENTS.DETAIL.COL_ENROLLMENT_DATE' | translate }} <p-sortIcon field="enrollmentDate"></p-sortIcon></th>
+                      @if (cancelledMastersAllMonthly()) {
+                        <th class="text-right">{{ 'STUDENTS.DETAIL.COL_MONTHLY_FEE' | translate }}</th>
+                        <th class="text-center">{{ 'STUDENTS.DETAIL.COL_MONTHLY_PAYMENTS' | translate }}</th>
+                      } @else {
+                        <th pSortableColumn="amountPaid" class="text-right">{{ 'STUDENTS.DETAIL.COL_AMOUNT_PAID' | translate }} <p-sortIcon field="amountPaid"></p-sortIcon></th>
+                        <th pSortableColumn="completedCourses" class="text-center">{{ 'STUDENTS.DETAIL.COL_PROGRESS' | translate }} <p-sortIcon field="completedCourses"></p-sortIcon></th>
+                      }
+                      <th pSortableColumn="status">{{ 'STUDENTS.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
+                    </tr>
+                  </ng-template>
+                  <ng-template pTemplate="body" let-me>
+                    <tr>
+                      <td>
+                        <div class="font-medium">{{ me.masterCourseName }}</div>
+                      </td>
+                      <td>{{ me.enrollmentDate | date:'mediumDate' }}</td>
+                      <td class="text-right">
+                        @if (isMonthlyMaster(me)) {
+                          <div class="font-semibold">{{ me.finalPrice | amount }}</div>
+                          <div class="text-xs text-amber-600 mt-0.5">{{ 'STUDENTS.DETAIL.MASTER_PER_MONTH' | translate }}</div>
+                        } @else {
+                          <div class="font-semibold">{{ me.amountPaid | amount }} / {{ me.finalPrice | amount }}</div>
+                        }
+                        @if ((me.totalRefunded || 0) > 0) {
+                          <div class="text-xs text-orange-600 mt-0.5">
+                            {{ 'STUDENTS.DETAIL.REFUNDED' | translate }}: {{ me.totalRefunded | amount }}
+                          </div>
+                        }
+                      </td>
+                      <td class="text-center">
+                        @if (isMonthlyMaster(me)) {
+                          @if (getMasterMonthlyPayments(me.id).length === 0) {
+                            <span class="text-sm text-gray-400">{{ 'STUDENTS.DETAIL.NO_MONTHLY_BILLS' | translate }}</span>
+                          } @else {
+                            <p-tag
+                              [value]="'STUDENTS.DETAIL.MONTHS_PAID_OF' | translate: { paid: masterMonthsPaid(me.id), total: getMasterMonthlyPayments(me.id).length }"
+                              [severity]="masterMonthsDue(me.id) > 0 ? 'warn' : 'success'"
+                            ></p-tag>
+                          }
+                        } @else {
+                          <p-tag [value]="me.completedCourses + ' / ' + me.totalCourses" severity="secondary"></p-tag>
+                        }
+                      </td>
+                      <td>
+                        <p-tag [value]="statusLabel(me.status)" severity="danger"></p-tag>
                       </td>
                     </tr>
                   </ng-template>

@@ -169,6 +169,10 @@ export async function extractTenantContext(authHeader?: string): Promise<TenantC
     } else if (subscription.status === 'MONTHLY' || subscription.status === 'ANNUAL') {
       const end = subscription.subscription_end_date?.toISOString?.()?.split('T')[0] ?? subscription.subscription_end_date;
       if (end && end < today) throw new Error('Subscription expired');
+    } else if (subscription.status === 'EXPIRED') {
+      // A tenant parked from the admin console. Not date-based — the flag
+      // itself is the lock, and activate is what lifts it.
+      throw new Error('Subscription expired');
     }
   }
 

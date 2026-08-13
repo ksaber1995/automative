@@ -13,6 +13,7 @@ export interface AvailableCourse {
   name: string;
   code: string;
   price: number;
+  paymentType: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION';
 }
 
 @Injectable({ providedIn: 'root' })

@@ -94,6 +94,27 @@ export async function ensureAutoManageSessionsColumn(): Promise<void> {
 }
 
 /**
+ * Opt-in (migration 092): auto-confirm a PER_SESSION charge raised while taking
+ * attendance, instead of leaving it PENDING for a manual click. Off by default —
+ * unlike auto-managed sessions, a company only wants this once it has actually
+ * decided cash changes hands at the door. Sticky in either direction once set.
+ */
+let autoConfirmSessionPaymentsColumnInitPromise: Promise<void> | null = null;
+export async function ensureAutoConfirmSessionPaymentsColumn(): Promise<void> {
+  if (!autoConfirmSessionPaymentsColumnInitPromise) {
+    autoConfirmSessionPaymentsColumnInitPromise = (async () => {
+      try {
+        await query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS auto_confirm_session_payments BOOLEAN NOT NULL DEFAULT FALSE`);
+      } catch (e) {
+        autoConfirmSessionPaymentsColumnInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return autoConfirmSessionPaymentsColumnInitPromise;
+}
+
+/**
  * How many free (TRIAL) sessions one student may ever attend, company-wide.
  *
  * 0 means unlimited, which is what every existing tenant gets — a free session
@@ -442,10 +463,10 @@ export const companiesRoutes = {
 
   getSettings: async ({ headers }: { headers: { authorization: string } }) => {
     try {
-      await Promise.all([ensureAutoManageSessionsColumn(), ensureHomeworkGradingColumn(), ensureFreeTrialLimitColumn()]);
+      await Promise.all([ensureAutoManageSessionsColumn(), ensureAutoConfirmSessionPaymentsColumn(), ensureHomeworkGradingColumn(), ensureFreeTrialLimitColumn()]);
       const context = await extractTenantContext(headers.authorization);
       const company = await queryOne(
-        'SELECT id, name, global_expense_allocation, auto_manage_sessions, homework_grading_mode, free_session_trial_limit FROM companies WHERE id = $1',
+        'SELECT id, name, global_expense_allocation, auto_manage_sessions, auto_confirm_session_payments, homework_grading_mode, free_session_trial_limit FROM companies WHERE id = $1',
         [context.companyId]
       );
       if (!company) {
@@ -458,6 +479,7 @@ export const companiesRoutes = {
           name: company.name,
           globalExpenseAllocation: company.global_expense_allocation || 'OVERHEAD',
           autoManageSessions: company.auto_manage_sessions === true,
+          autoConfirmSessionPayments: company.auto_confirm_session_payments === true,
           homeworkGradingMode: company.homework_grading_mode === 'RATING' ? 'RATING' : 'NUMERIC',
           freeSessionTrialLimit: parseInt(company.free_session_trial_limit ?? 0, 10) || 0,
         },
@@ -468,9 +490,9 @@ export const companiesRoutes = {
     }
   },
 
-  updateSettings: async ({ body, headers }: { body: { globalExpenseAllocation?: string; autoManageSessions?: boolean; homeworkGradingMode?: string; freeSessionTrialLimit?: number }; headers: { authorization: string } }) => {
+  updateSettings: async ({ body, headers }: { body: { globalExpenseAllocation?: string; autoManageSessions?: boolean; autoConfirmSessionPayments?: boolean; homeworkGradingMode?: string; freeSessionTrialLimit?: number }; headers: { authorization: string } }) => {
     try {
-      await Promise.all([ensureAutoManageSessionsColumn(), ensureHomeworkGradingColumn(), ensureFreeTrialLimitColumn()]);
+      await Promise.all([ensureAutoManageSessionsColumn(), ensureAutoConfirmSessionPaymentsColumn(), ensureHomeworkGradingColumn(), ensureFreeTrialLimitColumn()]);
       const context = await extractTenantContext(headers.authorization);
 
       if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
@@ -483,6 +505,9 @@ export const companiesRoutes = {
       }
       if (body.autoManageSessions !== undefined) {
         updateData.auto_manage_sessions = body.autoManageSessions === true;
+      }
+      if (body.autoConfirmSessionPayments !== undefined) {
+        updateData.auto_confirm_session_payments = body.autoConfirmSessionPayments === true;
       }
       if (body.homeworkGradingMode !== undefined) {
         if (!HOMEWORK_GRADING_MODES.includes(body.homeworkGradingMode as any)) {
@@ -512,6 +537,7 @@ export const companiesRoutes = {
           name: company.name,
           globalExpenseAllocation: company.global_expense_allocation || 'OVERHEAD',
           autoManageSessions: company.auto_manage_sessions === true,
+          autoConfirmSessionPayments: company.auto_confirm_session_payments === true,
           homeworkGradingMode: company.homework_grading_mode === 'RATING' ? 'RATING' : 'NUMERIC',
           freeSessionTrialLimit: parseInt(company.free_session_trial_limit ?? 0, 10) || 0,
         },

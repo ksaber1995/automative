@@ -10,7 +10,8 @@ import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { DialogModule } from 'primeng/dialog';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
-import { ConfirmationService } from 'primeng/api';
+import { MenuModule } from 'primeng/menu';
+import { ConfirmationService, MenuItem } from 'primeng/api';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
 import { DatePickerModule } from 'primeng/datepicker';
@@ -23,7 +24,10 @@ import { TabsModule, Tab, TabList, TabPanel, TabPanels } from 'primeng/tabs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { StudentQrDialogComponent } from '../student-qr/student-qr-dialog.component';
-import { openWhatsappChat } from '../../../core/utils/whatsapp.util';
+import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
+import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
+import { TelegramService } from '../../telegram/telegram.service';
+import { LanguageService } from '../../../core/services/language.service';
 import { GlobalScanService } from '../../../core/services/global-scan.service';
 import { QrCard, QrCardService } from '../../qr-cards/qr-card.service';
 import { serialLabel } from '../../qr-cards/qr-cards.component';
@@ -72,6 +76,7 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
     TooltipModule,
     DialogModule,
     ConfirmDialogModule,
+    MenuModule,
     InputNumberModule,
     // The link-card field is a plain pInputText (it takes a typed serial or a
     // scanned token) — without this import the directive is inert and it renders
@@ -120,6 +125,9 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private confirmationService = inject(ConfirmationService);
   private destroyRef = inject(DestroyRef);
+  private templatesSvc = inject(WhatsappTemplatesService);
+  private telegramSvc = inject(TelegramService);
+  private languageService = inject(LanguageService);
 
   /** TEACHER companies don't use master courses, so hide that whole section. */
   isTeacher = computed(() => this.authService.currentUser()?.companyType === 'TEACHER');
@@ -169,6 +177,55 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
       this.notificationService.error(this.translate.instant('STUDENTS.DETAIL.SEND_NOTES_NO_PHONE'));
     }
   }
+
+  // ── Send follow-up to the parent, straight from the header ────────────────
+  // The same action the QR dialog offers, surfaced on the main screen so staff
+  // don't have to open the QR view to reach it.
+  /** Telegram connect link, pre-fetched on load so window.open stays inside the click gesture. */
+  telegramParentUrl = signal<string | null>(null);
+
+  sendFollowupToParent(): void {
+    const s = this.student();
+    if (!s?.qrToken) return;
+    let text = renderWhatsappTemplate(this.templatesSvc.get('FOLLOWUP_PARENT'), {
+      studentName: s.name,
+      parentName: s.parentName || s.name,
+      academyName: this.authService.getCompanyName(),
+      link: `${window.location.origin}/p/s/${s.qrToken}`,
+    });
+    const tg = this.telegramParentUrl();
+    if (tg) text += '\n\n' + this.translate.instant('WHATSAPP.TELEGRAM_CONNECT_LINE', { link: tg });
+    if (!openWhatsappChat(s.parentPhone, text)) {
+      this.notificationService.error(this.translate.instant('STUDENT_QR.NO_PARENT_PHONE'));
+    }
+  }
+
+  /**
+   * Secondary header actions, folded behind one "more" button so the header
+   * stays scannable. The link-card entry is deliberately not gated on
+   * qrCardsEnabled: an admin can hand cards to a teacher who cannot generate
+   * their own, and those cards are worthless if there is no way to link them —
+   * the API scopes the lookup to the caller's company. Mark-left is offered
+   * only while the student is active (it's the reversible exit); the trash
+   * next to it is not reversible, hence both sit behind canDeleteStudents.
+   */
+  headerMenuItems = computed<MenuItem[]>(() => {
+    this.languageService.currentLang(); // rebuild labels when the language flips
+    const s = this.student();
+    const items: MenuItem[] = [
+      { label: this.translate.instant('QR_CARDS.LINK_BUTTON'), icon: 'pi pi-id-card', command: () => this.openLinkCard() },
+      { label: this.translate.instant('STUDENTS.DETAIL.SEND_NOTES'), icon: 'pi pi-whatsapp', command: () => this.openNotesDialog() },
+    ];
+    if (this.canDeleteStudents()) {
+      items.push({ separator: true });
+      if (s?.isActive) {
+        items.push({ label: this.translate.instant('STUDENTS.DETAIL.MARK_LEFT'), icon: 'pi pi-sign-out', command: () => this.markStudentLeft() });
+      }
+      items.push({ label: this.translate.instant('STUDENTS.DETAIL.HARD_DELETE'), icon: 'pi pi-trash', styleClass: 'text-red-600', command: () => this.openHardDelete() });
+    }
+    return items;
+  });
+
   enrollments = signal<Enrollment[]>([]);
   masterEnrollments = signal<MasterEnrollmentProgress[]>([]);
   classDoneMap = signal<Map<string, boolean>>(new Map());
@@ -198,8 +255,27 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
   tabEnrollments = computed(() =>
     this.enrollmentTab() === 'withdrawn-courses' ? this.withdrawnEnrollments() : this.activeEnrollments()
   );
-  activeMasterEnrollments = computed(() => this.masterEnrollments().filter(m => m.status !== 'COMPLETED'));
+  activeMasterEnrollments = computed(() => this.masterEnrollments().filter(m => m.status !== 'COMPLETED' && m.status !== 'CANCELLED'));
   finishedMasterEnrollments = computed(() => this.masterEnrollments().filter(m => m.status === 'COMPLETED'));
+  /** A cancelled subscription is history, not a live bundle — it gets its own tab. */
+  cancelledMasterEnrollments = computed(() => this.masterEnrollments().filter(m => m.status === 'CANCELLED'));
+  /**
+   * Every bundle in the tab is billed per month. Only then can the table swap
+   * its Amount Paid / Progress headers for monthly-payment ones — a mixed list
+   * still needs the original columns for its one-time rows.
+   */
+  activeMastersAllMonthly = computed(() =>
+    this.activeMasterEnrollments().length > 0 &&
+    this.activeMasterEnrollments().every(m => this.isMonthlyMaster(m))
+  );
+  finishedMastersAllMonthly = computed(() =>
+    this.finishedMasterEnrollments().length > 0 &&
+    this.finishedMasterEnrollments().every(m => this.isMonthlyMaster(m))
+  );
+  cancelledMastersAllMonthly = computed(() =>
+    this.cancelledMasterEnrollments().length > 0 &&
+    this.cancelledMasterEnrollments().every(m => this.isMonthlyMaster(m))
+  );
   courses = new Map<string, Course>();
   loading = signal(true);
   studentId: string | null = null;
@@ -469,6 +545,13 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
 
   private async loadStudentData(id: string) {
     this.resetStudentState();
+    // Warm the click-to-chat template + Telegram link so the header follow-up
+    // send stays inside the click gesture (no popup block, no empty body).
+    this.templatesSvc.load().subscribe({ error: () => {} });
+    this.telegramSvc.getStudentLink(id).subscribe({
+      next: (r) => this.telegramParentUrl.set(r.botConfigured ? r.parentUrl : null),
+      error: () => this.telegramParentUrl.set(null),
+    });
     await this.loadCourses();
     this.loadClassesForDoneMap();
     this.loadStudent(id);
@@ -487,9 +570,11 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
    *  doesn't linger when navigating to a new id on the same component. */
   private resetStudentState() {
     this.student.set(null);
+    this.telegramParentUrl.set(null);
     this.enrollments.set([]);
     this.masterEnrollments.set([]);
     this.monthlyByEnrollment.set(new Map());
+    this.monthlyByMasterEnrollment.set(new Map());
     this.sessionPaymentsByEnrollment.set(new Map());
     this.sessionPackagesByEnrollment.set(new Map());
     this.paymentHistoryMap.set(new Map());
@@ -548,7 +633,20 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
 
   loadMasterEnrollments(id: string) {
     this.masterEnrollmentService.getByStudent(id).subscribe({
-      next: (rows) => this.masterEnrollments.set(rows),
+      next: (rows) => {
+        this.masterEnrollments.set(rows);
+        // A per-month bundle's money lives in its monthly bills, so surface
+        // them without a click — the same way monthly course enrollments
+        // auto-expand. Programmatic expansion doesn't fire onRowExpand, so
+        // trigger the same loads it would.
+        rows.forEach(me => {
+          if (this.isMonthlyMaster(me) && me.status !== 'COMPLETED' && me.status !== 'CANCELLED') {
+            this.expandedMasterRows[me.id] = true;
+            this.onMasterRowExpand({ data: me });
+          }
+        });
+        this.expandedMasterRows = { ...this.expandedMasterRows };
+      },
     });
   }
 
@@ -717,6 +815,15 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
 
   getMasterMonthlyPayments(masterEnrollmentId: string): MonthlyPaymentWithDetails[] {
     return this.monthlyByMasterEnrollment().get(masterEnrollmentId) || [];
+  }
+
+  /** Settled months out of the visible bills — the monthly analogue of course progress. */
+  masterMonthsPaid(masterEnrollmentId: string): number {
+    return this.getMasterMonthlyPayments(masterEnrollmentId).filter(m => m.paymentStatus === 'PAID').length;
+  }
+
+  masterMonthsDue(masterEnrollmentId: string): number {
+    return this.getMasterMonthlyPayments(masterEnrollmentId).filter(m => m.paymentStatus !== 'PAID').length;
   }
 
   /** "March 2026" style label for a billing period. */

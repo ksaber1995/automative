@@ -26,7 +26,7 @@ export interface SessionAttendanceStudent {
   substitutedSessionDate?: string | null;
   isEnrolled?: boolean;
   /** PER_SESSION: the student's existing charge for this session (null if none). */
-  charge?: { status: string; amountDue: number; amountPaid: number } | null;
+  charge?: { id: string; status: string; amountDue: number; amountPaid: number } | null;
   /** How many of this class's most recent ended sessions the student missed in a row. */
   absentStreak?: number | null;
   /** Missed sessions inside the session's own month — scattered ones included,

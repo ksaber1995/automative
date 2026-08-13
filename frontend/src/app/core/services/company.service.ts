@@ -18,6 +18,9 @@ export interface CompanySettings {
   globalExpenseAllocation: GlobalExpenseAllocation;
   /** Opt-in: auto start/end sessions on their scheduled times (client-polled). */
   autoManageSessions: boolean;
+  /** Opt-in: a PER_SESSION charge raised while taking attendance is confirmed
+   *  PAID immediately, instead of sitting PENDING for a manual click. */
+  autoConfirmSessionPayments: boolean;
   homeworkGradingMode: HomeworkGradingMode;
   /** Free (trial) sessions one student may ever attend. 0 = unlimited. */
   freeSessionTrialLimit: number;

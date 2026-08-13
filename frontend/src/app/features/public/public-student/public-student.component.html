@@ -457,5 +457,26 @@
       <p class="text-center text-xs text-gray-400 mt-6">{{ 'PUBLIC_PROFILE.POWERED_BY' | translate: { name: p.student.academyName } }}</p>
     }
 
+    <!-- Netrofit footer — outside the @if chain so every state (profile,
+         loading, error, unassigned card) carries the product's contacts. -->
+    <footer class="mt-8 pt-5 pb-6 border-t border-gray-200 text-center">
+      <div class="text-base font-bold text-blue-700">Netrofit</div>
+      <div class="text-xs text-gray-500 mt-1">{{ 'PUBLIC_PROFILE.NETROFIT_TAGLINE' | translate }}</div>
+      <div class="flex items-center justify-center gap-5 mt-3 flex-wrap">
+        <a href="https://netrofit.com" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-800">
+          <i class="pi pi-globe"></i><span dir="ltr">netrofit.com</span>
+        </a>
+        <a href="https://wa.me/201515185099" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 hover:text-green-700">
+          <i class="pi pi-whatsapp"></i><span dir="ltr">01515185099</span>
+        </a>
+        <a href="https://www.facebook.com/profile.php?id=61560518472528" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700">
+          <i class="pi pi-facebook"></i>{{ 'PUBLIC_PROFILE.NETROFIT_FACEBOOK' | translate }}
+        </a>
+      </div>
+    </footer>
+
   </div>
 </div>

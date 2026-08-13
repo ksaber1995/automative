@@ -646,23 +646,19 @@ export const adminSecretRoutes = {
   },
   /**
    * POST /api/karim-admin-secret/companies/:companyId/deactivate
-   * The counterpart of activate: park a tenant who has stopped paying. Sets the
-   * subscription EXPIRED and ends it today, so the app's own subscription check
-   * locks them out. Nothing is deleted — activate puts them straight back.
+   * The counterpart of activate: park a tenant who has stopped paying. Only the
+   * status changes — the paid-through date stays untouched so activate restores
+   * exactly what they had. EXPIRED itself is the lock: login and every
+   * authenticated request reject it (auth.ts / tenant-isolation.ts).
    */
   deactivateSubscription: async ({ params }: { params: { companyId: string } }) => {
     try {
       const sub = await queryOne<any>('SELECT id FROM subscriptions WHERE company_id = $1', [params.companyId]);
       if (!sub) return { status: 404 as const, body: { message: 'Subscription not found for this company' } };
 
-      const today = new Date().toISOString().split('T')[0];
       await query(
-        `UPDATE subscriptions
-            SET status = 'EXPIRED',
-                subscription_end_date = LEAST(COALESCE(subscription_end_date, $2::date), $2::date),
-                updated_at = NOW()
-          WHERE id = $1`,
-        [sub.id, today],
+        `UPDATE subscriptions SET status = 'EXPIRED', updated_at = NOW() WHERE id = $1`,
+        [sub.id],
       );
 
       return { status: 200 as const, body: { success: true, subscription_type: 'EXPIRED' } };

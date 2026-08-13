@@ -194,8 +194,22 @@ export const masterCoursesRoutes = {
         return apiError(403, 'ERRORS.MASTER_COURSES.ACCESS_DENIED', 'Access denied to this master course');
       }
 
+      // sessions_per_week: how often the course actually meets, from its running
+      // classes' schedules (class_day_times is the source of truth; days_of_week
+      // is the legacy fallback). A per-session course's price only becomes
+      // comparable to a monthly bundle fee once multiplied by this — NULL when no
+      // class is scheduled, which the UI treats as "cannot estimate" rather than 0.
       const rows = await query(
-        `SELECT c.*, b.name AS branch_name
+        `SELECT c.*, b.name AS branch_name,
+                (SELECT MAX(
+                   COALESCE(
+                     NULLIF((SELECT COUNT(*)::int FROM class_day_times cdt WHERE cdt.class_id = cl.id), 0),
+                     COALESCE(array_length(string_to_array(NULLIF(cl.days_of_week, ''), ','), 1), 0)
+                   )
+                 )
+                 FROM classes cl
+                 WHERE cl.course_id = c.id AND cl.is_active = true AND cl.is_finished = false
+                ) AS sessions_per_week
          FROM courses c
          JOIN master_course_courses mcc ON mcc.course_id = c.id AND mcc.master_course_id = $1
          LEFT JOIN branches b ON b.id = c.branch_id
@@ -212,6 +226,9 @@ export const masterCoursesRoutes = {
           branchName: r.branch_name,
           name: r.name,
           price: parseFloat(r.price),
+          paymentType: r.payment_type,
+          sessionsPerWeek:
+            r.sessions_per_week == null ? null : parseInt(r.sessions_per_week, 10) || null,
           isActive: r.is_active,
         })),
       };
@@ -542,6 +559,7 @@ export const masterCoursesRoutes = {
           id: r.id,
           name: r.name,
           price: parseFloat(r.price),
+          paymentType: r.payment_type,
         })),
       };
     } catch (error: any) {

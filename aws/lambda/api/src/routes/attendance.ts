@@ -453,7 +453,7 @@ export const attendanceRoutes = {
 
       // PER_SESSION courses: attach each student's existing session charge so the
       // UI can warn (and show paid amount) before un-checking deletes it.
-      const chargeByStudent = new Map<string, { status: string; amountDue: number; amountPaid: number }>();
+      const chargeByStudent = new Map<string, { id: string; status: string; amountDue: number; amountPaid: number }>();
       const courseType = await queryOne<any>(
         `SELECT co.payment_type FROM classes cl JOIN courses co ON cl.course_id = co.id WHERE cl.id = $1`,
         [session.class_id]
@@ -461,12 +461,13 @@ export const attendanceRoutes = {
       if (courseType?.payment_type === 'PER_SESSION') {
         await ensurePerSessionSchema();
         const charges = await query<any>(
-          `SELECT student_id, payment_status, amount_due, amount_paid
+          `SELECT id, student_id, payment_status, amount_due, amount_paid
            FROM session_payments WHERE session_id = $1 AND company_id = $2`,
           [params.sessionId, context.companyId]
         );
         for (const c of charges) {
           chargeByStudent.set(c.student_id, {
+            id: c.id,
             status: c.payment_status,
             amountDue: parseFloat(c.amount_due || 0),
             amountPaid: parseFloat(c.amount_paid || 0),

@@ -133,11 +133,19 @@ export async function ensureFreeSessionSchema(): Promise<void> {
 }
 
 /**
- * How long a running session is allowed to overrun its scheduled end before the
- * automation closes it. A lesson that runs a few minutes over is normal, and
- * attendance scanned during the overrun must still land on the right session.
+ * How many times its own scheduled length a running session may overrun before
+ * the automation treats it as forgotten and closes it — a 2-hour class still
+ * open after 6 hours is clearly not a lesson someone is still sitting through.
+ * Applies to EVERY open session, not just ones the automation itself started:
+ * a tenant who opened it by hand and walked away is exactly the case this
+ * exists to catch. Closing still stamps the lesson's SCHEDULED end time, never
+ * the moment the automation happened to notice.
  */
-const AUTO_END_GRACE_MINUTES = 15;
+const AUTO_END_OVERRUN_MULTIPLE = 3;
+
+/** Stamped when a session is closed for running well past its scheduled length
+ *  (matched the timetable, same start day, but blew past the overrun multiple). */
+const AUTO_END_OVERRUN_NOTE = 'Auto-closed after running well past its scheduled length; stamped with the lesson\'s scheduled end time.';
 
 /**
  * Stamped on a session the automation had to close with nobody on record — its
@@ -733,24 +741,26 @@ export const sessionsRoutes = {
       if (adoptBranch) adoptSql += ` AND ${adoptBranch}`;
       await query(adoptSql, adoptParams);
 
-      // ── Auto-end: running sessions whose scheduled end has passed ─────────────
+      // ── Auto-end: running sessions overdue by AUTO_END_OVERRUN_MULTIPLE ───────
       //
-      // Every session is judged against ITS OWN start day, not today. The previous
-      // version required `start_date::date = today` and looked the schedule up
-      // under TODAY's weekday, which meant a session that survived midnight could
-      // never be closed by the automation again — a Tuesday lesson stayed open
-      // into the following Sunday (121 hours) because the poll only ever runs
-      // while a browser tab is open, and nobody has one at 22:00.
+      // Judged purely on elapsed time vs. the lesson's OWN scheduled length, never
+      // on today's date or which weekday it is now — a session that survived
+      // midnight is exactly the "forgot to close it" case this exists to catch.
+      // And it now applies to every open session, not only ones the automation
+      // itself started: a tenant who opened one by hand and walked away is the
+      // same problem. A lesson running a little over is normal (attendance
+      // scanned mid-overrun must still land on it); one running 3x its own
+      // scheduled length is not, whatever opened it.
       //
       // `off` is the academy's offset from UTC, derived from the clock the client
-      // just sent us: start_date is UTC while the schedule and localTime are local
+      // just sent us: start_date is UTC while the schedule/localTime are local
       // wall-clock, so every comparison happens in local terms by adding it.
       const endParams: any[] = [context.companyId, localDate, localTime];
-      let endSql = `
-        WITH off AS (SELECT (($2::date + $3::time) - NOW()) AS o)
-        SELECT s.id, s.notes, COALESCE(c.instructor_id, co.instructor_id) AS instructor_id,
+      let candidatesSql = `
+        SELECT s.id, s.notes, s.start_date,
+               COALESCE(c.instructor_id, co.instructor_id) AS instructor_id,
                -- Stamp the moment the lesson was SCHEDULED to end, never NOW():
-               -- closing a Tuesday class on Sunday must not log a 121-hour lesson.
+               -- closing a Tuesday class on Sunday must not log a multi-day lesson.
                -- GREATEST guards the odd case of a session adopted after its own
                -- end time, which would otherwise end before it started.
                GREATEST(
@@ -760,48 +770,46 @@ export const sessionsRoutes = {
                  ),
                  s.start_date
                ) AS end_at,
+               -- This lesson's own scheduled length: the day-specific window when
+               -- one matched, else the class's usual length, else a 2-hour default.
+               GREATEST(
+                 COALESCE(sched.end_time - sched.start_time, usual.dur, interval '2 hours'),
+                 interval '15 minutes'
+               ) AS sched_duration,
                (sched.end_time IS NULL) AS unscheduled,
                ((s.start_date + off.o)::date < $2::date) AS from_earlier_day
         FROM sessions s
         JOIN classes c ON c.id = s.class_id
         JOIN courses co ON co.id = c.course_id
-        CROSS JOIN off
+        CROSS JOIN (SELECT (($2::date + $3::time) - NOW()) AS o) off
         -- The class's schedule for the weekday the session actually started on.
         LEFT JOIN LATERAL (
-          SELECT cdt.end_time FROM class_day_times cdt
+          SELECT cdt.start_time, cdt.end_time FROM class_day_times cdt
           WHERE cdt.class_id = c.id
             AND cdt.day_of_week = TRIM(to_char(s.start_date + off.o, 'DAY'))
           ORDER BY cdt.end_time DESC LIMIT 1
         ) sched ON TRUE
-        -- Fallback only: this class's usual lesson length, for the backstop below.
+        -- Fallback only: this class's usual lesson length, when no exact-day match.
         LEFT JOIN LATERAL (
           SELECT (cdt2.end_time - cdt2.start_time) AS dur FROM class_day_times cdt2
           WHERE cdt2.class_id = c.id ORDER BY cdt2.end_time DESC LIMIT 1
         ) usual ON TRUE
         WHERE s.company_id = $1 AND s.end_date IS NULL AND s.started = true
-          -- ONLY sessions the automation owns (started or adopted). A session a
-          -- human opened outside its schedule is a human's to close.
-          AND s.auto_started = true
-          AND (
-            (sched.end_time IS NOT NULL AND (
-              -- Started on an earlier local day: overdue whatever the time is now.
-              ((s.start_date + off.o)::date < $2::date)
-              -- Started today: past that day's end time, plus a grace period. A
-              -- lesson running a few minutes over is normal, and attendance
-              -- scanned during the overrun must still land on this session.
-              OR ((s.start_date + off.o)::date = $2::date
-                  AND EXTRACT(EPOCH FROM ($3::time - sched.end_time)) >= ${AUTO_END_GRACE_MINUTES * 60})
-            ))
-            -- Backstop: no schedule row matches its start day at all (the class's
-            -- timetable changed after it opened), so nothing above can ever judge
-            -- it. Left alone it would stay open for ever, which is the one outcome
-            -- this automation exists to prevent.
-            OR (sched.end_time IS NULL
-                AND s.start_date < NOW() - interval '${AUTO_END_MAX_OPEN_HOURS} hours')
-          )
       `;
       const endBranch = appendBranchSqlFilter(context, endParams, 's.branch_id');
-      if (endBranch) endSql += ` AND ${endBranch}`;
+      if (endBranch) candidatesSql += ` AND ${endBranch}`;
+      const endSql = `
+        WITH candidates AS (${candidatesSql})
+        SELECT id, notes, instructor_id, end_at, unscheduled, from_earlier_day
+        FROM candidates
+        -- Forgotten once open AUTO_END_OVERRUN_MULTIPLE times its own scheduled
+        -- length, capped at AUTO_END_MAX_OPEN_HOURS so an unusually long scheduled
+        -- length (an all-day workshop) still can't stay open forever.
+        WHERE (NOW() - start_date) >= LEAST(
+          sched_duration * ${AUTO_END_OVERRUN_MULTIPLE},
+          interval '${AUTO_END_MAX_OPEN_HOURS} hours'
+        )
+      `;
       const overdue = await query<any>(endSql, endParams);
 
       let ended = 0;
@@ -843,6 +851,7 @@ export const sessionsRoutes = {
         // a 3-day-old closure isn't mistaken for a lesson someone sat through.
         if (s.unscheduled) extraNotes.push(AUTO_END_BACKSTOP_NOTE);
         else if (s.from_earlier_day) extraNotes.push(AUTO_END_LATE_NOTE);
+        else extraNotes.push(AUTO_END_OVERRUN_NOTE);
         if (extraNotes.length > 0) {
           changes.notes = [s.notes, ...extraNotes].filter(Boolean).join(' ').trim();
         }

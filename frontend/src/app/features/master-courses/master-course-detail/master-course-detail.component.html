@@ -65,16 +65,24 @@
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
       <p-card>
         <div class="text-sm text-gray-500">{{ 'MASTER_COURSES.DETAIL.BUNDLE_PRICE' | translate }}</div>
-        <div class="text-2xl font-bold">{{ m.defaultPrice | amount }}</div>
+        <div class="text-2xl font-bold">
+          {{ m.defaultPrice | amount }}
+          @if (m.paymentType === 'MONTHLY_SUBSCRIPTION') {
+            <span class="text-sm font-normal text-gray-500">{{ 'MASTER_COURSES.DETAIL.PER_MONTH' | translate }}</span>
+          }
+        </div>
       </p-card>
       <p-card>
         <div class="text-sm text-gray-500">{{ 'MASTER_COURSES.DETAIL.SUM_OF_COURSES' | translate }}</div>
-        <div class="text-2xl font-bold">{{ sumOfLinked() | amount }}</div>
+        <div class="text-2xl font-bold">{{ isEstimated() ? '≈ ' : '' }}{{ sumOfLinked() | amount }}</div>
+        @if (isEstimated()) {
+          <div class="text-xs text-gray-500 mt-1">{{ 'MASTER_COURSES.DETAIL.ESTIMATE_NOTE' | translate }}</div>
+        }
       </p-card>
       <p-card>
         <div class="text-sm text-gray-500">{{ 'MASTER_COURSES.DETAIL.SAVINGS' | translate }}</div>
         <div class="text-2xl font-bold" [class.text-green-700]="savings() >= 0" [class.text-red-700]="savings() < 0">
-          {{ savings() | amount }}
+          {{ isEstimated() ? '≈ ' : '' }}{{ savings() | amount }}
         </div>
       </p-card>
       <p-card>
@@ -116,7 +124,28 @@
       <ng-template pTemplate="body" let-row>
         <tr>
           <td class="font-medium">{{ row.name }}</td>
-          <td class="text-right">{{ row.price | amount }}</td>
+          <!-- A per-session price is not comparable to the bundle's monthly fee on
+               its own — spell out the multiplication that makes it one. -->
+          <td class="text-right">
+            @if (row.paymentType === 'PER_SESSION') {
+              <div>
+                {{ row.price | amount }}
+                <span class="text-xs text-gray-500">{{ 'MASTER_COURSES.DETAIL.PER_SESSION' | translate }}</span>
+              </div>
+              @if (monthlyEquivalent(row); as monthly) {
+                <div class="text-xs text-gray-500 mt-0.5">
+                  {{ 'MASTER_COURSES.DETAIL.MONTHLY_EQUIV' | translate: { count: sessionsPerMonth(row), amount: (monthly | amount) } }}
+                </div>
+              } @else {
+                <div class="text-xs text-amber-600 mt-0.5">{{ 'MASTER_COURSES.DETAIL.NO_SCHEDULE' | translate }}</div>
+              }
+            } @else {
+              {{ row.price | amount }}
+              @if (row.paymentType === 'MONTHLY_SUBSCRIPTION') {
+                <span class="text-xs text-gray-500">{{ 'MASTER_COURSES.DETAIL.PER_MONTH' | translate }}</span>
+              }
+            }
+          </td>
           <td>
             <p-tag
               [value]="row.isActive ? ('MASTER_COURSES.ACTIVE' | translate) : ('MASTER_COURSES.INACTIVE' | translate)"
@@ -163,7 +192,11 @@
         <tr>
           <th pSortableColumn="studentName">{{ 'MASTER_COURSES.DETAIL.COL_STUDENT' | translate }} <p-sortIcon field="studentName"></p-sortIcon></th>
           <th pSortableColumn="status">{{ 'MASTER_COURSES.DETAIL.COL_STATUS_ENROLL' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
-          <th pSortableColumn="paymentStatus">{{ 'MASTER_COURSES.DETAIL.COL_PAYMENT' | translate }} <p-sortIcon field="paymentStatus"></p-sortIcon></th>
+          <!-- A per-month bundle's enrollment carries no up-front payment status —
+               its money lives in the monthly bills — so the column would only mislead. -->
+          @if (master()?.paymentType !== 'MONTHLY_SUBSCRIPTION') {
+            <th pSortableColumn="paymentStatus">{{ 'MASTER_COURSES.DETAIL.COL_PAYMENT' | translate }} <p-sortIcon field="paymentStatus"></p-sortIcon></th>
+          }
           <th pSortableColumn="completedCourses" class="text-center">{{ 'MASTER_COURSES.DETAIL.COL_COMPLETED' | translate }} <p-sortIcon field="completedCourses"></p-sortIcon></th>
           <th pSortableColumn="activeCourses" class="text-center">{{ 'MASTER_COURSES.DETAIL.COL_IN_PROGRESS' | translate }} <p-sortIcon field="activeCourses"></p-sortIcon></th>
           <th pSortableColumn="pendingCourses" class="text-center">{{ 'MASTER_COURSES.DETAIL.COL_PENDING' | translate }} <p-sortIcon field="pendingCourses"></p-sortIcon></th>
@@ -179,12 +212,14 @@
               [severity]="e.status === 'ACTIVE' ? 'success' : e.status === 'COMPLETED' ? 'info' : 'danger'"
             ></p-tag>
           </td>
-          <td>
-            <p-tag
-              [value]="e.paymentStatus"
-              [severity]="e.paymentStatus === 'PAID' ? 'success' : e.paymentStatus === 'PARTIAL' ? 'warn' : 'danger'"
-            ></p-tag>
-          </td>
+          @if (master()?.paymentType !== 'MONTHLY_SUBSCRIPTION') {
+            <td>
+              <p-tag
+                [value]="e.paymentStatus"
+                [severity]="e.paymentStatus === 'PAID' ? 'success' : e.paymentStatus === 'PARTIAL' ? 'warn' : 'danger'"
+              ></p-tag>
+            </td>
+          }
           <td class="text-center">
             <span class="text-green-700 font-semibold">{{ e.completedCourses }}</span>
           </td>
@@ -199,7 +234,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="7" class="text-center py-6 text-gray-500">{{ 'MASTER_COURSES.DETAIL.NO_ENROLLMENTS' | translate }}</td>
+          <td [attr.colspan]="master()?.paymentType === 'MONTHLY_SUBSCRIPTION' ? 6 : 7" class="text-center py-6 text-gray-500">{{ 'MASTER_COURSES.DETAIL.NO_ENROLLMENTS' | translate }}</td>
         </tr>
       </ng-template>
     </p-table>
@@ -236,7 +271,14 @@
         <ng-template let-c pTemplate="item">
           <div class="flex justify-between items-center gap-3">
             <span>{{ c.name }}</span>
-            <span class="text-sm text-gray-600">{{ c.price | amount }}</span>
+            <span class="text-sm text-gray-600">
+              {{ c.price | amount }}
+              @if (c.paymentType === 'PER_SESSION') {
+                <span class="text-xs">{{ 'MASTER_COURSES.DETAIL.PER_SESSION' | translate }}</span>
+              } @else if (c.paymentType === 'MONTHLY_SUBSCRIPTION') {
+                <span class="text-xs">{{ 'MASTER_COURSES.DETAIL.PER_MONTH' | translate }}</span>
+              }
+            </span>
           </div>
         </ng-template>
       </p-select>

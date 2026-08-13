@@ -67,8 +67,32 @@ export class MasterCourseDetailComponent implements OnInit {
   toRemove = signal<LinkedCourseSummary | null>(null);
   showDeleteDialog = false;
 
+  /** Months are estimated as 4 schedule-weeks — same convention the client uses. */
+  readonly WEEKS_PER_MONTH = 4;
+
+  /**
+   * What this course costs on its own over one billing cycle — the figure the
+   * bundle price actually competes with. A per-month (or one-time) course is its
+   * price as-is; a per-session course is per-session fee × scheduled sessions per
+   * month. Null when a per-session course has no running class schedule yet:
+   * there is no honest number then, so it stays out of the sum and its row says so.
+   */
+  monthlyEquivalent(c: LinkedCourseSummary): number | null {
+    if (c.paymentType !== 'PER_SESSION') return c.price || 0;
+    if (!c.sessionsPerWeek) return null;
+    return (c.price || 0) * c.sessionsPerWeek * this.WEEKS_PER_MONTH;
+  }
+
+  sessionsPerMonth(c: LinkedCourseSummary): number {
+    return (c.sessionsPerWeek || 0) * this.WEEKS_PER_MONTH;
+  }
+
   sumOfLinked = computed(() =>
-    (this.linked() || []).reduce((sum, c) => sum + (c.price || 0), 0)
+    (this.linked() || []).reduce((sum, c) => sum + (this.monthlyEquivalent(c) ?? 0), 0)
+  );
+  /** Any per-session course makes the sum an estimate — shown with ≈ in the cards. */
+  isEstimated = computed(() =>
+    (this.linked() || []).some((c) => c.paymentType === 'PER_SESSION')
   );
   savings = computed(() => this.sumOfLinked() - (this.master()?.defaultPrice || 0));
 

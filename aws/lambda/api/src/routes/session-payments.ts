@@ -10,6 +10,20 @@ import { extractTenantContext, canAccessBranch, checkGranularPermission, appendB
 import { apiError, mapThrownError } from '../utils/api-error';
 import { issueReceipt, voidReceiptsFor } from '../db/receipts';
 import { studentIsPresent } from '../db/active-students';
+import { ensureAutoConfirmSessionPaymentsColumn } from './companies';
+
+/** Whether this company auto-confirms a PER_SESSION charge raised at attendance
+ *  time — see migration 092. Best-effort: a lookup failure just leaves charges
+ *  PENDING, same as the flag being off. */
+async function autoConfirmEnabled(companyId: string): Promise<boolean> {
+  try {
+    await ensureAutoConfirmSessionPaymentsColumn();
+    const row = await queryOne<any>('SELECT auto_confirm_session_payments FROM companies WHERE id = $1', [companyId]);
+    return row?.auto_confirm_session_payments === true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * The student is not paying for this session: they are in through a master
@@ -380,6 +394,7 @@ async function chargeOneEnrollment(
   enrollment: any,
   courseFee: number,
   state: 'PRESENT' | 'ABSENT',
+  autoConfirm = false,
 ): Promise<ChargeResult | null> {
   const fee = enrollment.final_price && parseFloat(enrollment.final_price) > 0
     ? parseFloat(enrollment.final_price)
@@ -393,18 +408,24 @@ async function chargeOneEnrollment(
     [enrollment.id]
   );
 
-  const status = pkg ? 'COVERED' : 'PENDING';
+  // A package-covered row is already settled — auto-confirm has nothing to add.
+  // Otherwise, when the company opted in, a PRESENT charge is written straight
+  // to PAID in full rather than left PENDING for a manual click.
+  const willAutoConfirm = !pkg && autoConfirm && state === 'PRESENT' && fee > 0;
+  const status = pkg ? 'COVERED' : willAutoConfirm ? 'PAID' : 'PENDING';
   const packageId = pkg ? pkg.id : null;
+  const amountPaid = willAutoConfirm ? fee : 0;
+  const today = new Date().toISOString().split('T')[0];
 
   const inserted = await query(
     `INSERT INTO session_payments
        (enrollment_id, session_id, company_id, student_id, course_id, branch_id,
-        package_id, attendance_state, amount_due, amount_paid, payment_status)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,0,$10)
+        package_id, attendance_state, amount_due, amount_paid, payment_status, paid_date)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
      ON CONFLICT (enrollment_id, session_id) DO NOTHING
      RETURNING id`,
     [enrollment.id, session.id, companyId, enrollment.student_id, session.course_id ?? enrollment.course_id,
-     enrollment.branch_id, packageId, state, fee, status]
+     enrollment.branch_id, packageId, state, fee, amountPaid, status, willAutoConfirm ? today : null]
   );
 
   if (inserted.length === 0) {
@@ -441,6 +462,30 @@ async function chargeOneEnrollment(
     packageRemaining = Number(pkg.sessions_total) - Number(pkg.sessions_used) - 1;
   }
 
+  // Mirror what a manual recordPayment call does, so an auto-confirmed charge
+  // leaves the same money trail (installment ledger + receipt) a clicked-through
+  // one would have.
+  if (willAutoConfirm) {
+    const row = await queryOne<any>('SELECT * FROM session_payments WHERE id = $1', [newId]);
+    if (row) {
+      await recordSessionInstallment(row, fee, today, 'Auto-confirmed at attendance', null);
+      await issueReceipt({
+        companyId,
+        sourceType: 'SESSION',
+        sourceId: newId,
+        studentId: enrollment.student_id,
+        courseId: session.course_id ?? enrollment.course_id,
+        branchId: enrollment.branch_id,
+        amount: fee,
+        paymentDate: today,
+        totalDue: fee,
+        paidToDate: fee,
+        notes: 'Auto-confirmed at attendance',
+        recordedByUserId: null,
+      });
+    }
+  }
+
   return { id: newId, isNew: true, status, packageRemaining };
 }
 
@@ -470,6 +515,7 @@ export async function chargeSessionAttendance(
   await ensurePerSessionSchema();
 
   const courseFee = parseFloat(course.price || 0);
+  const autoConfirm = await autoConfirmEnabled(companyId);
 
   const enrollments = await query(
     `SELECT e.id, e.student_id, e.branch_id, e.course_id, e.final_price
@@ -480,13 +526,16 @@ export async function chargeSessionAttendance(
     [session.class_id, companyId, ids]
   );
 
-  const newPendingIds: string[] = [];
+  const newChargeIds: string[] = [];
   for (const enr of enrollments) {
-    const res = await chargeOneEnrollment(companyId, { ...session, course_id: enr.course_id }, enr, courseFee, 'PRESENT');
-    if (res && res.isNew && res.status === 'PENDING') newPendingIds.push(res.id);
+    const res = await chargeOneEnrollment(companyId, { ...session, course_id: enr.course_id }, enr, courseFee, 'PRESENT', autoConfirm);
+    // Every freshly-created charge is returned — PENDING ones so the caller can
+    // prompt to collect them, PAID/COVERED ones so the roster can show them
+    // settled right away instead of waiting for a full reload.
+    if (res && res.isNew) newChargeIds.push(res.id);
   }
 
-  return fetchDetailsByIds(companyId, newPendingIds);
+  return fetchDetailsByIds(companyId, newChargeIds);
 }
 
 /**
@@ -619,8 +668,9 @@ export async function chargeSingleCheckin(
   );
   if (!enrollment) return null;
 
+  const autoConfirm = await autoConfirmEnabled(companyId);
   const res = await chargeOneEnrollment(
-    companyId, { ...session, course_id: enrollment.course_id }, enrollment, parseFloat(course.price || 0), 'PRESENT'
+    companyId, { ...session, course_id: enrollment.course_id }, enrollment, parseFloat(course.price || 0), 'PRESENT', autoConfirm
   );
   if (!res) return null;
   const [details] = await fetchDetailsByIds(companyId, [res.id]);

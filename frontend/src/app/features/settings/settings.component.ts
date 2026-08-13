@@ -44,6 +44,8 @@ export class SettingsComponent implements OnInit {
   selectedMethod = signal<GlobalExpenseAllocation>('OVERHEAD');
   /** Opt-in: auto start/end sessions on their scheduled times. */
   autoManageSessions = signal(false);
+  /** Opt-in: a PER_SESSION charge raised at attendance time is auto-confirmed PAID. */
+  autoConfirmSessionPayments = signal(false);
   /** Number box vs Excellent…Weak when marking homework. */
   homeworkGradingMode = signal<HomeworkGradingMode>('NUMERIC');
   /**
@@ -105,6 +107,7 @@ export class SettingsComponent implements OnInit {
       next: (settings) => {
         this.selectedMethod.set(settings.globalExpenseAllocation);
         this.autoManageSessions.set(settings.autoManageSessions === true);
+        this.autoConfirmSessionPayments.set(settings.autoConfirmSessionPayments === true);
         this.homeworkGradingMode.set(settings.homeworkGradingMode === 'RATING' ? 'RATING' : 'NUMERIC');
         this.freeSessionTrialLimit.set(settings.freeSessionTrialLimit ?? 0);
         this.loading.set(false);
@@ -120,6 +123,7 @@ export class SettingsComponent implements OnInit {
     this.companyService.updateSettings({
       globalExpenseAllocation: this.selectedMethod(),
       autoManageSessions: this.autoManageSessions(),
+      autoConfirmSessionPayments: this.autoConfirmSessionPayments(),
       homeworkGradingMode: this.homeworkGradingMode(),
       freeSessionTrialLimit: Math.max(0, Math.trunc(Number(this.freeSessionTrialLimit()) || 0)),
     }).subscribe({

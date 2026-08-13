@@ -839,6 +839,8 @@ const LinkedCourseSummarySchema = z.object({
   name: z.string(),
   code: z.string(),
   price: z.number(),
+  paymentType: z.enum(['ONE_TIME', 'MONTHLY_SUBSCRIPTION', 'PER_SESSION']),
+  sessionsPerWeek: z.number().int().nullable(),
   isActive: z.boolean(),
 });
 
@@ -4822,6 +4824,9 @@ export const contract = c.router({
           name: z.string(),
           globalExpenseAllocation: GlobalExpenseAllocationSchema,
           autoManageSessions: z.boolean(),
+          // Auto-confirm a PER_SESSION charge raised at attendance time as PAID,
+          // instead of leaving it PENDING for a manual click.
+          autoConfirmSessionPayments: z.boolean(),
           homeworkGradingMode: HomeworkGradingModeSchema,
           // Free (TRIAL) sessions one student may ever attend. 0 = unlimited.
           freeSessionTrialLimit: z.number().int().min(0),
@@ -4853,6 +4858,7 @@ export const contract = c.router({
       body: z.object({
         globalExpenseAllocation: GlobalExpenseAllocationSchema.optional(),
         autoManageSessions: z.boolean().optional(),
+        autoConfirmSessionPayments: z.boolean().optional(),
         homeworkGradingMode: HomeworkGradingModeSchema.optional(),
         freeSessionTrialLimit: z.number().int().min(0).optional(),
       }),
@@ -4862,6 +4868,7 @@ export const contract = c.router({
           name: z.string(),
           globalExpenseAllocation: GlobalExpenseAllocationSchema,
           autoManageSessions: z.boolean(),
+          autoConfirmSessionPayments: z.boolean(),
           homeworkGradingMode: HomeworkGradingModeSchema,
           // Free (TRIAL) sessions one student may ever attend. 0 = unlimited.
           freeSessionTrialLimit: z.number().int().min(0),
@@ -6645,6 +6652,7 @@ export const contract = c.router({
           substitutedSessionDate: z.string().nullable().optional(),
           isEnrolled: z.boolean().optional(),
           charge: z.object({
+            id: UUIDSchema,
             status: z.string(),
             amountDue: z.number(),
             amountPaid: z.number(),
@@ -6744,8 +6752,10 @@ export const contract = c.router({
         200: z.object({
           message: z.string(),
           presentCount: z.number(),
-          // For PER_SESSION courses: the session charges created/updated by this
-          // save that still need collection (payment_status PENDING). Empty/absent
+          // For PER_SESSION courses: every session charge freshly created by this
+          // save — PENDING ones the client should prompt to collect, and PAID/
+          // COVERED ones (auto-confirmed, or covered by a prepaid package) so the
+          // roster can show them settled without a full page reload. Empty/absent
           // for other course types.
           sessionCharges: z.array(SessionPaymentWithDetailsSchema).optional(),
         }),
