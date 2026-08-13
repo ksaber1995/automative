@@ -560,6 +560,16 @@
       "DELETE_FAILED": "Failed to delete semester",
       "LIST_FAILED": "Failed to load semesters"
     },
+    "SCHOOL_CLASSES": {
+      "NOT_FOUND": "Class not found",
+      "CREATE_FAILED": "Failed to create class",
+      "UPDATE_FAILED": "Failed to update class",
+      "DELETE_FAILED": "Failed to delete class",
+      "LIST_FAILED": "Failed to load classes",
+      "LEVEL_REQUIRED": "An educational stage must be selected",
+      "LEVEL_NOT_FOUND": "Educational stage not found",
+      "ROOM_NOT_FOUND": "Room not found"
+    },
     "ROOMS": {
       "NOT_FOUND": "Room not found",
       "ACCESS_DENIED": "Access denied to this room",
@@ -2189,6 +2199,42 @@
       "UPDATE": "Update",
       "CREATE_SUCCESS": "Semester created",
       "UPDATE_SUCCESS": "Semester updated"
+    }
+  },
+  "SCHOOL_CLASSES": {
+    "LIST": {
+      "TITLE": "Classes",
+      "ADD": "Add Class",
+      "COL_NAME": "Name",
+      "COL_LEVEL": "Educational Stage",
+      "COL_ROOM": "Room",
+      "COL_ACTIONS": "Actions",
+      "EDIT": "Edit",
+      "DELETE": "Delete",
+      "FILTER_LEVEL": "Educational Stage",
+      "FILTER_ALL": "All stages",
+      "NO_CLASSES": "No classes yet.",
+      "DELETE_TITLE": "Delete Class",
+      "DELETE_MSG": "Delete \"{{name}}\"?",
+      "DELETED": "Class deleted",
+      "LOAD_ERROR": "Failed to load classes"
+    },
+    "FORM": {
+      "CREATE_TITLE": "Add Class",
+      "EDIT_TITLE": "Edit Class",
+      "NAME_LABEL": "Name",
+      "NAME_PLACEHOLDER": "e.g., 3A",
+      "NAME_REQUIRED": "Name is required (min 2 characters)",
+      "LEVEL_LABEL": "Educational Stage",
+      "LEVEL_PLACEHOLDER": "Select a stage",
+      "LEVEL_REQUIRED": "An educational stage must be selected",
+      "ROOM_LABEL": "Room",
+      "ROOM_PLACEHOLDER": "Select a room (optional)",
+      "CANCEL": "Cancel",
+      "CREATE": "Create",
+      "UPDATE": "Update",
+      "CREATE_SUCCESS": "Class created",
+      "UPDATE_SUCCESS": "Class updated"
     }
   },
   "SUBJECTS": {

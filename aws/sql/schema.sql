@@ -240,6 +240,9 @@ CREATE TABLE school.semesters (
 
 CREATE INDEX idx_school_semesters_company_id ON school.semesters(company_id);
 
+-- school.classes (migration 096) is defined further down, right after the
+-- `rooms` table — its room_id FK needs that table to exist first.
+
 -- =============================================
 -- COURSES TABLE
 -- =============================================
@@ -1139,6 +1142,26 @@ ALTER TABLE courses
     ADD COLUMN default_room_id UUID REFERENCES rooms(id) ON DELETE SET NULL;
 
 CREATE INDEX idx_courses_default_room_id ON courses(default_room_id);
+
+-- =============================================
+-- SCHOOL.CLASSES TABLE  (migration 096)
+-- A SCHOOL tenant's class: no course, no timetable — just a name, an
+-- educational stage (one-to-many under school.levels, same as
+-- school.subjects), and which of the company's existing rooms it meets in.
+-- Placed here, after `rooms`, because its FK needs that table to exist first.
+-- =============================================
+CREATE TABLE school.classes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    level_id UUID NOT NULL REFERENCES school.levels(id) ON DELETE CASCADE,
+    room_id UUID REFERENCES rooms(id) ON DELETE SET NULL,
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_school_classes_company_id ON school.classes(company_id);
+CREATE INDEX idx_school_classes_level_id ON school.classes(level_id);
+CREATE INDEX idx_school_classes_room_id ON school.classes(room_id);
 
 -- =============================================
 -- SESSIONS TABLE  (migration 023)

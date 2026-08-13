@@ -107,6 +107,13 @@ export const routes: Routes = [
         loadComponent: () => import('./features/school-semesters/school-semester-list/school-semester-list.component').then(m => m.SchoolSemesterListComponent)
       },
       {
+        path: 'school-classes',
+        // SCHOOL tenants' equivalent of Classes — no course, no timetable;
+        // every class across every stage, with a level filter.
+        data: { breadcrumb: 'BREADCRUMBS.CLASSES' },
+        loadComponent: () => import('./features/school-levels/school-class-list/school-class-list.component').then(m => m.SchoolClassListComponent)
+      },
+      {
         path: 'subjects',
         // Academy-only feature: notTeacherGuard bounces TEACHER companies, matching
         // the sidebar entry (hidden for teachers) and the course-form dropdown.

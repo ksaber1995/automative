@@ -1,0 +1,164 @@
+<div class="container-custom py-8">
+  <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+    <h1 class="text-3xl font-bold text-gray-900">{{ 'SCHOOL_CLASSES.LIST.TITLE' | translate }}</h1>
+    @if (authService.canWrite('academy')) {
+      <p-button [label]="'SCHOOL_CLASSES.LIST.ADD' | translate" icon="pi pi-plus" (onClick)="openCreate()"></p-button>
+    }
+  </div>
+
+  <div class="mb-4 flex items-center gap-3 flex-wrap">
+    <label class="text-sm font-medium text-gray-700">{{ 'SCHOOL_CLASSES.LIST.FILTER_LEVEL' | translate }}</label>
+    <p-select
+      [ngModel]="levelFilter()"
+      (ngModelChange)="levelFilter.set($event)"
+      [options]="levels()"
+      optionLabel="name"
+      optionValue="id"
+      [showClear]="true"
+      [placeholder]="'SCHOOL_CLASSES.LIST.FILTER_ALL' | translate"
+      [style]="{ minWidth: '220px' }"
+    ></p-select>
+  </div>
+
+  <p-card>
+    <p-table
+      [value]="filteredClasses()"
+      [loading]="loading()"
+      [paginator]="true"
+      [rows]="10"
+      responsiveLayout="scroll"
+    >
+      <ng-template pTemplate="header">
+        <tr>
+          <th pSortableColumn="name">{{ 'SCHOOL_CLASSES.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
+          <th pSortableColumn="levelName">{{ 'SCHOOL_CLASSES.LIST.COL_LEVEL' | translate }} <p-sortIcon field="levelName"></p-sortIcon></th>
+          <th>{{ 'SCHOOL_CLASSES.LIST.COL_ROOM' | translate }}</th>
+          <th>{{ 'SCHOOL_CLASSES.LIST.COL_ACTIONS' | translate }}</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-cls>
+        <tr>
+          <td>{{ cls.name }}</td>
+          <td>{{ cls.levelName }}</td>
+          <td>
+            @if (cls.roomCode) { {{ cls.roomCode }} } @else { <span class="text-gray-400">—</span> }
+          </td>
+          <td>
+            <div class="flex gap-2">
+              @if (authService.canWrite('academy')) {
+                <p-button
+                  icon="pi pi-pencil"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="warn"
+                  (onClick)="openEdit(cls)"
+                  [pTooltip]="'SCHOOL_CLASSES.LIST.EDIT' | translate"
+                ></p-button>
+              }
+              @if (authService.canDelete('academy')) {
+                <p-button
+                  icon="pi pi-trash"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="danger"
+                  (onClick)="deleteClass(cls)"
+                  [pTooltip]="'SCHOOL_CLASSES.LIST.DELETE' | translate"
+                ></p-button>
+              }
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="4" class="text-center py-8">
+            <div class="text-gray-500">
+              <i class="pi pi-inbox text-4xl mb-3"></i>
+              <p>{{ 'SCHOOL_CLASSES.LIST.NO_CLASSES' | translate }}</p>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </p-card>
+
+  <p-dialog
+    [visible]="showDialog()"
+    (visibleChange)="showDialog.set($event)"
+    [modal]="true"
+    [style]="{ width: '480px' }"
+    [header]="(isEditMode() ? 'SCHOOL_CLASSES.FORM.EDIT_TITLE' : 'SCHOOL_CLASSES.FORM.CREATE_TITLE') | translate"
+  >
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="flex flex-col gap-4">
+        <div>
+          <label for="name" class="block text-sm font-medium text-gray-700 mb-2">
+            {{ 'SCHOOL_CLASSES.FORM.NAME_LABEL' | translate }} <span class="text-red-500">*</span>
+          </label>
+          <input
+            pInputText
+            id="name"
+            formControlName="name"
+            [placeholder]="'SCHOOL_CLASSES.FORM.NAME_PLACEHOLDER' | translate"
+            class="w-full"
+            [class.border-red-500]="name?.invalid && name?.touched"
+          />
+          @if (name?.invalid && name?.touched) {
+            <small class="text-red-500">{{ 'SCHOOL_CLASSES.FORM.NAME_REQUIRED' | translate }}</small>
+          }
+        </div>
+        <div>
+          <label for="levelId" class="block text-sm font-medium text-gray-700 mb-2">
+            {{ 'SCHOOL_CLASSES.FORM.LEVEL_LABEL' | translate }} <span class="text-red-500">*</span>
+          </label>
+          <p-select
+            inputId="levelId"
+            formControlName="levelId"
+            [options]="levels()"
+            optionLabel="name"
+            optionValue="id"
+            [placeholder]="'SCHOOL_CLASSES.FORM.LEVEL_PLACEHOLDER' | translate"
+            [style]="{ width: '100%' }"
+            [class.ng-invalid]="levelId?.invalid && levelId?.touched"
+          ></p-select>
+          @if (levelId?.invalid && levelId?.touched) {
+            <small class="text-red-500">{{ 'SCHOOL_CLASSES.FORM.LEVEL_REQUIRED' | translate }}</small>
+          }
+        </div>
+        <div>
+          <label for="roomId" class="block text-sm font-medium text-gray-700 mb-2">
+            {{ 'SCHOOL_CLASSES.FORM.ROOM_LABEL' | translate }}
+          </label>
+          <p-select
+            inputId="roomId"
+            formControlName="roomId"
+            [options]="rooms()"
+            optionLabel="code"
+            optionValue="id"
+            [showClear]="true"
+            [placeholder]="'SCHOOL_CLASSES.FORM.ROOM_PLACEHOLDER' | translate"
+            [style]="{ width: '100%' }"
+          ></p-select>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
+        <p-button
+          [label]="'SCHOOL_CLASSES.FORM.CANCEL' | translate"
+          severity="secondary"
+          [outlined]="true"
+          (onClick)="closeDialog()"
+          type="button"
+        ></p-button>
+        <p-button
+          [label]="(isEditMode() ? 'SCHOOL_CLASSES.FORM.UPDATE' : 'SCHOOL_CLASSES.FORM.CREATE') | translate"
+          type="submit"
+          [loading]="saving()"
+          [disabled]="form.invalid"
+        ></p-button>
+      </div>
+    </form>
+  </p-dialog>
+
+  <p-confirmDialog></p-confirmDialog>
+</div>

@@ -601,6 +601,35 @@ const SchoolSemesterSchema = z.object({
 });
 
 // =============================================
+// School Class Schemas — one-to-many under an educational stage, no course,
+// no timetable. See aws/lambda/api/src/routes/school-classes.ts.
+// =============================================
+const CreateSchoolClassSchema = z.object({
+  name: z.string(),
+  levelId: UUIDSchema,
+  roomId: UUIDSchema.nullable().optional(),
+});
+
+const UpdateSchoolClassSchema = z.object({
+  name: z.string().optional(),
+  levelId: UUIDSchema.optional(),
+  roomId: UUIDSchema.nullable().optional(),
+});
+
+const SchoolClassSchema = z.object({
+  id: UUIDSchema,
+  companyId: UUIDSchema,
+  levelId: UUIDSchema,
+  roomId: UUIDSchema.nullable(),
+  name: z.string(),
+  // Present on list/getById (joined); absent right after create/update.
+  levelName: z.string().optional(),
+  roomCode: z.string().nullable().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+// =============================================
 // Subject Schemas
 // =============================================
 const CreateSubjectSchema = z.object({
@@ -2744,6 +2773,60 @@ export const contract = c.router({
     delete: {
       method: 'DELETE',
       path: '/api/school-semesters/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+  },
+
+  // School classes routes — one-to-many under an educational stage; no
+  // course, no timetable. See routes/school-classes.ts.
+  schoolClasses: {
+    create: {
+      method: 'POST',
+      path: '/api/school-classes',
+      body: CreateSchoolClassSchema,
+      responses: {
+        201: SchoolClassSchema,
+        400: ApiErrorSchema,
+      },
+    },
+    // levelId narrows to one stage's classes; omitted, every class across
+    // every stage (the flat Classes page's level filter uses both).
+    list: {
+      method: 'GET',
+      path: '/api/school-classes',
+      query: z.object({ levelId: OptionalUUIDSchema }),
+      responses: {
+        200: z.array(SchoolClassSchema),
+      },
+    },
+    getById: {
+      method: 'GET',
+      path: '/api/school-classes/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: SchoolClassSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    update: {
+      method: 'PATCH',
+      path: '/api/school-classes/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: UpdateSchoolClassSchema,
+      responses: {
+        200: SchoolClassSchema,
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    delete: {
+      method: 'DELETE',
+      path: '/api/school-classes/:id',
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {

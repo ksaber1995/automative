@@ -236,9 +236,13 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
     const academic: NavLeaf[] = [
       ...teacherStudentsFirst,
-      { labelKey: 'NAV.COURSES', icon: 'pi pi-book', routerLink: ['/courses'], visible: auth.canRead('academy') },
-      { labelKey: 'NAV.MASTER_COURSES', icon: 'pi pi-th-large', routerLink: ['/master-courses'], visible: auth.canRead('academy') && !auth.isTeacher() },
-      { labelKey: 'NAV.CLASSES', icon: 'pi pi-calendar', routerLink: ['/classes'], visible: auth.canRead('academy') },
+      // Courses/Master Courses/Classes are all built around the course model
+      // a SCHOOL tenant doesn't have — Educational Stages/Subjects/Classes
+      // (below, under Admin and here) replace them instead.
+      { labelKey: 'NAV.COURSES', icon: 'pi pi-book', routerLink: ['/courses'], visible: auth.canRead('academy') && !auth.isSchool() },
+      { labelKey: 'NAV.MASTER_COURSES', icon: 'pi pi-th-large', routerLink: ['/master-courses'], visible: auth.canRead('academy') && !auth.isTeacher() && !auth.isSchool() },
+      { labelKey: 'NAV.CLASSES', icon: 'pi pi-calendar', routerLink: ['/classes'], visible: auth.canRead('academy') && !auth.isSchool() },
+      { labelKey: 'NAV.CLASSES', icon: 'pi pi-calendar', routerLink: ['/school-classes'], visible: auth.isSchool() },
       { labelKey: 'NAV.ROOMS', icon: 'pi pi-building', routerLink: ['/rooms'], visible: auth.canRead('academy') && !auth.isTeacher() },
       // Session history is the Sessions page's History tab now; the route stays
       // reachable by URL, it just doesn't need its own sidebar entry.

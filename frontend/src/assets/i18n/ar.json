@@ -560,6 +560,16 @@
       "DELETE_FAILED": "فشل حذف الفصل الدراسي",
       "LIST_FAILED": "فشل تحميل الفصول الدراسية"
     },
+    "SCHOOL_CLASSES": {
+      "NOT_FOUND": "الشعبة غير موجودة",
+      "CREATE_FAILED": "فشل إنشاء الشعبة",
+      "UPDATE_FAILED": "فشل تحديث الشعبة",
+      "DELETE_FAILED": "فشل حذف الشعبة",
+      "LIST_FAILED": "فشل تحميل الشعب",
+      "LEVEL_REQUIRED": "يجب اختيار مرحلة دراسية",
+      "LEVEL_NOT_FOUND": "المرحلة الدراسية غير موجودة",
+      "ROOM_NOT_FOUND": "الغرفة غير موجودة"
+    },
     "ROOMS": {
       "NOT_FOUND": "الغرفة غير موجودة",
       "ACCESS_DENIED": "الوصول إلى هذه الغرفة غير مسموح",
@@ -2189,6 +2199,42 @@
       "UPDATE": "تحديث",
       "CREATE_SUCCESS": "تم إنشاء الفصل الدراسي",
       "UPDATE_SUCCESS": "تم تحديث الفصل الدراسي"
+    }
+  },
+  "SCHOOL_CLASSES": {
+    "LIST": {
+      "TITLE": "الشعب",
+      "ADD": "إضافة شعبة",
+      "COL_NAME": "الاسم",
+      "COL_LEVEL": "المرحلة الدراسية",
+      "COL_ROOM": "الغرفة",
+      "COL_ACTIONS": "الإجراءات",
+      "EDIT": "تعديل",
+      "DELETE": "حذف",
+      "FILTER_LEVEL": "المرحلة الدراسية",
+      "FILTER_ALL": "كل المراحل",
+      "NO_CLASSES": "لا توجد شعب بعد.",
+      "DELETE_TITLE": "حذف الشعبة",
+      "DELETE_MSG": "حذف \"{{name}}\"؟",
+      "DELETED": "تم حذف الشعبة",
+      "LOAD_ERROR": "فشل تحميل الشعب"
+    },
+    "FORM": {
+      "CREATE_TITLE": "إضافة شعبة",
+      "EDIT_TITLE": "تعديل الشعبة",
+      "NAME_LABEL": "الاسم",
+      "NAME_PLACEHOLDER": "مثال: شعبة أ",
+      "NAME_REQUIRED": "الاسم مطلوب (حرفان على الأقل)",
+      "LEVEL_LABEL": "المرحلة الدراسية",
+      "LEVEL_PLACEHOLDER": "اختر مرحلة",
+      "LEVEL_REQUIRED": "يجب اختيار مرحلة دراسية",
+      "ROOM_LABEL": "الغرفة",
+      "ROOM_PLACEHOLDER": "اختر غرفة (اختياري)",
+      "CANCEL": "إلغاء",
+      "CREATE": "إنشاء",
+      "UPDATE": "تحديث",
+      "CREATE_SUCCESS": "تم إنشاء الشعبة",
+      "UPDATE_SUCCESS": "تم تحديث الشعبة"
     }
   },
   "SUBJECTS": {
