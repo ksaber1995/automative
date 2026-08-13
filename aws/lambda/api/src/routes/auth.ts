@@ -232,7 +232,7 @@ export const authRoutes = {
   }: {
     body: {
       companyName: string;
-      type?: 'ACADEMY' | 'TEACHER';
+      type?: 'ACADEMY' | 'TEACHER' | 'SCHOOL';
       plan?: 'SIMPLE' | 'ADVANCED';
       vertical?: 'GENERAL' | 'SPORTS';
       industry?: string;
@@ -269,6 +269,13 @@ export const authRoutes = {
     }
     if (!email) {
       return apiError(400, 'ERRORS.AUTH.EMAIL_REQUIRED', 'Email is required.');
+    }
+    // SCHOOL is a recognised company type with no signup flow yet — the login
+    // page shows it as "Coming soon" (no link), so reaching here at all means a
+    // request was crafted by hand. Reject explicitly rather than silently
+    // downgrading it to ACADEMY, which would create a company nobody asked for.
+    if (body.type === 'SCHOOL') {
+      return apiError(400, 'ERRORS.AUTH.SCHOOL_NOT_AVAILABLE', 'School registration is coming soon.');
     }
 
     const client = await getClient();

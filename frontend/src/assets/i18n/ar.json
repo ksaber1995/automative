@@ -198,6 +198,7 @@
       "EMAIL_REQUIRED": "البريد الإلكتروني مطلوب",
       "EMAIL_TAKEN": "هذا البريد الإلكتروني مسجل بالفعل",
       "PHONE_TAKEN": "رقم الهاتف هذا مسجل بالفعل",
+      "SCHOOL_NOT_AVAILABLE": "تسجيل المدارس متاح قريباً.",
       "REGISTRATION_CONFLICT": "يوجد حساب مسجل بهذه البيانات بالفعل",
       "REGISTRATION_FAILED": "فشل التسجيل. يرجى المحاولة مرة أخرى.",
       "INVALID_VERIFICATION_REQUEST": "طلب التحقق غير صالح",
@@ -536,6 +537,29 @@
       "LIST_FAILED": "فشل تحميل المستويات",
       "AGE_RANGE_INVALID": "يجب أن يكون العمر \"إلى\" أكبر من العمر \"من\""
     },
+    "SCHOOL_LEVELS": {
+      "NOT_FOUND": "المرحلة الدراسية غير موجودة",
+      "CREATE_FAILED": "فشل إنشاء المرحلة الدراسية",
+      "UPDATE_FAILED": "فشل تحديث المرحلة الدراسية",
+      "DELETE_FAILED": "فشل حذف المرحلة الدراسية",
+      "LIST_FAILED": "فشل تحميل المراحل الدراسية"
+    },
+    "SCHOOL_SUBJECTS": {
+      "NOT_FOUND": "المادة غير موجودة",
+      "CREATE_FAILED": "فشل إنشاء المادة",
+      "UPDATE_FAILED": "فشل تحديث المادة",
+      "DELETE_FAILED": "فشل حذف المادة",
+      "LIST_FAILED": "فشل تحميل المواد",
+      "LEVEL_REQUIRED": "يجب اختيار مرحلة دراسية",
+      "LEVEL_NOT_FOUND": "المرحلة الدراسية غير موجودة"
+    },
+    "SCHOOL_SEMESTERS": {
+      "NOT_FOUND": "الفصل الدراسي غير موجود",
+      "CREATE_FAILED": "فشل إنشاء الفصل الدراسي",
+      "UPDATE_FAILED": "فشل تحديث الفصل الدراسي",
+      "DELETE_FAILED": "فشل حذف الفصل الدراسي",
+      "LIST_FAILED": "فشل تحميل الفصول الدراسية"
+    },
     "ROOMS": {
       "NOT_FOUND": "الغرفة غير موجودة",
       "ACCESS_DENIED": "الوصول إلى هذه الغرفة غير مسموح",
@@ -801,6 +825,9 @@
     "COURSE_CLASSES": "المجموعات",
     "MASTER_COURSES": "عروض الكورسات",
     "LEVELS": "المستويات",
+    "EDUCATIONAL_STAGES": "المراحل الدراسية",
+    "EDUCATIONAL_STAGE_DETAIL": "تفاصيل المرحلة",
+    "SEMESTERS": "الفصول الدراسية",
     "SUBJECTS": "المواد الدراسية",
     "EVENTS": "الفعاليات",
     "CLASSES": "المجموعات",
@@ -1400,6 +1427,8 @@
     "SESSION_PAYMENTS": "مدفوعات الحصص",
     "MASTER_COURSES": "عروض الكورسات",
     "LEVELS": "المستويات",
+    "EDUCATIONAL_STAGES": "المراحل الدراسية",
+    "SEMESTERS": "الفصول الدراسية",
     "SUBJECTS": "المواد الدراسية",
     "EVENTS": "الفعاليات",
     "CLASSES": "المجموعات",
@@ -1493,6 +1522,9 @@
       "REGISTER_TEACHER_HINT": "مدرس فردي / خصوصي",
       "REGISTER_SPORTS_ACADEMY": "تسجيل كأكاديمية رياضية",
       "REGISTER_SPORTS_ACADEMY_HINT": "مدربون ومتدربون ومجموعات",
+      "REGISTER_SCHOOL": "تسجيل كمدرسة",
+      "REGISTER_SCHOOL_HINT": "صفوف وفصول دراسية وفصول",
+      "COMING_SOON": "قريباً",
       "COPYRIGHT": "2026 نتروفيت. جميع الحقوق محفوظة.",
       "SUCCESS": "تم تسجيل الدخول بنجاح!",
       "EMAIL_NOT_VERIFIED": "يرجى التحقق من حسابك عبر رمز واتساب قبل تسجيل الدخول.",
@@ -2061,6 +2093,102 @@
       "UPDATE": "تحديث",
       "CREATE_SUCCESS": "تم إنشاء المستوى",
       "UPDATE_SUCCESS": "تم تحديث المستوى"
+    }
+  },
+  "SCHOOL_LEVELS": {
+    "LIST": {
+      "TITLE": "المراحل الدراسية",
+      "ADD": "إضافة مرحلة",
+      "COL_NAME": "الاسم",
+      "COL_ACTIONS": "الإجراءات",
+      "EDIT": "تعديل",
+      "DELETE": "حذف",
+      "VIEW_SUBJECTS": "عرض المواد",
+      "NO_LEVELS": "لا توجد مراحل دراسية بعد. أضف مرحلة لبناء سلم الصفوف الدراسية.",
+      "DELETE_TITLE": "حذف المرحلة الدراسية",
+      "DELETE_MSG": "حذف \"{{name}}\"؟ سيتم فقط إلغاء ربط ما هو مرتبط بهذه المرحلة.",
+      "DELETED": "تم حذف المرحلة الدراسية",
+      "LOAD_ERROR": "فشل تحميل المراحل الدراسية"
+    },
+    "FORM": {
+      "CREATE_TITLE": "إضافة مرحلة دراسية",
+      "EDIT_TITLE": "تعديل المرحلة الدراسية",
+      "NAME_LABEL": "الاسم",
+      "NAME_PLACEHOLDER": "مثال: الصف الثالث",
+      "NAME_REQUIRED": "الاسم مطلوب (حرفان على الأقل)",
+      "CANCEL": "إلغاء",
+      "CREATE": "إنشاء",
+      "UPDATE": "تحديث",
+      "CREATE_SUCCESS": "تم إنشاء المرحلة الدراسية",
+      "UPDATE_SUCCESS": "تم تحديث المرحلة الدراسية"
+    }
+  },
+  "SCHOOL_SUBJECTS": {
+    "LIST": {
+      "TITLE": "المواد الدراسية",
+      "ADD": "إضافة مادة",
+      "COL_NAME": "الاسم",
+      "COL_LEVEL": "المرحلة الدراسية",
+      "COL_ACTIONS": "الإجراءات",
+      "EDIT": "تعديل",
+      "DELETE": "حذف",
+      "FILTER_LEVEL": "المرحلة الدراسية",
+      "FILTER_ALL": "كل المراحل",
+      "NO_SUBJECTS": "لا توجد مواد بعد.",
+      "NO_SUBJECTS_IN_STAGE": "لا توجد مواد في هذه المرحلة بعد. أضف واحدة.",
+      "DELETE_TITLE": "حذف المادة",
+      "DELETE_MSG": "حذف \"{{name}}\"؟",
+      "DELETED": "تم حذف المادة",
+      "LOAD_ERROR": "فشل تحميل المواد"
+    },
+    "FORM": {
+      "CREATE_TITLE": "إضافة مادة",
+      "EDIT_TITLE": "تعديل المادة",
+      "NAME_LABEL": "الاسم",
+      "NAME_PLACEHOLDER": "مثال: الرياضيات",
+      "NAME_REQUIRED": "الاسم مطلوب (حرفان على الأقل)",
+      "LEVEL_LABEL": "المرحلة الدراسية",
+      "LEVEL_PLACEHOLDER": "اختر مرحلة",
+      "LEVEL_REQUIRED": "يجب اختيار مرحلة دراسية",
+      "CANCEL": "إلغاء",
+      "CREATE": "إنشاء",
+      "UPDATE": "تحديث",
+      "CREATE_SUCCESS": "تم إنشاء المادة",
+      "UPDATE_SUCCESS": "تم تحديث المادة"
+    }
+  },
+  "SCHOOL_SEMESTERS": {
+    "LIST": {
+      "TITLE": "الفصول الدراسية",
+      "ADD": "إضافة فصل دراسي",
+      "COL_NAME": "الاسم",
+      "COL_DATES": "التواريخ",
+      "COL_STATUS": "الحالة",
+      "COL_ACTIONS": "الإجراءات",
+      "ACTIVE": "نشط",
+      "INACTIVE": "غير نشط",
+      "EDIT": "تعديل",
+      "DELETE": "حذف",
+      "NO_SEMESTERS": "لا توجد فصول دراسية بعد. أضف واحدًا للبدء.",
+      "DELETE_TITLE": "حذف الفصل الدراسي",
+      "DELETE_MSG": "حذف \"{{name}}\"؟",
+      "DELETED": "تم حذف الفصل الدراسي",
+      "LOAD_ERROR": "فشل تحميل الفصول الدراسية"
+    },
+    "FORM": {
+      "CREATE_TITLE": "إضافة فصل دراسي",
+      "EDIT_TITLE": "تعديل الفصل الدراسي",
+      "NAME_LABEL": "الاسم",
+      "NAME_PLACEHOLDER": "مثال: الفصل الأول",
+      "NAME_REQUIRED": "الاسم مطلوب (حرفان على الأقل)",
+      "START_DATE_LABEL": "تاريخ البداية",
+      "END_DATE_LABEL": "تاريخ النهاية",
+      "ACTIVE_LABEL": "نشط",
+      "CANCEL": "إلغاء",
+      "CREATE": "إنشاء",
+      "UPDATE": "تحديث",
+      "CREATE_SUCCESS": "تم إنشاء الفصل الدراسي",
+      "UPDATE_SUCCESS": "تم تحديث الفصل الدراسي"
     }
   },
   "SUBJECTS": {

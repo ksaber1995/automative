@@ -94,6 +94,42 @@ export async function ensureAutoManageSessionsColumn(): Promise<void> {
 }
 
 /**
+ * Migration 093: companies.type gains a real CHECK constraint (it was a free
+ * VARCHAR(20) since migration 028) and SCHOOL becomes a legal value — ahead of
+ * its signup flow shipping. Mirrors the guarded pattern in session-payments.ts'
+ * ensurePerSessionSchema: skip when already in the desired state, swallow
+ * duplicate_object so concurrent cold-starting containers can't race.
+ */
+let companyTypeConstraintInitPromise: Promise<void> | null = null;
+export async function ensureCompanyTypeConstraint(): Promise<void> {
+  if (!companyTypeConstraintInitPromise) {
+    companyTypeConstraintInitPromise = (async () => {
+      try {
+        await query(`DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_constraint
+              WHERE conname = 'companies_type_check' AND conrelid = 'companies'::regclass
+                AND pg_get_constraintdef(oid) LIKE '%SCHOOL%'
+            ) THEN
+              ALTER TABLE companies DROP CONSTRAINT IF EXISTS companies_type_check;
+              BEGIN
+                ALTER TABLE companies ADD CONSTRAINT companies_type_check
+                  CHECK (type IN ('ACADEMY', 'TEACHER', 'SCHOOL'));
+              EXCEPTION WHEN duplicate_object THEN NULL;
+              END;
+            END IF;
+          END $$`);
+      } catch (e) {
+        companyTypeConstraintInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return companyTypeConstraintInitPromise;
+}
+
+/**
  * Opt-in (migration 092): auto-confirm a PER_SESSION charge raised while taking
  * attendance, instead of leaving it PENDING for a manual click. Off by default —
  * unlike auto-managed sessions, a company only wants this once it has actually

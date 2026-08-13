@@ -226,7 +226,10 @@ const RegisterRequestSchema = z.object({
   companyName: z.string().min(1),
   // Account type: ACADEMY (institution) or TEACHER (individual). Optional so
   // older clients that omit it still validate; the backend defaults to ACADEMY.
-  type: z.enum(['ACADEMY', 'TEACHER']).optional(),
+  // SCHOOL is a recognised value with no signup flow yet ("Coming soon" on the
+  // login page) — the handler rejects it explicitly rather than silently
+  // downgrading it to ACADEMY.
+  type: z.enum(['ACADEMY', 'TEACHER', 'SCHOOL']).optional(),
   // Feature plan chosen at signup (academies only; teachers are always SIMPLE).
   plan: z.enum(['SIMPLE', 'ADVANCED']).optional(),
   // What the academy calls things. SPORTS registers an ordinary ADVANCED academy
@@ -282,7 +285,7 @@ const SafeUserSchema = z.object({
   lastName: z.string(),
   role: UserRoleSchema,
   companyId: UUIDSchema,
-  companyType: z.enum(['ACADEMY', 'TEACHER']).optional(),
+  companyType: z.enum(['ACADEMY', 'TEACHER', 'SCHOOL']).optional(),
   plan: z.enum(['SIMPLE', 'ADVANCED']).optional(), // Feature plan; ADVANCED unlocks CRM
   vertical: z.enum(['GENERAL', 'SPORTS']).optional(), // Vocabulary only; drives the i18n overlay
   qrFree: z.boolean().optional(), // Teacher tenant is in the free QR-activation launch tier
@@ -527,6 +530,74 @@ const LevelSchema = z.object({
 const CourseLevelSchema = z.object({
   id: UUIDSchema,
   name: z.string().nullable(),
+});
+
+// =============================================
+// School Level ("Educational Stage") Schemas
+// A SCHOOL tenant's grade/class-year ladder — lives in its own `school.levels`
+// table (migration 094), deliberately simpler than LevelSchema above: no age
+// range. See aws/lambda/api/src/routes/school-levels.ts.
+// =============================================
+const CreateSchoolLevelSchema = z.object({
+  name: z.string(),
+});
+
+const UpdateSchoolLevelSchema = CreateSchoolLevelSchema.partial();
+
+const SchoolLevelSchema = z.object({
+  id: UUIDSchema,
+  companyId: UUIDSchema,
+  name: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+// =============================================
+// School Subject Schemas — one-to-many under an educational stage
+// (school.levels), never company-wide like the academy Subjects table.
+// =============================================
+const CreateSchoolSubjectSchema = z.object({
+  name: z.string(),
+  levelId: UUIDSchema,
+});
+
+const UpdateSchoolSubjectSchema = z.object({
+  name: z.string().optional(),
+  levelId: UUIDSchema.optional(),
+});
+
+const SchoolSubjectSchema = z.object({
+  id: UUIDSchema,
+  companyId: UUIDSchema,
+  levelId: UUIDSchema,
+  name: z.string(),
+  // Present on list/getById (joined); absent right after create/update.
+  levelName: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+// =============================================
+// School Semester Schemas — company-wide, no relation to levels/subjects.
+// =============================================
+const CreateSchoolSemesterSchema = z.object({
+  name: z.string(),
+  startDate: z.string().nullable().optional(),
+  endDate: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+const UpdateSchoolSemesterSchema = CreateSchoolSemesterSchema.partial();
+
+const SchoolSemesterSchema = z.object({
+  id: UUIDSchema,
+  companyId: UUIDSchema,
+  name: z.string(),
+  startDate: z.string().nullable(),
+  endDate: z.string().nullable(),
+  isActive: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 
 // =============================================
@@ -2519,6 +2590,160 @@ export const contract = c.router({
     delete: {
       method: 'DELETE',
       path: '/api/levels/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+  },
+
+  // School levels ("Educational Stages") routes — SCHOOL tenants only, own
+  // `school.levels` table (migration 094). See routes/school-levels.ts.
+  schoolLevels: {
+    create: {
+      method: 'POST',
+      path: '/api/school-levels',
+      body: CreateSchoolLevelSchema,
+      responses: {
+        201: SchoolLevelSchema,
+        400: ApiErrorSchema,
+      },
+    },
+    list: {
+      method: 'GET',
+      path: '/api/school-levels',
+      responses: {
+        200: z.array(SchoolLevelSchema),
+      },
+    },
+    getById: {
+      method: 'GET',
+      path: '/api/school-levels/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: SchoolLevelSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    update: {
+      method: 'PATCH',
+      path: '/api/school-levels/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: UpdateSchoolLevelSchema,
+      responses: {
+        200: SchoolLevelSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    delete: {
+      method: 'DELETE',
+      path: '/api/school-levels/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+  },
+
+  // School subjects routes — one-to-many under an educational stage. See
+  // routes/school-subjects.ts.
+  schoolSubjects: {
+    create: {
+      method: 'POST',
+      path: '/api/school-subjects',
+      body: CreateSchoolSubjectSchema,
+      responses: {
+        201: SchoolSubjectSchema,
+        400: ApiErrorSchema,
+      },
+    },
+    // levelId narrows to one stage's subjects; omitted, every subject across
+    // every stage (the flat Subjects page's level filter uses both).
+    list: {
+      method: 'GET',
+      path: '/api/school-subjects',
+      query: z.object({ levelId: OptionalUUIDSchema }),
+      responses: {
+        200: z.array(SchoolSubjectSchema),
+      },
+    },
+    getById: {
+      method: 'GET',
+      path: '/api/school-subjects/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: SchoolSubjectSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    update: {
+      method: 'PATCH',
+      path: '/api/school-subjects/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: UpdateSchoolSubjectSchema,
+      responses: {
+        200: SchoolSubjectSchema,
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    delete: {
+      method: 'DELETE',
+      path: '/api/school-subjects/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+  },
+
+  // School semesters routes — company-wide, no relation to levels/subjects.
+  // See routes/school-semesters.ts.
+  schoolSemesters: {
+    create: {
+      method: 'POST',
+      path: '/api/school-semesters',
+      body: CreateSchoolSemesterSchema,
+      responses: {
+        201: SchoolSemesterSchema,
+        400: ApiErrorSchema,
+      },
+    },
+    list: {
+      method: 'GET',
+      path: '/api/school-semesters',
+      responses: {
+        200: z.array(SchoolSemesterSchema),
+      },
+    },
+    getById: {
+      method: 'GET',
+      path: '/api/school-semesters/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: SchoolSemesterSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    update: {
+      method: 'PATCH',
+      path: '/api/school-semesters/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: UpdateSchoolSemesterSchema,
+      responses: {
+        200: SchoolSemesterSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    delete: {
+      method: 'DELETE',
+      path: '/api/school-semesters/:id',
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
@@ -5941,7 +6166,7 @@ export const contract = c.router({
       method: 'POST',
       path: '/api/karim-admin-secret/companies/:companyId/type',
       pathParams: z.object({ companyId: UUIDSchema }),
-      body: z.object({ type: z.enum(['ACADEMY', 'TEACHER']) }),
+      body: z.object({ type: z.enum(['ACADEMY', 'TEACHER', 'SCHOOL']) }),
       responses: {
         200: z.object({ success: z.boolean(), company_type: z.string() }),
         400: z.object({ message: z.string() }),

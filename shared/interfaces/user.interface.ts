@@ -34,7 +34,9 @@ export interface SafeUser {
   firstName: string;
   lastName: string;
   role: UserRole;
-  companyType?: 'ACADEMY' | 'TEACHER'; // Owning company's registration type
+  // Owning company's registration type. SCHOOL exists in the schema ahead of
+  // its signup flow shipping — see RegisterDto.type below.
+  companyType?: 'ACADEMY' | 'TEACHER' | 'SCHOOL';
   plan?: 'SIMPLE' | 'ADVANCED';      // Feature plan; ADVANCED unlocks CRM & add-ons
   /** What this academy calls things. Drives the vocabulary overlay, nothing else. */
   vertical?: CompanyVertical;
@@ -96,7 +98,9 @@ export interface RegisterDto {
   // Company details
   companyName: string;
   // Account type chosen at signup: ACADEMY (institution) or TEACHER (individual).
-  type?: 'ACADEMY' | 'TEACHER';
+  // SCHOOL is a recognised value with no signup flow yet — the login page shows
+  // it as "Coming soon" and the register endpoint rejects it until that ships.
+  type?: 'ACADEMY' | 'TEACHER' | 'SCHOOL';
   // Feature plan chosen at signup (academies only).
   plan?: 'SIMPLE' | 'ADVANCED';
   // Vocabulary chosen by which signup link was used. SPORTS forces an ADVANCED

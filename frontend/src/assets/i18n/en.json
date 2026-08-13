@@ -198,6 +198,7 @@
       "EMAIL_REQUIRED": "Email is required",
       "EMAIL_TAKEN": "This email is already registered",
       "PHONE_TAKEN": "This phone number is already registered",
+      "SCHOOL_NOT_AVAILABLE": "School registration is coming soon.",
       "REGISTRATION_CONFLICT": "An account with these details already exists",
       "REGISTRATION_FAILED": "Registration failed. Please try again.",
       "INVALID_VERIFICATION_REQUEST": "Invalid verification request",
@@ -536,6 +537,29 @@
       "LIST_FAILED": "Failed to load levels",
       "AGE_RANGE_INVALID": "\"To\" age must be greater than \"From\" age"
     },
+    "SCHOOL_LEVELS": {
+      "NOT_FOUND": "Educational stage not found",
+      "CREATE_FAILED": "Failed to create educational stage",
+      "UPDATE_FAILED": "Failed to update educational stage",
+      "DELETE_FAILED": "Failed to delete educational stage",
+      "LIST_FAILED": "Failed to load educational stages"
+    },
+    "SCHOOL_SUBJECTS": {
+      "NOT_FOUND": "Subject not found",
+      "CREATE_FAILED": "Failed to create subject",
+      "UPDATE_FAILED": "Failed to update subject",
+      "DELETE_FAILED": "Failed to delete subject",
+      "LIST_FAILED": "Failed to load subjects",
+      "LEVEL_REQUIRED": "An educational stage must be selected",
+      "LEVEL_NOT_FOUND": "Educational stage not found"
+    },
+    "SCHOOL_SEMESTERS": {
+      "NOT_FOUND": "Semester not found",
+      "CREATE_FAILED": "Failed to create semester",
+      "UPDATE_FAILED": "Failed to update semester",
+      "DELETE_FAILED": "Failed to delete semester",
+      "LIST_FAILED": "Failed to load semesters"
+    },
     "ROOMS": {
       "NOT_FOUND": "Room not found",
       "ACCESS_DENIED": "Access denied to this room",
@@ -801,6 +825,9 @@
     "COURSE_CLASSES": "Classes",
     "MASTER_COURSES": "Master Courses",
     "LEVELS": "Levels",
+    "EDUCATIONAL_STAGES": "Educational Stages",
+    "EDUCATIONAL_STAGE_DETAIL": "Stage Details",
+    "SEMESTERS": "Semesters",
     "SUBJECTS": "Subjects",
     "EVENTS": "Events",
     "CLASSES": "Classes",
@@ -1398,6 +1425,8 @@
     "COURSES": "Courses",
     "MASTER_COURSES": "Master Courses",
     "LEVELS": "Levels",
+    "EDUCATIONAL_STAGES": "Educational Stages",
+    "SEMESTERS": "Semesters",
     "SUBJECTS": "Subjects",
     "EVENTS": "Events",
     "CLASSES": "Classes",
@@ -1493,6 +1522,9 @@
       "REGISTER_TEACHER_HINT": "Individual / private tutor",
       "REGISTER_SPORTS_ACADEMY": "Register as Sports Academy",
       "REGISTER_SPORTS_ACADEMY_HINT": "Coaches, trainees & groups",
+      "REGISTER_SCHOOL": "Register as School",
+      "REGISTER_SCHOOL_HINT": "Grades, terms & classrooms",
+      "COMING_SOON": "Coming soon",
       "COPYRIGHT": "2026 Netrofit. All rights reserved.",
       "SUCCESS": "Login successful!",
       "EMAIL_NOT_VERIFIED": "Please verify your account via WhatsApp OTP before logging in.",
@@ -2061,6 +2093,102 @@
       "UPDATE": "Update",
       "CREATE_SUCCESS": "Level created",
       "UPDATE_SUCCESS": "Level updated"
+    }
+  },
+  "SCHOOL_LEVELS": {
+    "LIST": {
+      "TITLE": "Educational Stages",
+      "ADD": "Add Stage",
+      "COL_NAME": "Name",
+      "COL_ACTIONS": "Actions",
+      "EDIT": "Edit",
+      "DELETE": "Delete",
+      "VIEW_SUBJECTS": "View subjects",
+      "NO_LEVELS": "No educational stages yet. Add one to build your grade ladder.",
+      "DELETE_TITLE": "Delete Educational Stage",
+      "DELETE_MSG": "Delete \"{{name}}\"? Anything linked to this stage will simply be unlinked.",
+      "DELETED": "Educational stage deleted",
+      "LOAD_ERROR": "Failed to load educational stages"
+    },
+    "FORM": {
+      "CREATE_TITLE": "Add Educational Stage",
+      "EDIT_TITLE": "Edit Educational Stage",
+      "NAME_LABEL": "Name",
+      "NAME_PLACEHOLDER": "e.g., Grade 3",
+      "NAME_REQUIRED": "Name is required (min 2 characters)",
+      "CANCEL": "Cancel",
+      "CREATE": "Create",
+      "UPDATE": "Update",
+      "CREATE_SUCCESS": "Educational stage created",
+      "UPDATE_SUCCESS": "Educational stage updated"
+    }
+  },
+  "SCHOOL_SUBJECTS": {
+    "LIST": {
+      "TITLE": "Subjects",
+      "ADD": "Add Subject",
+      "COL_NAME": "Name",
+      "COL_LEVEL": "Educational Stage",
+      "COL_ACTIONS": "Actions",
+      "EDIT": "Edit",
+      "DELETE": "Delete",
+      "FILTER_LEVEL": "Educational Stage",
+      "FILTER_ALL": "All stages",
+      "NO_SUBJECTS": "No subjects yet.",
+      "NO_SUBJECTS_IN_STAGE": "No subjects in this stage yet. Add one.",
+      "DELETE_TITLE": "Delete Subject",
+      "DELETE_MSG": "Delete \"{{name}}\"?",
+      "DELETED": "Subject deleted",
+      "LOAD_ERROR": "Failed to load subjects"
+    },
+    "FORM": {
+      "CREATE_TITLE": "Add Subject",
+      "EDIT_TITLE": "Edit Subject",
+      "NAME_LABEL": "Name",
+      "NAME_PLACEHOLDER": "e.g., Mathematics",
+      "NAME_REQUIRED": "Name is required (min 2 characters)",
+      "LEVEL_LABEL": "Educational Stage",
+      "LEVEL_PLACEHOLDER": "Select a stage",
+      "LEVEL_REQUIRED": "An educational stage must be selected",
+      "CANCEL": "Cancel",
+      "CREATE": "Create",
+      "UPDATE": "Update",
+      "CREATE_SUCCESS": "Subject created",
+      "UPDATE_SUCCESS": "Subject updated"
+    }
+  },
+  "SCHOOL_SEMESTERS": {
+    "LIST": {
+      "TITLE": "Semesters",
+      "ADD": "Add Semester",
+      "COL_NAME": "Name",
+      "COL_DATES": "Dates",
+      "COL_STATUS": "Status",
+      "COL_ACTIONS": "Actions",
+      "ACTIVE": "Active",
+      "INACTIVE": "Inactive",
+      "EDIT": "Edit",
+      "DELETE": "Delete",
+      "NO_SEMESTERS": "No semesters yet. Add one to get started.",
+      "DELETE_TITLE": "Delete Semester",
+      "DELETE_MSG": "Delete \"{{name}}\"?",
+      "DELETED": "Semester deleted",
+      "LOAD_ERROR": "Failed to load semesters"
+    },
+    "FORM": {
+      "CREATE_TITLE": "Add Semester",
+      "EDIT_TITLE": "Edit Semester",
+      "NAME_LABEL": "Name",
+      "NAME_PLACEHOLDER": "e.g., Semester 1",
+      "NAME_REQUIRED": "Name is required (min 2 characters)",
+      "START_DATE_LABEL": "Start Date",
+      "END_DATE_LABEL": "End Date",
+      "ACTIVE_LABEL": "Active",
+      "CANCEL": "Cancel",
+      "CREATE": "Create",
+      "UPDATE": "Update",
+      "CREATE_SUCCESS": "Semester created",
+      "UPDATE_SUCCESS": "Semester updated"
     }
   },
   "SUBJECTS": {

@@ -20,7 +20,11 @@ CREATE TABLE companies (
     tax_id VARCHAR(100),
     registration_number VARCHAR(100),
     industry VARCHAR(100),
-    type VARCHAR(20) NOT NULL DEFAULT 'ACADEMY',
+    -- Registration type (migration 093 added the CHECK — see that file for why
+    -- it wasn't enforced before). SCHOOL has no signup flow yet: it's a
+    -- disabled "Coming soon" card on the login page, and the register endpoint
+    -- rejects it explicitly.
+    type VARCHAR(20) NOT NULL DEFAULT 'ACADEMY' CHECK (type IN ('ACADEMY', 'TEACHER', 'SCHOOL')),
     -- Feature plan (migration 053): SIMPLE (core) or ADVANCED (unlocks CRM, etc.).
     plan VARCHAR(20) NOT NULL DEFAULT 'SIMPLE' CHECK (plan IN ('SIMPLE', 'ADVANCED')),
     subscription_tier VARCHAR(50) DEFAULT 'BASIC' CHECK (subscription_tier IN ('BASIC', 'PROFESSIONAL', 'ENTERPRISE')),
@@ -175,6 +179,66 @@ CREATE TABLE levels (
 );
 
 CREATE INDEX idx_levels_company_id ON levels(company_id);
+
+-- =============================================
+-- SCHOOL.LEVELS TABLE  (migration 094)
+-- Educational stages for a SCHOOL-type tenant (grade/class-year ladder shown
+-- on their sidebar as "Educational Stages" — never "Levels", which is the
+-- academy vocabulary). Deliberately its OWN schema, not a row shape shared
+-- with `levels` above: a school's ladder has no age range, and keeping it
+-- structurally separate means changing one later never risks the other.
+-- This is the FIRST table outside the `public` schema in this codebase — see
+-- migration 094's header comment for why, and why every query against it must
+-- schema-qualify (`school.levels`, never bare `levels`).
+-- =============================================
+CREATE SCHEMA IF NOT EXISTS school;
+
+CREATE TABLE school.levels (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_school_levels_company_id ON school.levels(company_id);
+
+-- =============================================
+-- SCHOOL.SUBJECTS TABLE  (migration 095)
+-- Unlike the academy-wide `subjects` table, a school subject belongs to
+-- exactly ONE educational stage — one-to-many, level_id NOT NULL. Creating a
+-- subject always means picking a stage first; deleting a stage takes its
+-- subjects with it.
+-- =============================================
+CREATE TABLE school.subjects (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    level_id UUID NOT NULL REFERENCES school.levels(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_school_subjects_company_id ON school.subjects(company_id);
+CREATE INDEX idx_school_subjects_level_id ON school.subjects(level_id);
+
+-- =============================================
+-- SCHOOL.SEMESTERS TABLE  (migration 095)
+-- Company-wide, no relation to levels/subjects. Minimal shape — expected to
+-- be refined once the real School feature set is designed.
+-- =============================================
+CREATE TABLE school.semesters (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    start_date DATE,
+    end_date DATE,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_school_semesters_company_id ON school.semesters(company_id);
 
 -- =============================================
 -- COURSES TABLE

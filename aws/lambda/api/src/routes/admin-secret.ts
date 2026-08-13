@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { ensureQrCardSchema, nextCardSerial, firstTakenCardNumber, CARD_SERIAL_BASE_V2 } from './qr-cards';
 import { query, queryOne, getClient } from '../db/connection';
 import { DEBUG_ACCOUNT_EMAIL, isDebugAccount } from '../utils/debug-account';
+import { ensureCompanyTypeConstraint } from './companies';
 
 /** The roles a user account can hold (mirrors the users.role CHECK constraint). */
 export const ADMIN_ROLES = [
@@ -196,15 +197,17 @@ export const adminSecretRoutes = {
 
   /**
    * POST /api/karim-admin-secret/companies/:companyId/type
-   * Switch a company's registration type between ACADEMY and TEACHER. This is
-   * the `companies.type` set at signup, which gates teacher-only vs academy-only
-   * features; nothing else about the tenant's data changes.
+   * Switch a company's registration type between ACADEMY, TEACHER, and SCHOOL.
+   * This is the `companies.type` set at signup, which gates teacher-only vs
+   * academy-only features; nothing else about the tenant's data changes. SCHOOL
+   * has no self-serve signup yet — this is currently the only way one gets set.
    */
-  setCompanyType: async ({ params, body }: { params: { companyId: string }; body: { type: 'ACADEMY' | 'TEACHER' } }) => {
+  setCompanyType: async ({ params, body }: { params: { companyId: string }; body: { type: 'ACADEMY' | 'TEACHER' | 'SCHOOL' } }) => {
     try {
-      const type = body?.type === 'TEACHER' ? 'TEACHER' : body?.type === 'ACADEMY' ? 'ACADEMY' : null;
+      await ensureCompanyTypeConstraint();
+      const type = (['ACADEMY', 'TEACHER', 'SCHOOL'] as const).includes(body?.type as any) ? body.type : null;
       if (!type) {
-        return { status: 400 as const, body: { message: "type must be 'ACADEMY' or 'TEACHER'" } };
+        return { status: 400 as const, body: { message: "type must be 'ACADEMY', 'TEACHER', or 'SCHOOL'" } };
       }
 
       const company = await queryOne<any>('SELECT id FROM companies WHERE id = $1', [params.companyId]);

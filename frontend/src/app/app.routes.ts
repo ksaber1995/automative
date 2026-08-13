@@ -81,6 +81,32 @@ export const routes: Routes = [
         loadComponent: () => import('./features/levels/level-list/level-list.component').then(m => m.LevelListComponent)
       },
       {
+        path: 'educational-stages',
+        // SCHOOL tenants' equivalent of Levels — same no-guard treatment,
+        // gated only by the sidebar entry that links here.
+        data: { breadcrumb: 'BREADCRUMBS.EDUCATIONAL_STAGES' },
+        loadComponent: () => import('./features/school-levels/school-level-list/school-level-list.component').then(m => m.SchoolLevelListComponent)
+      },
+      {
+        path: 'educational-stages/:id',
+        // One stage's own page: its subjects, reached from the list above.
+        data: { breadcrumb: 'BREADCRUMBS.EDUCATIONAL_STAGE_DETAIL' },
+        loadComponent: () => import('./features/school-levels/school-level-detail/school-level-detail.component').then(m => m.SchoolLevelDetailComponent)
+      },
+      {
+        path: 'school-subjects',
+        // SCHOOL tenants' equivalent of Subjects — every subject across every
+        // stage, with a level filter; unlike academy Subjects, creating one
+        // always requires picking a stage.
+        data: { breadcrumb: 'BREADCRUMBS.SUBJECTS' },
+        loadComponent: () => import('./features/school-levels/school-subject-list/school-subject-list.component').then(m => m.SchoolSubjectListComponent)
+      },
+      {
+        path: 'semesters',
+        data: { breadcrumb: 'BREADCRUMBS.SEMESTERS' },
+        loadComponent: () => import('./features/school-semesters/school-semester-list/school-semester-list.component').then(m => m.SchoolSemesterListComponent)
+      },
+      {
         path: 'subjects',
         // Academy-only feature: notTeacherGuard bounces TEACHER companies, matching
         // the sidebar entry (hidden for teachers) and the course-form dropdown.

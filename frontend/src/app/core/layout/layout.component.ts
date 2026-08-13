@@ -361,11 +361,20 @@ export class LayoutComponent implements OnInit, OnDestroy {
       // permission check of its own — the Admin group is already global-admin gated.
       { labelKey: 'NAV.BRANCHES', icon: 'pi pi-building', routerLink: ['/branches'], visible: auth.canRead('academy') && !auth.isTeacher() },
       // Academy-only, like Subjects below: a teacher tenant files nothing under a
-      // level ladder, and the course form hides the picker for them too.
-      { labelKey: 'NAV.LEVELS', icon: 'pi pi-sort-amount-up', routerLink: ['/levels'], visible: !auth.isTeacher() },
+      // level ladder, and the course form hides the picker for them too. A
+      // SCHOOL tenant gets its own equivalent (Educational Stages, no age
+      // range) just below instead — the two never both show at once.
+      { labelKey: 'NAV.LEVELS', icon: 'pi pi-sort-amount-up', routerLink: ['/levels'], visible: !auth.isTeacher() && !auth.isSchool() },
+      { labelKey: 'NAV.EDUCATIONAL_STAGES', icon: 'pi pi-sort-amount-up', routerLink: ['/educational-stages'], visible: auth.isSchool() },
       // Subjects are academy-only — hidden for teacher accounts (same gate as the
-      // /subjects route's notTeacherGuard and the course-form dropdown).
-      { labelKey: 'NAV.SUBJECTS', icon: 'pi pi-tags', routerLink: ['/subjects'], visible: !auth.isTeacher() },
+      // /subjects route's notTeacherGuard and the course-form dropdown). A
+      // SCHOOL tenant gets its own equivalent instead — every subject lives
+      // under a stage there, so its list carries a level filter and its
+      // create dialog requires picking one; the two never both show at once.
+      { labelKey: 'NAV.SUBJECTS', icon: 'pi pi-tags', routerLink: ['/subjects'], visible: !auth.isTeacher() && !auth.isSchool() },
+      { labelKey: 'NAV.SUBJECTS', icon: 'pi pi-tags', routerLink: ['/school-subjects'], visible: auth.isSchool() },
+      // SCHOOL-only: semesters/terms, company-wide.
+      { labelKey: 'NAV.SEMESTERS', icon: 'pi pi-calendar', routerLink: ['/semesters'], visible: auth.isSchool() },
       // Card Design (the shared back face of the printed ID cards) stays off the
       // sidebar for customers: it is set up once and never touched again, so it
       // earns no place in a menu people read every day, and /card-design still

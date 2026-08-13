@@ -251,6 +251,15 @@ export class AuthService {
     return this.currentUser()?.companyType === 'TEACHER';
   }
 
+  /**
+   * True when the signed-in user's company registered as a SCHOOL. Used to
+   * swap Levels for Educational Stages (a school's grade/class-year ladder,
+   * no age range) in the sidebar and elsewhere.
+   */
+  isSchool(): boolean {
+    return this.currentUser()?.companyType === 'SCHOOL';
+  }
+
   /** Company feature plan; ADVANCED unlocks CRM and future add-ons. */
   plan(): 'SIMPLE' | 'ADVANCED' {
     return this.currentUser()?.plan === 'ADVANCED' ? 'ADVANCED' : 'SIMPLE';

@@ -152,7 +152,9 @@
               <div class="absolute inset-x-0 top-1/2 h-px bg-gray-200"></div>
               <span class="relative bg-white px-3 text-xs font-medium text-gray-400">{{ 'AUTH.LOGIN.NO_ACCOUNT' | translate }}</span>
             </div>
-            <div class="grid grid-cols-3 gap-3 mt-3">
+            <!-- Always 2 columns: four registration options in two rows,
+                 not squeezed into one on wider screens. -->
+            <div class="grid grid-cols-2 gap-3 mt-3">
               <a routerLink="/auth/register/academy"
                  class="group flex flex-col items-center text-center gap-1.5 rounded-xl border border-gray-200 p-4 hover:border-primary-500 hover:bg-primary-50 transition-colors">
                 <span class="flex items-center justify-center w-10 h-10 rounded-full bg-primary-50 text-primary-600 group-hover:bg-primary-100 transition-colors">
@@ -177,6 +179,19 @@
                 <span class="text-sm font-semibold text-gray-800">{{ 'AUTH.LOGIN.REGISTER_TEACHER' | translate }}</span>
                 <span class="text-[11px] leading-tight text-gray-400">{{ 'AUTH.LOGIN.REGISTER_TEACHER_HINT' | translate }}</span>
               </a>
+              <!-- Not a link: School registration doesn't exist yet. Rendered
+                   inert (no routerLink, no hover state, dimmed) rather than
+                   omitted, so it reads as "on the way" instead of missing. -->
+              <div class="relative flex flex-col items-center text-center gap-1.5 rounded-xl border border-gray-200 p-4 opacity-60 cursor-not-allowed select-none">
+                <span class="absolute -top-2 right-2 px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-600 text-[9px] font-bold uppercase tracking-wide">
+                  {{ 'AUTH.LOGIN.COMING_SOON' | translate }}
+                </span>
+                <span class="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-400">
+                  <i class="pi pi-graduation-cap"></i>
+                </span>
+                <span class="text-sm font-semibold text-gray-500">{{ 'AUTH.LOGIN.REGISTER_SCHOOL' | translate }}</span>
+                <span class="text-[11px] leading-tight text-gray-400">{{ 'AUTH.LOGIN.REGISTER_SCHOOL_HINT' | translate }}</span>
+              </div>
             </div>
           </div>
         </form>
