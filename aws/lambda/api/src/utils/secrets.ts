@@ -161,3 +161,30 @@ export async function putWaTenantCredentials(companyId: string, creds: WaTenantC
 export async function deleteWaTenantCredentials(companyId: string): Promise<void> {
   await deleteSecret(waTenantSecretId(companyId));
 }
+
+// ─── Web Push (parent PWA notifications) ────────────────────────────────────
+// See docs/parent-pwa-notifications-plan.md.
+
+/** The VAPID keypair sendPush signs with. Created by the CDK stack, pasted in by hand. */
+export interface PushVapidConfig {
+  publicKey: string;
+  privateKey: string;
+  subject: string;
+}
+
+export async function getPushVapidConfig(): Promise<PushVapidConfig> {
+  const secretArn = process.env.PUSH_VAPID_SECRET_ARN;
+  if (!secretArn) {
+    throw new Error('PUSH_VAPID_SECRET_ARN not set');
+  }
+  return await getSecret(secretArn);
+}
+
+/**
+ * True once a real keypair has been generated and pasted in. The secret
+ * exists from the first deploy with blank fields, so its presence proves
+ * nothing — same reasoning as isWaPlatformConfigured.
+ */
+export function isPushVapidConfigured(config: PushVapidConfig): boolean {
+  return !!(config?.publicKey && config?.privateKey);
+}

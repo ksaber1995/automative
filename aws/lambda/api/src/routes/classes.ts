@@ -679,7 +679,7 @@ export const classesRoutes = {
     }
   },
 
-  list: async ({ query: queryParams, headers }: { query: { branchId?: string; courseId?: string }; headers: { authorization: string } }) => {
+  list: async ({ query: queryParams, headers }: { query: { branchId?: string; courseId?: string; instructorId?: string }; headers: { authorization: string } }) => {
     try {
       await ensureClassStatusColumns();
       const context = await extractTenantContext(headers.authorization);
@@ -740,6 +740,11 @@ export const classesRoutes = {
       if (queryParams.courseId) {
         params.push(queryParams.courseId);
         sql += ` AND c.course_id = $${params.length}`;
+      }
+
+      if (queryParams.instructorId) {
+        params.push(queryParams.instructorId);
+        sql += ` AND c.instructor_id = $${params.length}`;
       }
 
       sql += ' ORDER BY c.start_date DESC, c.created_at DESC';

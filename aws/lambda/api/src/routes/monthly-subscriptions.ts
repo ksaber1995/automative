@@ -293,15 +293,14 @@ export async function ensureBillsForMonth(
        AND ${studentIsPresentById('e.student_id')}
        AND c.payment_type = 'MONTHLY_SUBSCRIPTION'
        AND c.is_active = true
-       -- Not if this enrolment came in through a per-month master course. There
-       -- the master's own fee is the bill and it covers everything inside it, so
-       -- charging the member course as well would bill the student twice for the
-       -- same month. NOT EXISTS is null-safe: a plain enrolment has no master.
+       -- Not if this enrolment came in through a master course — one-time or
+       -- per-month, the bundle already covers it (its own fee is the bill, or
+       -- there is none), so charging the member course too would bill the
+       -- student twice for the same month. NOT EXISTS is null-safe: a plain
+       -- enrolment has no master.
        AND NOT EXISTS (
          SELECT 1 FROM master_enrollments me
-         JOIN master_courses mc ON mc.id = me.master_course_id
          WHERE me.id = e.master_enrollment_id
-           AND mc.payment_type = 'MONTHLY_SUBSCRIPTION'
        )
        -- never bill a month that ended before the student even enrolled
        AND (e.enrollment_date IS NULL OR e.enrollment_date <= period.last_day)

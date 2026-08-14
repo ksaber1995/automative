@@ -460,7 +460,8 @@
       "INSUFFICIENT_COURSES_PERMISSION": "You do not have permission to manage courses",
       "HAS_ENROLLMENTS": "This master course has subscribers and cannot be deleted. Deactivate it instead.",
       "HAS_ACTIVE_COURSES": "Deactivate the linked courses (or finish their classes) before deactivating this bundle.",
-      "COURSE_PAYMENT_TYPE": "Only one-time payment courses can be grouped into a master course. Monthly and per-session courses are billed on their own schedule, so they can't share a bundle price."
+      "COURSE_PAYMENT_TYPE": "This course cannot be grouped into this master course.",
+      "COURSE_PAYMENT_TYPE_MONTHLY": "A per-month master course takes per-month and per-session courses only. A one-time course can't join because a recurring fee has no way to cover a price that's paid once."
     },
     "MASTER_ENROLLMENTS": {
       "NOT_FOUND": "Master enrollment not found",
@@ -2318,7 +2319,7 @@
       "MONTHLY_FEE": "Monthly fee",
       "PAYMENT_TYPE": "How is it sold?",
       "PAYMENT_TYPE_ONE_TIME": "One-off bundle",
-      "PAYMENT_TYPE_ONE_TIME_HINT": "One price, paid once. Holds one-time courses, which are then free to the student.",
+      "PAYMENT_TYPE_ONE_TIME_HINT": "One price, paid once. Holds any kind of course — one-time, monthly, or per-session — all of which become free to the student once they buy the bundle.",
       "PAYMENT_TYPE_MONTHLY": "Per month",
       "PAYMENT_TYPE_MONTHLY_HINT": "A fee every month that covers everything inside it. Holds per-month and per-session courses â those stop charging the student on their own.",
       "DEFAULT_DURATION": "Default Duration (weeks)",
@@ -2377,10 +2378,12 @@
       "DESC": "Only courses from this master's branch that aren't already in another bundle are shown.",
       "SELECT": "Course",
       "PLACEHOLDER": "Select a course",
+      "SEARCH_PLACEHOLDER": "Search courses...",
       "NONE": "No eligible courses available.",
       "CANCEL": "Cancel",
       "CONFIRM": "Add",
-      "ONE_TIME_ONLY": "Only one-time payment courses can be added. A master course sells its courses as one bundle for one price, so monthly and per-session courses can't join yet."
+      "ONE_TIME_HINT": "Any course can join this bundle — one-time, monthly, or per-session. Once a student buys the bundle, every course inside becomes free to them, regardless of how it normally bills.",
+      "MONTHLY_ONLY_HINT": "Only monthly and per-session courses can be added. This bundle charges its own fee every month and covers whatever's inside it, so a one-time course can't join."
     },
     "DELETED": "Master course deleted",
     "COURSE_ADDED": "Course added",
@@ -3355,7 +3358,21 @@
       "TEACHER": "Teacher",
       "SUBJECTS": "Subjects",
       "LEVELS": "Levels",
-      "NONE": "None"
+      "NONE": "None",
+      "CLASSES_TAUGHT": "Classes Taught",
+      "CLASSES_COUNT": "{{count}} class(es)",
+      "COL_CLASS_NAME": "Class",
+      "COL_COURSE": "Course",
+      "COL_SCHEDULE": "Schedule",
+      "COL_STUDENTS": "Students",
+      "COL_PAY": "Pay",
+      "PAY_PERCENTAGE": "{{rate}}% of revenue",
+      "PAY_SESSION": "{{rate}} / session",
+      "PAY_MONTHLY": "Monthly salary",
+      "PAY_UNPAID": "Unpaid",
+      "PAY_OVERRIDE_HINT": "Course-specific rate, overrides the default above",
+      "CLASS_FINISHED": "Finished",
+      "NO_CLASSES": "Not assigned to any class yet."
     },
     "CREATED": "Employee created successfully",
     "UPDATED": "Employee updated successfully",

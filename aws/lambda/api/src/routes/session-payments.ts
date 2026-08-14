@@ -27,17 +27,18 @@ async function autoConfirmEnabled(companyId: string): Promise<boolean> {
 
 /**
  * The student is not paying for this session: they are in through a master
- * course sold per month, and that fee covers everything inside the bundle. Their
- * attendance is still recorded — only the charge is skipped.
+ * course — one-time or per-month — and that bundle already covers them, so a
+ * per-session member stops billing on its own once someone is in through it.
+ * Their attendance is still recorded — only the charge is skipped.
  *
  * Expects the enrolments table aliased as `e`. Null-safe: an ordinary enrolment
- * has no master, so NOT EXISTS finds nothing and the charge goes ahead.
+ * has no master, so NOT EXISTS finds nothing and the charge goes ahead. Not
+ * conditioned on the master's own payment_type — a ONE_TIME master can hold a
+ * PER_SESSION course same as a MONTHLY_SUBSCRIPTION master can.
  */
-const NOT_COVERED_BY_MONTHLY_MASTER = `NOT EXISTS (
+const NOT_COVERED_BY_MASTER = `NOT EXISTS (
   SELECT 1 FROM master_enrollments me
-  JOIN master_courses mc ON mc.id = me.master_course_id
   WHERE me.id = e.master_enrollment_id
-    AND mc.payment_type = 'MONTHLY_SUBSCRIPTION'
 )`;
 
 // ============================================================
@@ -522,7 +523,7 @@ export async function chargeSessionAttendance(
      FROM enrollments e
      WHERE e.class_id = $1 AND e.company_id = $2 AND e.student_id = ANY($3::uuid[])
        AND e.payment_type = 'PER_SESSION' AND e.status NOT IN ('DROPPED', 'CANCELLED', 'ON_HOLD')
-       AND ${NOT_COVERED_BY_MONTHLY_MASTER}`,
+       AND ${NOT_COVERED_BY_MASTER}`,
     [session.class_id, companyId, ids]
   );
 
@@ -568,7 +569,7 @@ export async function chargeAbsencesAtSessionEnd(companyId: string, session: any
      FROM enrollments e
      WHERE e.class_id = $1 AND e.company_id = $2 AND e.payment_type = 'PER_SESSION'
        AND e.status NOT IN ('DROPPED', 'CANCELLED', 'ON_HOLD')
-       AND ${NOT_COVERED_BY_MONTHLY_MASTER}
+       AND ${NOT_COVERED_BY_MASTER}
        AND NOT EXISTS (
          SELECT 1 FROM session_attendance sa WHERE sa.session_id = $3 AND sa.student_id = e.student_id
        )`,

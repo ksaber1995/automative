@@ -16,7 +16,7 @@ import { MultiSelectModule } from 'primeng/multiselect';
 import { TableModule } from 'primeng/table';
 import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { EmployeeService } from '../services/employee.service';
+import { EmployeeService, EmployeeCoursePercentage } from '../services/employee.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { UserService } from '../../users/services/user.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -24,8 +24,10 @@ import { NotificationService } from '../../../core/services/notification.service
 import { ExpenseService, BackPayPreview, PercentageSummary } from '../../expenses/services/expense.service';
 import { SalaryBreakdownDialogComponent } from '../../expenses/salaries/salary-breakdown-dialog.component';
 import { TeacherAttendanceService, TeacherAttendanceHistoryRow } from '../../attendance/services/teacher-attendance.service';
-import { Employee } from '@shared/interfaces/employee.interface';
+import { ClassService } from '../../courses/services/class.service';
+import { Employee, SalaryType } from '@shared/interfaces/employee.interface';
 import { ExpensePayment } from '@shared/interfaces/expense.interface';
+import { ClassWithDetails } from '@shared/interfaces/class.interface';
 import { UserRole } from '@shared/enums/user-role.enum';
 
 @Component({
@@ -47,6 +49,7 @@ export class EmployeeDetailComponent implements OnInit {
   private notificationService = inject(NotificationService);
   private expenseService = inject(ExpenseService);
   private teacherAttendanceService = inject(TeacherAttendanceService);
+  private classService = inject(ClassService);
   private translate = inject(TranslateService);
   private confirmationService = inject(ConfirmationService);
   private router = inject(Router);
@@ -79,6 +82,42 @@ export class EmployeeDetailComponent implements OnInit {
   attendanceLoading = signal(false);
   attendancePresentCount = computed(() => this.attendanceHistory().filter((r) => r.status === 'PRESENT').length);
   attendanceAbsentCount = computed(() => this.attendanceHistory().filter((r) => r.status === 'ABSENT').length);
+
+  // Classes this teacher is assigned to (classes.instructor_id), and any
+  // per-course pay overrides — a course can pay this teacher differently
+  // (percentage vs. per-session, and its own rate) than their default.
+  teacherClasses = signal<ClassWithDetails[]>([]);
+  classesLoading = signal(false);
+  coursePercentages = signal<EmployeeCoursePercentage[]>([]);
+
+  /** The course override for a class, when that course pays this teacher differently. */
+  private overrideFor(c: ClassWithDetails): EmployeeCoursePercentage | undefined {
+    return this.coursePercentages().find((p) => p.courseId === c.courseId);
+  }
+
+  hasPayOverride(c: ClassWithDetails): boolean {
+    return !!this.overrideFor(c);
+  }
+
+  /** PERCENTAGE / SESSION_BASED / MONTHLY / UNPAID — the override's type if the
+   *  course has one, otherwise the teacher's own default salary type. */
+  classPayType(c: ClassWithDetails): SalaryType {
+    return this.overrideFor(c)?.payType || this.employee()?.salaryType || 'MONTHLY';
+  }
+
+  /** The rate that goes with classPayType(c) — a percentage or a session rate,
+   *  null for MONTHLY/UNPAID where there's no per-class rate to show. */
+  classPayRate(c: ClassWithDetails): number | null {
+    const override = this.overrideFor(c);
+    if (override) {
+      return override.payType === 'PERCENTAGE' ? override.percentageRate : override.sessionRate;
+    }
+    const emp = this.employee();
+    if (!emp) return null;
+    if (emp.salaryType === 'PERCENTAGE') return emp.percentageRate ?? null;
+    if (emp.salaryType === 'SESSION_BASED') return emp.sessionRate ?? null;
+    return null;
+  }
 
   showConvertDialog = false;
   convertForm = {
@@ -145,6 +184,10 @@ export class EmployeeDetailComponent implements OnInit {
         this.loadSalaryHistory(id);
         this.loadAttendanceHistory(id);
         if (emp.salaryType === 'PERCENTAGE') this.loadPercentageSummary(id);
+        if (emp.isTeacher) {
+          this.loadTeacherClasses(id);
+          this.loadCoursePercentages(id);
+        }
       },
       error: () => {
         // Interceptor toasted the translated error.
@@ -213,6 +256,46 @@ export class EmployeeDetailComponent implements OnInit {
         this.attendanceLoading.set(false);
       }
     });
+  }
+
+  private loadTeacherClasses(employeeId: string) {
+    this.classesLoading.set(true);
+    // The API returns the course/branch/instructor join and student count too
+    // (ClassWithDetails), even though the service's declared type is the bare
+    // Class — same cast the class list page uses for the same response shape.
+    this.classService.getClassesByTeacher(employeeId).subscribe({
+      next: (classes) => {
+        this.teacherClasses.set(classes as unknown as ClassWithDetails[]);
+        this.classesLoading.set(false);
+      },
+      error: () => {
+        this.teacherClasses.set([]);
+        this.classesLoading.set(false);
+      },
+    });
+  }
+
+  private loadCoursePercentages(employeeId: string) {
+    this.employeeService.getCoursePercentages(employeeId).subscribe({
+      next: (rates) => this.coursePercentages.set(rates),
+      error: () => this.coursePercentages.set([]),
+    });
+  }
+
+  /** "Sat, Mon, Wed" from the stored "SATURDAY,MONDAY,WEDNESDAY". */
+  formatDaysOfWeek(days: string | null | undefined): string {
+    if (!days) return '';
+    return days.split(',').map((d) => this.translate.instant('CLASSES.LIST.DAY_' + d.trim())).join(', ');
+  }
+
+  /** "2:00 PM" from the stored "14:00" / "14:00:00". */
+  formatClassTime(time: string | null | undefined): string {
+    if (!time) return '';
+    const [h, m] = time.split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return time;
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    return d.toLocaleTimeString(this.translate.currentLang === 'ar' ? 'ar-EG' : 'en-US', { hour: 'numeric', minute: '2-digit' });
   }
 
   attendanceRoleSeverity(role: string): 'success' | 'info' | 'warn' | 'secondary' {

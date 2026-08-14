@@ -252,6 +252,91 @@
 
     </div>
 
+    <!-- Classes Taught -->
+    @if (employee()!.isTeacher) {
+      <p-card styleClass="mb-6">
+        <ng-template pTemplate="header">
+          <div class="flex items-center gap-2 px-4 pt-4">
+            <i class="pi pi-book text-indigo-500"></i>
+            <span class="font-semibold text-gray-700">{{ 'EMPLOYEES.DETAIL.CLASSES_TAUGHT' | translate }}</span>
+            <span class="text-xs text-gray-400 ml-auto mr-4">
+              {{ 'EMPLOYEES.DETAIL.CLASSES_COUNT' | translate:{ count: teacherClasses().length } }}
+            </span>
+          </div>
+        </ng-template>
+
+        @if (classesLoading()) {
+          <div class="flex justify-center py-8">
+            <i class="pi pi-spin pi-spinner text-2xl text-gray-400"></i>
+          </div>
+        } @else {
+          <p-table [value]="teacherClasses()" [paginator]="teacherClasses().length > 10" [rows]="10" responsiveLayout="scroll">
+            <ng-template pTemplate="header">
+              <tr>
+                <th>{{ 'EMPLOYEES.DETAIL.COL_CLASS_NAME' | translate }}</th>
+                <th>{{ 'EMPLOYEES.DETAIL.COL_COURSE' | translate }}</th>
+                <th>{{ 'EMPLOYEES.DETAIL.COL_BRANCH' | translate }}</th>
+                <th>{{ 'EMPLOYEES.DETAIL.COL_SCHEDULE' | translate }}</th>
+                <th class="text-right">{{ 'EMPLOYEES.DETAIL.COL_STUDENTS' | translate }}</th>
+                <th>{{ 'EMPLOYEES.DETAIL.COL_PAY' | translate }}</th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-c>
+              <tr>
+                <td class="font-medium">
+                  {{ c.name }}
+                  @if (c.isFinished) {
+                    <p-tag styleClass="ml-1" severity="secondary" [value]="'EMPLOYEES.DETAIL.CLASS_FINISHED' | translate"></p-tag>
+                  }
+                </td>
+                <td class="text-sm text-gray-600">{{ c.courseName || '—' }}</td>
+                <td class="text-sm text-gray-600">{{ c.branchName || '—' }}</td>
+                <td class="text-sm">
+                  @if (c.daysOfWeek) {
+                    <div>{{ formatDaysOfWeek(c.daysOfWeek) }}</div>
+                  }
+                  @if (c.startTime && c.endTime) {
+                    <div class="text-gray-500">{{ formatClassTime(c.startTime) }} - {{ formatClassTime(c.endTime) }}</div>
+                  }
+                  @if (!c.daysOfWeek && !c.startTime) {
+                    <span class="text-gray-300">—</span>
+                  }
+                </td>
+                <td class="text-right">{{ c.studentCount ?? c.currentEnrollment ?? 0 }}</td>
+                <td>
+                  @switch (classPayType(c)) {
+                    @case ('PERCENTAGE') {
+                      <p-tag severity="success" [value]="'EMPLOYEES.DETAIL.PAY_PERCENTAGE' | translate:{ rate: (classPayRate(c) ?? 0) }"></p-tag>
+                    }
+                    @case ('SESSION_BASED') {
+                      <p-tag severity="info" [value]="'EMPLOYEES.DETAIL.PAY_SESSION' | translate:{ rate: (classPayRate(c) ?? 0) }"></p-tag>
+                    }
+                    @case ('UNPAID') {
+                      <p-tag severity="secondary" [value]="'EMPLOYEES.DETAIL.PAY_UNPAID' | translate"></p-tag>
+                    }
+                    @default {
+                      <p-tag severity="warn" [value]="'EMPLOYEES.DETAIL.PAY_MONTHLY' | translate"></p-tag>
+                    }
+                  }
+                  @if (hasPayOverride(c)) {
+                    <i class="pi pi-info-circle text-gray-400 ml-1" [pTooltip]="'EMPLOYEES.DETAIL.PAY_OVERRIDE_HINT' | translate"></i>
+                  }
+                </td>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="emptymessage">
+              <tr>
+                <td colspan="6" class="text-center py-8 text-gray-400">
+                  <i class="pi pi-book text-2xl mb-2 block"></i>
+                  {{ 'EMPLOYEES.DETAIL.NO_CLASSES' | translate }}
+                </td>
+              </tr>
+            </ng-template>
+          </p-table>
+        }
+      </p-card>
+    }
+
     <!-- Salary Payment History -->
     <p-card>
       <ng-template pTemplate="header">

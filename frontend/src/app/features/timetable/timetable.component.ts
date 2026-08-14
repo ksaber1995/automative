@@ -410,25 +410,19 @@ export class TimetableComponent implements OnInit {
     this.courseService.getActiveCourses().subscribe({
       next: (c) => this.courses.set(c),
     });
-    this.employeeService.getAllEmployees().subscribe({
+    // Teacher is a boolean flag on Employee (isTeacher), not something derivable
+    // from free-text position/role — matching on "TEACH"/"INSTRUCT"/"TRAIN"
+    // silently dropped any teacher whose position text didn't happen to contain
+    // one of those words. Ask the server for isTeacher=true directly, the same
+    // split the employee list page uses.
+    this.employeeService.getEmployeesByRole(true).subscribe({
       next: (employees) => {
-        const teachers = employees
-          .filter((e: any) => {
-            const role = (e.role || e.position || '').toString().toUpperCase();
-            return role.includes('TEACH') || role.includes('INSTRUCT') || role.includes('TRAIN');
-          })
-          .map((e: any) => ({
+        this.teachers.set(
+          employees.map((e: any) => ({
             id: e.id,
             displayName: `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email || 'Unnamed',
-          }));
-        // If filter produced nothing, fall back to all employees so the user still has options
-        const result = teachers.length > 0
-          ? teachers
-          : employees.map((e: any) => ({
-              id: e.id,
-              displayName: `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email || 'Unnamed',
-            }));
-        this.teachers.set(result);
+          }))
+        );
       },
     });
   }

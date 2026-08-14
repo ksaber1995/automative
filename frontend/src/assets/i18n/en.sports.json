@@ -130,7 +130,8 @@
       "INSUFFICIENT_COURSES_PERMISSION": "You do not have permission to manage subscriptions",
       "HAS_ENROLLMENTS": "This package has subscribers and cannot be deleted. Deactivate it instead.",
       "HAS_ACTIVE_COURSES": "Deactivate the linked subscriptions (or finish their groups) before deactivating this bundle.",
-      "COURSE_PAYMENT_TYPE": "Only one-time payment subscriptions can be grouped into a package. Monthly and per-training subscriptions are billed on their own schedule, so they can't share a bundle price."
+      "COURSE_PAYMENT_TYPE": "This subscription cannot be grouped into this package.",
+      "COURSE_PAYMENT_TYPE_MONTHLY": "A per-month package takes per-month and per-training subscriptions only. A one-time subscription can't join because a recurring fee has no way to cover a price that's paid once."
     },
     "MASTER_ENROLLMENTS": {
       "STUDENT_BRANCH_MISMATCH": "Trainee branch does not match enrollment branch",
@@ -475,8 +476,10 @@
       "DESC": "Only subscriptions from this package's branch that aren't already in another bundle are shown.",
       "SELECT": "Subscription",
       "PLACEHOLDER": "Select a subscription",
+      "SEARCH_PLACEHOLDER": "Search subscriptions...",
       "NONE": "No eligible subscriptions available.",
-      "ONE_TIME_ONLY": "Only one-time payment subscriptions can be added. A package sells its subscriptions as one bundle for one price, so monthly and per-training ones can't join yet."
+      "ONE_TIME_HINT": "Any subscription can join this bundle — one-time, monthly, or per-training. Once a trainee buys the bundle, every subscription inside becomes free to them, regardless of how it normally bills.",
+      "MONTHLY_ONLY_HINT": "Only monthly and per-training subscriptions can be added. This bundle charges its own fee every month and covers whatever's inside it, so a one-time subscription can't join."
     },
     "DELETED": "Master subscription deleted",
     "COURSE_ADDED": "Subscription added",

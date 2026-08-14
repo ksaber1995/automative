@@ -21,8 +21,10 @@ export class ClassService {
     return this.api.get<Class[]>('classes', { courseId });
   }
 
-  getClassesByTeacher(teacherId: string): Observable<Class[]> {
-    return this.api.get<Class[]>('classes', { teacherId });
+  /** The contract's filter field is `instructorId`, not `teacherId` — matches
+   *  classes.instructor_id server-side. */
+  getClassesByTeacher(instructorId: string): Observable<Class[]> {
+    return this.api.get<Class[]>('classes', { instructorId });
   }
 
   getClassesByBranch(branchId: string): Observable<Class[]> {

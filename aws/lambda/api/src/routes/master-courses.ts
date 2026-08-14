@@ -46,24 +46,24 @@ export type MasterPaymentType = (typeof MASTER_PAYMENT_TYPES)[number];
  * What a master of each kind is allowed to hold.
  *
  * A ONE_TIME master sells its members as one bundle for one price (see
- * master_enrollments), which only has meaning if every member is charged the same
- * way — a monthly or per-session member cannot answer "what does this bundle
- * cost". So it groups one-time courses only, as it always has.
+ * master_enrollments): once a student buys in, every linked course becomes
+ * free to them. That works regardless of how a member normally bills — a
+ * one-time course, a monthly course, and a per-session course all simply stop
+ * charging that student once they're in through the bundle. So a ONE_TIME
+ * master can hold any of the three. (This was one-time-only at first; prod's
+ * "diploma of robotics" master already mixed all three before the rule
+ * existed, and that turned out to be the right shape to support generally,
+ * not a one-off exception.)
  *
- * A MONTHLY_SUBSCRIPTION master answers that question differently: it charges its
- * own fee every month and covers whatever is inside it. A member that bills
- * monthly, or per session attended, stops billing the student entirely once they
- * are in through the master — so those are exactly the two kinds worth putting in
- * one. A one-time member is not: a fee that recurs cannot cover a price that is
- * paid once, and nothing would ever collect it.
- *
- * NOTE: enforced for NEW links only. Links made before these rules existed are
- * left alone — a live master with a paid enrolment is not something to rewrite
- * from a deploy. Prod had exactly one such master ("diploma of robotics", all
- * three types) when the first version of this check landed.
+ * A MONTHLY_SUBSCRIPTION master answers the pricing question differently: it
+ * charges its own fee every month and covers whatever is inside it. A member
+ * that bills monthly, or per session attended, stops billing the student
+ * entirely once they are in through the master — so those are exactly the two
+ * kinds worth putting in one. A one-time member is not: a fee that recurs
+ * cannot cover a price that is paid once, and nothing would ever collect it.
  */
 const BUNDLEABLE_BY_MASTER_TYPE: Record<MasterPaymentType, readonly string[]> = {
-  ONE_TIME: ['ONE_TIME'],
+  ONE_TIME: ['ONE_TIME', 'MONTHLY_SUBSCRIPTION', 'PER_SESSION'],
   MONTHLY_SUBSCRIPTION: ['MONTHLY_SUBSCRIPTION', 'PER_SESSION'],
 };
 
@@ -475,7 +475,7 @@ export const masterCoursesRoutes = {
           : apiError(
               400,
               'ERRORS.MASTER_COURSES.COURSE_PAYMENT_TYPE',
-              'Only one-time payment courses can be grouped into a master course'
+              'This course cannot be grouped into this master course'
             );
       }
 

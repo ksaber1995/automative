@@ -1,8 +1,26 @@
 # WhatsApp — the Meta steps (Karim's checklist)
 
+> **Superseded 2026-08-14 for §2 and §5** — decided to go through a BSP
+> (360dialog) instead of becoming our own Meta Tech Provider. See
+> `whatsapp-360dialog-migration.md` for the new plan. §1 (Business
+> Verification) and §7 (templates) below are still accurate regardless of
+> provider — kept here for reference.
+>
+> Status as of 2026-08-14 before that decision: nothing on this list had been
+> started. Re-checked against the code (`1cbad45 feat(whatsapp): a tenant can
+> connect their own number and actually send from it`, 2026-07-17) — still
+> accurate as a description of the Meta-direct build, which is now on hold.
+
 Everything on this list is work only you can do: it needs a Meta login, a company
 document, or a decision. The code side is built and deployed — connecting a
 number and sending are waiting on **§3** below and nothing else.
+
+"Tenant" below = the academy/teacher's own account in the system. A **teacher
+running their own business connects their own personal WhatsApp Business
+number** through §8's "Connect WhatsApp" flow — the number stays theirs, Meta
+just needs it converted to a WhatsApp Business number (it can't stay registered
+in the plain WhatsApp consumer app at the same time, hence the "not currently
+registered" requirement in §8).
 
 Work top to bottom. §1 gates almost everything, so start it today; most of the
 elapsed time here is Meta reviewing things, not you typing.
@@ -12,6 +30,26 @@ elapsed time here is Meta reviewing things, not you typing.
 > `whatsapp-cloud-api-plan.md` (the architecture and phase plan).
 
 ---
+
+## 0. Fast path: test with real numbers before Business Verification clears
+
+Business Verification (§1) isn't actually required to send real messages from a
+real number — it only gates (a) raising the 250-conversations/day cap and (b)
+**App Review / Advanced Access**, which is what lets *any uninvited* teacher use
+the connect flow. Neither blocks testing today:
+
+- [ ] Do §2 (create the Meta App) — no verification needed for this.
+- [ ] Skip §1 for now.
+- [ ] In the Meta App dashboard → **App Roles → Roles**, add your own account
+      and the first teacher's Meta/Facebook account as **Admin/Developer/Tester**.
+- [ ] Run Embedded Signup with that teacher's real number while the app is still
+      in **Development Mode** — it connects and sends for real, no Meta wait.
+
+Limits of this mode: only accounts you've added as roles/testers can connect
+(no self-serve for a random new teacher); the 250/day cap still applies; you
+still need §1 + Advanced Access before the connect flow works for anyone
+who *isn't* on that list. But it's enough to fully validate connect → send →
+receive → Coexistence (§7.5) end-to-end while §1 is in progress.
 
 ## 1. Meta Business Account + Business Verification
 
@@ -130,7 +168,38 @@ needs its own budget rather than sharing the attendance volume.
 - [ ] Get the category right at submission. Meta can recategorise a "utility"
       template it judges promotional, and it then bills at the marketing rate.
 
-## 8. Per number (netrofit + Karim tenants)
+## 7.5 Optional: keep the number in the WhatsApp Business app too ("Coexistence")
+
+By default (§8 below), connecting a number to Cloud API means it can **no
+longer** also run as a normal WhatsApp Business app on the teacher's phone —
+that's a hard Meta rule, not something we chose.
+
+Meta does have a way around this, called **Coexistence**: the number stays
+active in the real WhatsApp Business app *and* is connected to Cloud API at
+the same time, with messages synced both ways (one-time history sync on
+connect, then ongoing mirroring). If a teacher wants to keep chatting normally
+on their phone while the system also auto-sends/receives, this is the feature
+that makes that possible.
+
+- [ ] **Ask Meta / check current docs whether Coexistence is enabled for our
+      Tech Provider app.** It's a newer, unevenly-rolled-out feature — it may
+      need Meta to switch it on for our Embedded Signup config, not just a
+      client-side change.
+- [ ] If enabled: the code change is a one-line flip in
+      `frontend/.../wa-connect/wa-connect.component.ts` — the `FB.login` call
+      passes `extras: { setup: {}, featureType: '', sessionInfoVersion: '3' }`;
+      `featureType` is the switch between "standard" (current, app must be
+      deleted first) and "coexistence" (app stays). **Verify the exact
+      `featureType` value against Meta's current Coexistence docs before
+      changing it** — don't trust a remembered string here.
+- [ ] Coexistence requires the number to be **already active** in the app at
+      connect time (the opposite of §8's "not currently registered"
+      requirement) and only syncs recent history, not the full chat log.
+- [ ] Decide per-teacher: some may prefer a dedicated business SIM (§8, simpler,
+      fewer moving parts) over keeping their personal/existing number dual-purposed
+      (Coexistence, more convenient but newer and less battle-tested).
+
+## 8. Per number (netrofit + Karim tenants) — standard flow, no Coexistence
 
 For each of the two trial tenants:
 
