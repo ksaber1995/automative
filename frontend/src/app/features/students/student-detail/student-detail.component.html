@@ -213,9 +213,9 @@
     <!-- Student Information Card -->
     <p-card>
       <ng-template pTemplate="header">
-        <div class="flex justify-between items-center p-4">
+        <div class="flex items-center justify-between flex-wrap gap-3 p-4">
           <div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 flex-wrap">
               <h2 class="text-2xl font-bold">{{ s.name }}</h2>
               @if (showCode(s)) {
                 <span class="inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-3 py-1"
@@ -250,37 +250,37 @@
           <h3 class="text-lg font-semibold mb-3 text-gray-700">{{ 'STUDENTS.DETAIL.PERSONAL' | translate }}</h3>
           <div class="space-y-2">
             @if (s.dateOfBirth) {
-              <div class="flex">
-                <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.DOB' | translate }}</span>
-                <span>{{ s.dateOfBirth | date: 'MMM d, y' }}</span>
+              <div class="flex flex-wrap">
+                <span class="font-medium text-gray-600 w-32 shrink-0">{{ 'STUDENTS.DETAIL.DOB' | translate }}</span>
+                <span class="break-words min-w-0">{{ s.dateOfBirth | date: 'MMM d, y' }}</span>
               </div>
             }
             @if (s.email) {
-              <div class="flex">
-                <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.EMAIL' | translate }}</span>
-                <span>{{ s.email }}</span>
+              <div class="flex flex-wrap">
+                <span class="font-medium text-gray-600 w-32 shrink-0">{{ 'STUDENTS.DETAIL.EMAIL' | translate }}</span>
+                <span class="break-words min-w-0">{{ s.email }}</span>
               </div>
             }
             @if (s.phone) {
-              <div class="flex">
-                <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.PHONE' | translate }}</span>
-                <span>{{ s.phone }}</span>
+              <div class="flex flex-wrap">
+                <span class="font-medium text-gray-600 w-32 shrink-0">{{ 'STUDENTS.DETAIL.PHONE' | translate }}</span>
+                <span class="break-words min-w-0">{{ s.phone }}</span>
               </div>
             }
             @if (s.schoolName) {
-              <div class="flex">
-                <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.SCHOOL_NAME' | translate }}</span>
-                <span>{{ s.schoolName }}</span>
+              <div class="flex flex-wrap">
+                <span class="font-medium text-gray-600 w-32 shrink-0">{{ 'STUDENTS.DETAIL.SCHOOL_NAME' | translate }}</span>
+                <span class="break-words min-w-0">{{ s.schoolName }}</span>
               </div>
             }
             @if (s.address) {
-              <div class="flex">
-                <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.ADDRESS' | translate }}</span>
-                <span>{{ s.address }}</span>
+              <div class="flex flex-wrap">
+                <span class="font-medium text-gray-600 w-32 shrink-0">{{ 'STUDENTS.DETAIL.ADDRESS' | translate }}</span>
+                <span class="break-words min-w-0">{{ s.address }}</span>
               </div>
             }
-            <div class="flex">
-              <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.STATUS' | translate }}</span>
+            <div class="flex flex-wrap">
+              <span class="font-medium text-gray-600 w-32 shrink-0">{{ 'STUDENTS.DETAIL.STATUS' | translate }}</span>
               <p-tag
                 [value]="s.isActive ? ('STUDENTS.DETAIL.ACTIVE' | translate) : ('STUDENTS.DETAIL.INACTIVE' | translate)"
                 [severity]="s.isActive ? 'success' : 'danger'"
@@ -292,18 +292,18 @@
         <div>
           <h3 class="text-lg font-semibold mb-3 text-gray-700">{{ 'STUDENTS.DETAIL.PARENT' | translate }}</h3>
           <div class="space-y-2">
-            <div class="flex">
-              <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.PARENT_NAME' | translate }}</span>
-              <span>{{ s.parentName }}</span>
+            <div class="flex flex-wrap">
+              <span class="font-medium text-gray-600 w-32 shrink-0">{{ 'STUDENTS.DETAIL.PARENT_NAME' | translate }}</span>
+              <span class="break-words min-w-0">{{ s.parentName }}</span>
             </div>
-            <div class="flex">
-              <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.PARENT_PHONE' | translate }}</span>
-              <span>{{ s.parentPhone }}</span>
+            <div class="flex flex-wrap">
+              <span class="font-medium text-gray-600 w-32 shrink-0">{{ 'STUDENTS.DETAIL.PARENT_PHONE' | translate }}</span>
+              <span class="break-words min-w-0">{{ s.parentPhone }}</span>
             </div>
             @if (s.acquisitionChannel) {
-              <div class="flex">
-                <span class="font-medium text-gray-600 w-32">{{ 'STUDENTS.DETAIL.CHANNEL' | translate }}</span>
-                <span>{{ 'STUDENTS.FORM.CHANNEL_' + s.acquisitionChannel | translate }}</span>
+              <div class="flex flex-wrap">
+                <span class="font-medium text-gray-600 w-32 shrink-0">{{ 'STUDENTS.DETAIL.CHANNEL' | translate }}</span>
+                <span class="break-words min-w-0">{{ 'STUDENTS.FORM.CHANNEL_' + s.acquisitionChannel | translate }}</span>
               </div>
             }
           </div>

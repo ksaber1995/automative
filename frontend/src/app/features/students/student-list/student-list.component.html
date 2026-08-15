@@ -1,9 +1,9 @@
 <div class="container mx-auto p-6">
   <p-card>
     <ng-template pTemplate="header">
-      <div class="flex justify-between items-center p-4">
+      <div class="flex items-center justify-between flex-wrap gap-3 p-4">
         <h2 class="text-2xl font-bold">{{ 'STUDENTS.LIST.TITLE' | translate }}</h2>
-        <div class="flex gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
           <!-- Exports what the filters are showing, one row per student-and-class -->
           <button pButton severity="secondary" [outlined]="true"
                   [label]="'STUDENTS.EXPORT.EXCEL' | translate" icon="pi pi-file-excel"
