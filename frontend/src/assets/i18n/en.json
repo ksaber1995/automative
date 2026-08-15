@@ -2840,6 +2840,8 @@
       "VIEW_STUDENT": "View Student",
       "SEARCH_STUDENTS": "Search students by name…",
       "NO_STUDENTS_ENROLLED": "No students enrolled",
+      "ABSENT_ONLY": "Absences only",
+      "NO_ABSENT_STUDENTS": "Nobody has missed a lesson",
       "ENR_STATUS_ACTIVE": "Active",
       "ENR_STATUS_COMPLETED": "Completed",
       "ENR_STATUS_DROPPED": "Dropped",

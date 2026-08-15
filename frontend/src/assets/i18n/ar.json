@@ -2840,6 +2840,8 @@
       "VIEW_STUDENT": "عرض الطالب",
       "SEARCH_STUDENTS": "ابحث عن طالب بالاسم…",
       "NO_STUDENTS_ENROLLED": "لا يوجد طلاب مسجلون",
+      "ABSENT_ONLY": "الغائبون فقط",
+      "NO_ABSENT_STUDENTS": "لا يوجد طالب تغيّب عن حصة",
       "ENR_STATUS_ACTIVE": "نشط",
       "ENR_STATUS_COMPLETED": "مكتمل",
       "ENR_STATUS_DROPPED": "ملغى",

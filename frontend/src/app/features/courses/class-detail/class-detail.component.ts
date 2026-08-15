@@ -73,13 +73,31 @@ export class ClassDetailComponent implements OnInit {
   enrollments = signal<any[]>([]);
   // Free-text filter for the enrolled-students table (by student name).
   studentFilter = signal('');
+  /**
+   * Narrows the same table to the students worth picking up the phone about:
+   * anyone on a run of missed lessons, or with scattered misses this month.
+   * A view only — nobody's enrolment or attendance changes.
+   */
+  absentOnly = signal(false);
   filteredEnrollments = computed(() => {
     const term = this.studentFilter().trim().toLowerCase();
-    if (!term) return this.enrollments();
+    const absentOnly = this.absentOnly();
     return this.enrollments().filter(e =>
-      `${e.studentName ?? ''}`.toLowerCase().includes(term)
+      (!term || `${e.studentName ?? ''}`.toLowerCase().includes(term))
+      && (!absentOnly || this.hasAbsence(e.studentId))
     );
   });
+
+  /** Has anything the absence badge would show — the toggle's test and its count. */
+  private hasAbsence(studentId: string): boolean {
+    const a = this.absenceByStudent().get(studentId);
+    return (a?.absentStreak ?? 0) > 0 || (a?.monthAbsences ?? 0) > 0;
+  }
+
+  /** How many of the class's students that is, so the button can say so. */
+  absentStudentCount = computed(() =>
+    this.enrollments().filter(e => this.hasAbsence(e.studentId)).length
+  );
   sessions = signal<Session[]>([]);
   freeRooms = signal<Room[]>([]);
   loadingClass = signal(true);

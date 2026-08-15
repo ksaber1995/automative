@@ -115,17 +115,36 @@
         <!-- Students Tab -->
         <p-tabpanel value="students">
           <div class="flex flex-wrap items-center justify-between gap-3 mb-3 mt-2">
-            <span class="p-input-icon-left w-full sm:w-80 block relative">
-              <i class="pi pi-search absolute top-1/2 -translate-y-1/2 left-3 text-gray-400"></i>
-              <input
-                type="text"
-                pInputText
-                [ngModel]="studentFilter()"
-                (ngModelChange)="studentFilter.set($event)"
-                [placeholder]="'CLASSES.DETAIL.SEARCH_STUDENTS' | translate"
-                class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </span>
+            <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <span class="p-input-icon-left w-full sm:w-80 block relative">
+                <i class="pi pi-search absolute top-1/2 -translate-y-1/2 left-3 text-gray-400"></i>
+                <input
+                  type="text"
+                  pInputText
+                  [ngModel]="studentFilter()"
+                  (ngModelChange)="studentFilter.set($event)"
+                  [placeholder]="'CLASSES.DETAIL.SEARCH_STUDENTS' | translate"
+                  class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </span>
+              <!-- Down to the students worth chasing. Disabled with nothing to
+                   show rather than hidden, so "who is missing lessons?" always
+                   has an answer here — sometimes the answer is nobody. -->
+              <button
+                type="button"
+                class="shrink-0 px-3 py-2 text-sm rounded-md border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                [class.bg-red-600]="absentOnly()"
+                [class.text-white]="absentOnly()"
+                [class.border-red-600]="absentOnly()"
+                [class.bg-white]="!absentOnly()"
+                [class.text-gray-600]="!absentOnly()"
+                [class.border-gray-300]="!absentOnly()"
+                [disabled]="absentStudentCount() === 0 && !absentOnly()"
+                (click)="absentOnly.set(!absentOnly())"
+              >
+                <i class="pi pi-calendar-times ltr:mr-2 rtl:ml-2"></i>{{ 'CLASSES.DETAIL.ABSENT_ONLY' | translate }} ({{ absentStudentCount() }})
+              </button>
+            </div>
             <p-button [label]="'CLASSES.DETAIL.ADD_STUDENT' | translate" icon="pi pi-user-plus" severity="secondary" [outlined]="true" [disabled]="isFinished()" (onClick)="addStudent()"></p-button>
           </div>
           @if (isFinished()) {
@@ -179,7 +198,9 @@
               <tr>
                 <td colspan="4" class="text-center py-8 text-gray-500">
                   <i class="pi pi-users text-4xl mb-3 block"></i>
-                  {{ 'CLASSES.DETAIL.NO_STUDENTS_ENROLLED' | translate }}
+                  <!-- With the filter on, "no students enrolled" would read as
+                       an empty class rather than a class with nobody missing. -->
+                  {{ (absentOnly() ? 'CLASSES.DETAIL.NO_ABSENT_STUDENTS' : 'CLASSES.DETAIL.NO_STUDENTS_ENROLLED') | translate }}
                 </td>
               </tr>
             </ng-template>
