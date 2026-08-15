@@ -10,6 +10,7 @@ import { extractTenantContext, canAccessBranch, checkGranularPermission, appendB
 import { apiError, mapThrownError } from '../utils/api-error';
 import { issueReceipt, voidReceiptsFor } from '../db/receipts';
 import { studentIsPresent } from '../db/active-students';
+import { joinedBySession } from '../db/enrollment-start';
 import { ensureAutoConfirmSessionPaymentsColumn } from './companies';
 
 /** Whether this company auto-confirms a PER_SESSION charge raised at attendance
@@ -572,8 +573,13 @@ export async function chargeAbsencesAtSessionEnd(companyId: string, session: any
        AND ${NOT_COVERED_BY_MASTER}
        AND NOT EXISTS (
          SELECT 1 FROM session_attendance sa WHERE sa.session_id = $3 AND sa.student_id = e.student_id
-       )`,
-    [session.class_id, companyId, session.id]
+       )
+       -- Not yet a student here when the lesson ran, so there is no absence to
+       -- bill: an enrolment dated ahead of a lesson already on the books (it
+       -- starts when the class does) would otherwise be charged for lessons
+       -- from before the student ever joined.
+       AND ${joinedBySession('e.student_id', '$1', 'COALESCE($4::timestamptz, CURRENT_DATE)')}`,
+    [session.class_id, companyId, session.id, session.start_date ?? null]
   );
 
   for (const enr of absentees) {

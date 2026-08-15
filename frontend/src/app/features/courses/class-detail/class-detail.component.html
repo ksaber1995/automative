@@ -313,7 +313,10 @@
                   <p class="text-sm text-green-600 mt-1">{{ 'CLASSES.DETAIL.AVG_ATTENDANCE_RATE' | translate }}</p>
                 </div>
                 <div class="bg-gray-50 rounded-xl p-4 text-center">
-                  <p class="text-2xl font-bold text-gray-700">{{ attendanceSummary()[0]?.totalStudents ?? 0 }}</p>
+                  <!-- The class roster as it stands. Not the latest session's
+                       figure: that one counts who had joined by the day it ran,
+                       so it drops anyone who enrolled since. -->
+                  <p class="text-2xl font-bold text-gray-700">{{ enrolledCount() }}</p>
                   <p class="text-sm text-gray-600 mt-1">{{ 'CLASSES.DETAIL.ENROLLED_STUDENTS' | translate }}</p>
                 </div>
               </div>

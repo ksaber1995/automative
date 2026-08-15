@@ -8,6 +8,7 @@ import {
   substitutionCoversLateral,
   substitutionIsOrphanClause,
 } from '../db/substitutions';
+import { joinedBySession } from '../db/enrollment-start';
 import { resolveStatus } from './monthly-subscriptions';
 import { isRatingCompany, mapStudentExamRow, studentExamFeedSql } from './exams';
 
@@ -184,6 +185,15 @@ export const publicStudentsRoutes = {
              UNION
              SELECT class_id FROM master_class_enrollments
              WHERE student_id = $1 AND company_id = $2 AND status != 'DROPPED'
+           )
+           -- Lessons the class ran before the student joined it are not theirs
+           -- to have missed; the same rule as attendance.getByStudent, so the
+           -- parent's page and the office's never disagree about a run of
+           -- absences. Anything actually attended still shows.
+           AND (
+             sa.id IS NOT NULL
+             OR subst.sub_session_id IS NOT NULL
+             OR ${joinedBySession('$1', 's.class_id', 's.start_date')}
            )
          ORDER BY s.start_date DESC`,
         [student.id, student.company_id]

@@ -16,6 +16,7 @@ import {
   substitutionIsOrphanClause,
 } from '../db/substitutions';
 import { studentIsPresent, studentIsPresentById } from '../db/active-students';
+import { joinedBySession } from '../db/enrollment-start';
 
 /** What the roster panels say about a student's attendance record. */
 export interface AbsenceStats {
@@ -23,7 +24,11 @@ export interface AbsenceStats {
   absentStreak: number;
   /** Misses inside `monthAnchor`'s month — scattered ones included. */
   monthAbsences: number;
-  /** Ended sessions that month there were to attend, so the count has a scale. */
+  /**
+   * Ended sessions that month THIS student was there to attend, so the count
+   * has a scale. Per-student, because someone who joined mid-month was not
+   * expected at the lessons that ran before they did.
+   */
   monthSessions: number;
 }
 
@@ -32,7 +37,9 @@ export interface AbsenceStats {
  *
  * Only ended, non-free sessions count, and a SUBSTITUTION standing in for the
  * session counts as present — same fairness as the student attendance history,
- * so someone who took the lesson in a sibling class is not flagged.
+ * so someone who took the lesson in a sibling class is not flagged. Lessons
+ * that ran before the student joined the class are not theirs to miss and are
+ * left out of both figures (see joinedBySession).
  *
  * `excludeSessionId` drops the session currently being registered (it has not
  * happened yet from the roster's point of view); pass null from a class page,
@@ -57,7 +64,7 @@ export async function absenceStats(
   // Streak, capped at the last 20 sessions.
   const streakRows = await query<any>(
     `WITH recent AS (
-        SELECT s.id, s.session_number,
+        SELECT s.id, s.session_number, s.start_date,
                ROW_NUMBER() OVER (ORDER BY s.start_date DESC) AS rn
         FROM sessions s
         WHERE s.class_id = $1 AND s.company_id = $2
@@ -95,6 +102,11 @@ export async function absenceStats(
             })}
           ) AS present
         FROM recent r CROSS JOIN enrolled e
+        -- A lesson that ran before the student joined is not one they missed.
+        -- Dropping those rows can only shorten the tail (they are always the
+        -- oldest ones), so the run counted back from the latest lesson is
+        -- unaffected — it just stops at the day they arrived.
+        WHERE ${joinedBySession('e.student_id', '$1', 'r.start_date')}
      )
      SELECT student_id,
        CASE WHEN bool_or(present) THEN MIN(rn) FILTER (WHERE present) - 1
@@ -109,7 +121,7 @@ export async function absenceStats(
   // other week never builds a run, so the streak alone makes them look fine.
   const monthRows = await query<any>(
     `WITH month_sessions AS (
-        SELECT s.id, s.session_number
+        SELECT s.id, s.session_number, s.start_date
         FROM sessions s
         WHERE s.class_id = $1 AND s.company_id = $2
           AND ($3::uuid IS NULL OR s.id <> $3::uuid)
@@ -144,6 +156,10 @@ export async function absenceStats(
               })}
             )) AS absent_count
        FROM month_sessions m CROSS JOIN enrolled e
+      -- Same as the streak: a lesson from before they joined is neither an
+      -- absence nor a lesson there was for them to attend, so it leaves both
+      -- the count and its denominator.
+      WHERE ${joinedBySession('e.student_id', '$1', 'm.start_date')}
       GROUP BY e.student_id`,
     [classId, companyId, excludeSessionId, monthAnchor instanceof Date ? monthAnchor.toISOString() : monthAnchor],
   );
@@ -1159,6 +1175,15 @@ export const attendanceRoutes = {
             SELECT class_id FROM master_class_enrollments
             WHERE student_id = $1 AND company_id = $2 AND status != 'DROPPED'
           )
+          -- Lessons the class ran before this student joined it are not part of
+          -- their record: with nothing to attend, every one of them would read
+          -- ABSENT and drag the attendance rate down from the day they arrived.
+          -- A row (or a make-up) still wins — whatever they actually sat stays.
+          AND (
+            sa.id IS NOT NULL
+            OR subst.sub_session_id IS NOT NULL
+            OR ${joinedBySession('$1', 's.class_id', 's.start_date')}
+          )
         ORDER BY s.start_date DESC`,
         [params.studentId, context.companyId]
       );
@@ -1412,6 +1437,10 @@ export const attendanceRoutes = {
              ) AS present
            FROM recent20 r
            JOIN enrolled e ON e.class_id = r.class_id
+             -- Lessons from before the student joined that class are not theirs
+             -- to have missed; without this every new joiner arrives at the top
+             -- of the follow-up list with a streak as long as the class is old.
+             AND ${joinedBySession('e.student_id', 'r.class_id', 'r.start_date')}
          ),
          streaks AS (
            SELECT student_id, class_id,
@@ -1489,24 +1518,6 @@ export const attendanceRoutes = {
         return apiError(403, 'ERRORS.CLASSES.ACCESS_DENIED', 'Access denied to this class');
       }
 
-      // Total enrolled students for this class — the denominator every "12 of 18
-      // present" on the class page divides by, so it has to be the same set the
-      // register lists. Counting students who have left would hold the
-      // attendance rate permanently below 100%.
-      const totalResult = await queryOne(
-        `SELECT COUNT(*) AS total FROM (
-          SELECT student_id FROM enrollments
-          WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
-            AND ${studentIsPresentById('student_id')}
-          UNION
-          SELECT student_id FROM master_class_enrollments
-          WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
-            AND ${studentIsPresentById('student_id')}
-        ) enrolled`,
-        [params.classId, context.companyId]
-      );
-      const totalStudents = parseInt(totalResult?.total ?? '0', 10);
-
       const sessions = await query(
         `SELECT
           s.id AS session_id,
@@ -1515,7 +1526,8 @@ export const attendanceRoutes = {
           s.session_number AS session_number,
           r.code AS room_code,
           COUNT(sa.id) AS present_count,
-          subst.n AS substituted_count
+          subst.n AS substituted_count,
+          expected.n AS expected_count
         FROM sessions s
         LEFT JOIN rooms r ON s.room_id = r.id
         -- Counts the class's own students, however their row was typed: a
@@ -1562,8 +1574,33 @@ export const attendanceRoutes = {
             sessionNumber: 's.session_number',
           })}
         ) subst ON true
+        -- How many students there were to attend THIS lesson — the denominator
+        -- of every "12 of 18 present" and of the rate beside it. Per session,
+        -- not per class: someone who joined in week three was not missing from
+        -- week one, and counting them there holds the rate of every early
+        -- lesson permanently below 100%. Students who have left are out for the
+        -- same reason (they stop being expected), and anyone with a row on the
+        -- session is counted whatever their dates say — the register is the
+        -- record, so present can never exceed expected.
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*) AS n
+          FROM (
+            SELECT student_id FROM enrollments
+            WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+              AND ${studentIsPresentById('student_id')}
+            UNION
+            SELECT student_id FROM master_class_enrollments
+            WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
+              AND ${studentIsPresentById('student_id')}
+          ) e
+          WHERE ${joinedBySession('e.student_id', '$1', 's.start_date')}
+             OR EXISTS (
+               SELECT 1 FROM session_attendance ea
+               WHERE ea.session_id = s.id AND ea.student_id = e.student_id
+             )
+        ) expected ON true
         WHERE s.class_id = $1 AND s.company_id = $2
-        GROUP BY s.id, s.start_date, s.end_date, s.session_number, r.code, subst.n
+        GROUP BY s.id, s.start_date, s.end_date, s.session_number, r.code, subst.n, expected.n
         ORDER BY s.start_date DESC`,
         [params.classId, context.companyId]
       );
@@ -1578,12 +1615,15 @@ export const attendanceRoutes = {
             ? null
             : parseInt(row.session_number, 10),
           roomCode: row.room_code,
-          totalStudents,
+          /** Students there were to attend this lesson — see expected above. */
+          totalStudents: parseInt(row.expected_count ?? '0', 10) || 0,
           presentCount: parseInt(row.present_count, 10),
           substitutedCount: parseInt(row.substituted_count ?? '0', 10) || 0,
           absentCount: Math.max(
             0,
-            totalStudents - parseInt(row.present_count, 10) - (parseInt(row.substituted_count ?? '0', 10) || 0),
+            (parseInt(row.expected_count ?? '0', 10) || 0)
+              - parseInt(row.present_count, 10)
+              - (parseInt(row.substituted_count ?? '0', 10) || 0),
           ),
         })),
       };

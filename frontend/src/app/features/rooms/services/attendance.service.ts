@@ -123,6 +123,11 @@ export interface ClassAttendanceSummary {
   sessionEndDate?: string | null;
   sessionNumber?: number | null;
   roomCode?: string | null;
+  /**
+   * Students there were to attend THIS lesson — those who had joined the class
+   * by the day it ran. Not the class roster: a student who joined in week three
+   * was not missing from week one.
+   */
   totalStudents: number;
   presentCount: number;
   /** Missed here but made up with a sibling class — kept out of absentCount. */

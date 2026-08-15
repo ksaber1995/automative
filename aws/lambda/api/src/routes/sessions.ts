@@ -6,6 +6,7 @@ import { ensureAutoManageSessionsColumn } from './companies';
 import { chargeAbsencesAtSessionEnd } from './session-payments';
 import { ensureClassDayTimesSchema } from './classes';
 import { claimPendingSubstitutions, ensureSubstitutionLinkSchema, substitutionCoversExists } from '../db/substitutions';
+import { joinedBySession } from '../db/enrollment-start';
 
 let sessionSchemaInitPromise: Promise<void> | null = null;
 async function ensureSessionRoomNullable(): Promise<void> {
@@ -1175,6 +1176,17 @@ export const sessionsRoutes = {
             SELECT 1 FROM enrollments en WHERE en.class_id = s.class_id AND en.student_id = $${studentIdx}
             UNION ALL
             SELECT 1 FROM master_class_enrollments mce WHERE mce.class_id = s.class_id AND mce.student_id = $${studentIdx}
+          )`;
+        // …but only from the day they joined that class. Earlier lessons had
+        // nothing to do with them, and listing them would fill the Absent tab
+        // with weeks they were never enrolled for. A lesson they did sit stays,
+        // whatever the dates say.
+        sql += ` AND (
+            ${joinedBySession(`$${studentIdx}`, 's.class_id', 's.start_date')}
+            OR EXISTS (
+              SELECT 1 FROM session_attendance sa3
+              WHERE sa3.session_id = s.id AND sa3.student_id = $${studentIdx}
+            )
           )`;
         // Present/Absent filter for that student.
         if (queryParams.attendance === 'PRESENT') {

@@ -4,6 +4,7 @@ import { query, queryOne } from '../db/connection';
 import { extractTenantContext, checkGranularPermission, canAccessBranch } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 import { releaseSubstitutionClaims } from '../db/substitutions';
+import { joinedBySession } from '../db/enrollment-start';
 
 /**
  * Telegram attendance bot + auto-notifications (Phase 1, Bot API only).
@@ -218,7 +219,7 @@ export async function notifySessionAttendance(companyId: string, sessionId: stri
     if (!settings.notify_on_present && !settings.notify_on_absent) return;
     const ctx = await loadSessionCtx(companyId, sessionId);
     if (!ctx) return;
-    const session = await queryOne<any>('SELECT class_id FROM sessions WHERE id = $1 AND company_id = $2', [sessionId, companyId]);
+    const session = await queryOne<any>('SELECT class_id, start_date FROM sessions WHERE id = $1 AND company_id = $2', [sessionId, companyId]);
     if (!session) return;
 
     // Enrolled roster for this class + whether each has a present row this session.
@@ -233,8 +234,12 @@ export async function notifySessionAttendance(companyId: string, sessionId: stri
          SELECT student_id FROM master_class_enrollments
          WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
        ) enr ON enr.student_id = st.id
-       LEFT JOIN session_attendance sa ON sa.session_id = $3 AND sa.student_id = st.id`,
-      [session.class_id, companyId, sessionId]
+       LEFT JOIN session_attendance sa ON sa.session_id = $3 AND sa.student_id = st.id
+       -- Nobody hears "your child was absent" for a lesson that ran before
+       -- their child joined the class. Presence still speaks for itself.
+       WHERE sa.id IS NOT NULL
+          OR ${joinedBySession('st.id', '$1', 'COALESCE($4::timestamptz, CURRENT_DATE)')}`,
+      [session.class_id, companyId, sessionId, session.start_date ?? null]
     );
 
     const templates = await loadTemplates(companyId);

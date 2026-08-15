@@ -36,6 +36,10 @@ export interface ClassAttendanceSummary {
   sessionStartDate: string;
   sessionEndDate?: string | null;
   roomCode?: string | null;
+  /**
+   * Students there were to attend THIS lesson — those who had joined the class
+   * by the day it ran, not the class roster as it stands today.
+   */
   totalStudents: number;
   presentCount: number;
   absentCount: number;
