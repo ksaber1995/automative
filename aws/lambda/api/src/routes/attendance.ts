@@ -389,12 +389,13 @@ export const attendanceRoutes = {
         return apiError(403, 'ERRORS.SESSIONS.ACCESS_DENIED', 'Access denied to this session');
       }
 
-      // Enrolled roster (direct + bundle) plus any SUBSTITUTION or TRIAL attendees
-      // who are NOT enrolled in this class. Substitution rows are surfaced so the
-      // editor can show "<name> · Substitution (from A_1)"; TRIAL rows so that a
-      // prospect who scanned into a free session appears on the roster at all —
-      // they have no enrolment to be found by, and an attendance editor that
-      // silently dropped them would delete them on the next save.
+      // Enrolled roster (direct + bundle, as it stood on the day of the lesson —
+      // see the WHERE below) plus any SUBSTITUTION or TRIAL attendees who are NOT
+      // enrolled in this class. Substitution rows are surfaced so the editor can
+      // show "<name> · Substitution (from A_1)"; TRIAL rows so that a prospect who
+      // scanned into a free session appears on the roster at all — they have no
+      // enrolment to be found by, and an attendance editor that silently dropped
+      // them would delete them on the next save.
       const students = await query(
         `SELECT
             s.id AS student_id,
@@ -435,6 +436,21 @@ export const attendanceRoutes = {
              sessionNumber: '$4::int',
            })}
          ) subst ON true
+         -- Only students who had joined the class by the day of this lesson.
+         -- The register IS the absent list every page reads — the class page's
+         -- "N absent", the names behind a session on the history page — so a
+         -- student who enrolled in week three sitting unticked on week one's
+         -- sheet is exactly the invented absence, wherever it is shown. Anyone
+         -- with a row on the session, or a make-up covering it, stays on the
+         -- sheet whatever the dates say: the record outranks them.
+         --
+         -- A session still running is exempt: there the register is the thing
+         -- being filled in, and a class whose enrolments are all dated from its
+         -- (later) start day would hand the teacher an empty sheet to tick.
+         WHERE sa.id IS NOT NULL
+            OR subst.sub_session_id IS NOT NULL
+            OR $6::boolean IS NOT TRUE
+            OR ${joinedBySession('s.id', '$1', 'COALESCE($5::timestamptz, CURRENT_DATE)')}
 
          UNION ALL
 
@@ -464,7 +480,8 @@ export const attendanceRoutes = {
              WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
            )
          ORDER BY student_name`,
-        [session.class_id, context.companyId, params.sessionId, session.session_number ?? null]
+        [session.class_id, context.companyId, params.sessionId, session.session_number ?? null,
+         session.start_date ?? null, session.end_date != null]
       );
 
       // PER_SESSION courses: attach each student's existing session charge so the
