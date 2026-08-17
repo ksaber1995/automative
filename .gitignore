@@ -47,6 +47,10 @@ shared/**/*.d.ts
 .DS_Store
 Thumbs.db
 desktop.ini
+# Cygwin/MSYS crash dumps. Git Bash drops these wherever it happened to be when a
+# child process died, so they appear at the repo root and inside subfolders alike.
+**/bash.exe.stackdump
+*.stackdump
 
 # Logs
 *.log
