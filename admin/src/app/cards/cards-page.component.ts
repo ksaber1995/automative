@@ -9,6 +9,7 @@ import { KpiTileComponent } from './kpi-tile.component';
 import { PoolBarComponent } from './pool-bar.component';
 import { ClientTableComponent } from './client-table.component';
 import { ClientDrawerComponent } from './client-drawer.component';
+import { boolParam, readBool, syncQueryParams } from '../shared/query-sync';
 
 /**
  * The Cards section: KPIs, the pool bar, the client table, and the per-client
@@ -257,6 +258,36 @@ export class CardsPageComponent {
   });
 
   constructor() {
+    // The filters, beside `client` below on the same URL — which is why the
+    // helper merges rather than replaces the query string.
+    //
+    // "Only clients with cards" defaults ON, so it appears in the URL only when
+    // switched OFF; the other two default off and appear only when switched on.
+    // That keeps the common case a clean `/cards`.
+    syncQueryParams([
+      { key: 'q', get: () => this.search().trim() || null, set: (v) => this.search.set(v ?? '') },
+      {
+        key: 'type',
+        get: () => (this.typeFilter() === 'ALL' ? null : this.typeFilter()),
+        set: (v) => this.typeFilter.set(v === 'ACADEMY' || v === 'TEACHER' ? v : 'ALL'),
+      },
+      {
+        key: 'withCards',
+        get: () => boolParam(this.onlyWithCards(), true),
+        set: (v) => this.onlyWithCards.set(readBool(v, true)),
+      },
+      {
+        key: 'needsPrinting',
+        get: () => boolParam(this.needsPrinting(), false),
+        set: (v) => this.needsPrinting.set(readBool(v, false)),
+      },
+      {
+        key: 'exhausted',
+        get: () => boolParam(this.poolExhausted(), false),
+        set: (v) => this.poolExhausted.set(readBool(v, false)),
+      },
+    ]);
+
     this.load();
 
     // `?client=<id>` is what says a sheet is open, so a reload or a pasted link
@@ -325,17 +356,27 @@ export class CardsPageComponent {
    */
   protected open(row: ClientRow): void {
     this.selected.set(row);
+    // merge, not replace: the filters live on this URL too, and opening a client
+    // must not throw away the search that found them.
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { client: row.id },
+      queryParamsHandling: 'merge',
       replaceUrl: false,
     });
   }
 
-  /** Closing drops the parameter, so Back does the same thing the × does. */
+  /**
+   * Closing drops only `client`, so Back does the same thing the × does and the
+   * report underneath is still filtered the way it was.
+   */
   protected closeSheet(): void {
     this.selected.set(null);
-    this.router.navigate([], { relativeTo: this.route, queryParams: {} });
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { client: null },
+      queryParamsHandling: 'merge',
+    });
   }
 
   /**

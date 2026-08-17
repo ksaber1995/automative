@@ -174,6 +174,24 @@ landed on Companies.
 permission on to the first section they DO hold — so an account granted only
 Cards lands on `/cards` rather than a page it cannot open.
 
+Searches and filters are in the URL too, so a filtered table survives a reload
+and can be sent to someone as a link:
+
+| Page | Keys |
+|---|---|
+| `/companies` | `q`, `status` |
+| `/users` | `q`, `tenant` |
+| `/cards` | `q`, `type`, `withCards`, `needsPrinting`, `exhausted`, `client` |
+
+A key is written only when it differs from the default, so the common case stays
+a clean `/cards` — `withCards` defaults on and appears only when switched off.
+The plumbing is `shared/query-sync.ts`; writes `merge` (so the Cards sheet's
+`client` and the filters can share a URL) and `replaceUrl` (so typing in a search
+box does not push a history entry per keystroke).
+
+Sorting is deliberately **not** in the URL — it is a way of reading a table
+rather than a way of choosing what is in it.
+
 Deep links survive a reload because CloudFront rewrites anything that is not
 `/api/*` and has no file extension to `/index.html` (the SPA fallback function in
 `aws/lib/landing-stack.ts`).

@@ -6,6 +6,7 @@ import {
 } from '../subscriptions.service';
 import { PortalAuthService } from '../auth/portal-auth.service';
 import { AdminStore } from '../admin-store.service';
+import { syncQueryParams } from '../shared/query-sync';
 
 /**
  * Companies & Subscriptions — the tenant table and everything you can do to one
@@ -413,6 +414,13 @@ export class CompaniesPageComponent {
   });
 
   constructor() {
+    // `?q=` and `?status=` — so a filtered table survives a reload and can be
+    // sent to someone as a link.
+    syncQueryParams([
+      { key: 'q', get: () => this.search().trim() || null, set: (v) => this.search.set(v ?? '') },
+      { key: 'status', get: () => this.statusFilter() || null, set: (v) => this.statusFilter.set(v ?? '') },
+    ]);
+
     this.store.loadCompanies();
     // The store owns the fetch, so its failure is the one to surface here.
     this.error.set(this.store.companiesError());

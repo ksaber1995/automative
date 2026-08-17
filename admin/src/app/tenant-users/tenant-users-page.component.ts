@@ -5,6 +5,7 @@ import { NgSelectModule } from '@ng-select/ng-select';
 import { SubscriptionsService, TenantUser, USER_ROLES } from '../subscriptions.service';
 import { PortalAuthService } from '../auth/portal-auth.service';
 import { AdminStore } from '../admin-store.service';
+import { syncQueryParams } from '../shared/query-sync';
 
 /**
  * The vendor's debugging login. It is the reason the move-between-tenants
@@ -195,6 +196,13 @@ export class TenantUsersPageComponent {
   });
 
   constructor() {
+    // `?q=` and `?tenant=` — the tenant filter especially, since "show me this
+    // customer's accounts" is the link worth sending to someone.
+    syncQueryParams([
+      { key: 'q', get: () => this.userSearch().trim() || null, set: (v) => this.userSearch.set(v ?? '') },
+      { key: 'tenant', get: () => this.userCompany() || null, set: (v) => this.userCompany.set(v ?? '') },
+    ]);
+
     this.store.loadUsers();
     // The tenant pickers need the company list even when this page is opened
     // directly by URL, so it can no longer be assumed already loaded.
