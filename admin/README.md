@@ -157,6 +157,27 @@ Never put a plaintext password — or the hash of one — in this repository.
 
 ## Sections
 
+Each one is a route, so a reload, a bookmark or a pasted link comes back to the
+same screen — the sidebar used to be a `view` signal, which meant every refresh
+landed on Companies.
+
+| URL | Section | Permission |
+|---|---|---|
+| `/companies` | Companies & Subscriptions | `companies.read` |
+| `/users` | tenant user accounts | `tenant_users.read` |
+| `/cards` | card-pool report (`?client=<id>` opens a client sheet) | `cards.read` |
+| `/bots` | Telegram bot pool | `bots.read` |
+| `/qr` | QR generator | none |
+| `/portal-users` | console sign-ins | `portal_users.read` |
+
+`/` redirects to `/companies`, and the route guard bounces anyone without that
+permission on to the first section they DO hold — so an account granted only
+Cards lands on `/cards` rather than a page it cannot open.
+
+Deep links survive a reload because CloudFront rewrites anything that is not
+`/api/*` and has no file extension to `/index.html` (the SPA fallback function in
+`aws/lib/landing-stack.ts`).
+
 The sidebar switches between:
 
 - **Companies** — every tenant, with activate / deactivate / extend / change-type /
@@ -170,6 +191,18 @@ The sidebar switches between:
   do. Not the same thing as **Users**: that one creates accounts inside a
   customer's tenant, this one hands out keys to the console that can delete those
   customers.
+
+### Where the code lives
+
+- `app.component.ts` — the shell only: sidebar, session, the outlet.
+- `app.routes.ts` — the route table, the `SECTIONS` list the sidebar renders
+  from, and the permission guard.
+- `admin-store.service.ts` — the data more than one screen needs (tenants, tenant
+  users, bots). Loads are idempotent, so moving between sections does not
+  re-fetch; the Refresh buttons pass `force`.
+- `shared/admin-ui.css` — the common chrome, pulled in per page via `styleUrls`
+  rather than dropped in the global stylesheet, so it stays scoped and cannot
+  leak into the Cards section's own palette.
 
 ## Cards
 

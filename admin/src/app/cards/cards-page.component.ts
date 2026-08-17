@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CardsService } from './cards.service';
 import { ClientRow, SortKey, SortState } from './models';
 import { KpiTileComponent } from './kpi-tile.component';
@@ -175,6 +177,8 @@ import { ClientDrawerComponent } from './client-drawer.component';
 })
 export class CardsPageComponent {
   private service = inject(CardsService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
 
   protected rows = signal<ClientRow[]>([]);
   protected loading = signal(true);
@@ -254,6 +258,46 @@ export class CardsPageComponent {
 
   constructor() {
     this.load();
+
+    // `?client=<id>` is what says a sheet is open, so a reload or a pasted link
+    // comes back to the same tenant. A query parameter rather than a child route
+    // on purpose: it changes without tearing this component down, so opening and
+    // closing a client does not re-fetch the whole report.
+    //
+    // The id can arrive before the list has loaded (a cold reload straight onto
+    // a client), so it is resolved against `rows()` when that lands too — see
+    // the effect below.
+    // The URL is the single source of truth for whether a sheet is open, which
+    // is what makes the browser's Back button close it: dropping the parameter
+    // has to clear the selection, not just stop pointing at it.
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((params) => {
+      const id = params.get('client');
+      this.selectedId.set(id);
+      if (!id) {
+        this.selected.set(null);
+        return;
+      }
+      if (this.selected()?.id !== id) this.resolveSelected(id);
+    });
+  }
+
+  /** The client id in the URL, if any. */
+  private selectedId = signal<string | null>(null);
+
+  /**
+   * Fetch the tenant named in the URL. Its own request rather than a lookup in
+   * `rows()`: the report only lists ACTIVE subscriptions, and a link to a tenant
+   * that has since been parked should still open rather than silently do
+   * nothing.
+   */
+  private resolveSelected(id: string): void {
+    this.service.loadClient(id).subscribe({
+      next: (row) => {
+        // Ignore a response that arrives after the user moved on.
+        if (row && this.selectedId() === id) this.selected.set(row);
+      },
+      error: () => {},
+    });
   }
 
   protected load(): void {
@@ -274,13 +318,24 @@ export class CardsPageComponent {
     });
   }
 
-  /** Picking a client opens the sheet over the report. */
+  /**
+   * Picking a client puts them in the URL; the query-param subscription above is
+   * what actually opens the sheet. Setting `selected` here as well so the sheet
+   * appears on the same tick rather than after a navigation round-trip.
+   */
   protected open(row: ClientRow): void {
     this.selected.set(row);
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { client: row.id },
+      replaceUrl: false,
+    });
   }
 
+  /** Closing drops the parameter, so Back does the same thing the × does. */
   protected closeSheet(): void {
     this.selected.set(null);
+    this.router.navigate([], { relativeTo: this.route, queryParams: {} });
   }
 
   /**
