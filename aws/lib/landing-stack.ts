@@ -37,6 +37,17 @@ export interface LandingStackProps extends cdk.StackProps {
   /** Defaults to the last two labels of `domainName` (e.g. "netrofit.com"). */
   hostedZoneName?: string;
   /**
+   * Write the ACM validation records into `hostedZoneId` instead of leaving them
+   * to be added by hand — the deploy then issues the cert on its own.
+   *
+   * OPT-IN, and it must stay that way. Passing the zone to
+   * `CertificateValidation.fromDns` changes the CloudFormation property on the
+   * certificate, which REPLACES an already-issued one. The three stacks that
+   * predate this flag hold valid certs, so they must keep the zoneless call.
+   * Only set this on a brand-new stack.
+   */
+  certValidationInZone?: boolean;
+  /**
    * Zone-apex TXT records (SPF / DMARC). Only set this on ONE stack per zone,
    * typically the apex landing stack — otherwise CFN will conflict on duplicates.
    */
@@ -71,11 +82,26 @@ export class LandingStack extends cdk.Stack {
       autoDeleteObjects: false,
     });
 
+    // ─── Route 53 zone (read-only reference) ────────────────────────────────
+    // Resolved before the certificate so `certValidationInZone` can hand it to
+    // ACM. Importing a zone creates no resource, so the position of this call
+    // changes nothing in the synthesised template.
+    const zone = props.hostedZoneId
+      ? route53.HostedZone.fromHostedZoneAttributes(this, 'Zone', {
+          hostedZoneId: props.hostedZoneId,
+          zoneName: props.hostedZoneName ?? props.domainName.split('.').slice(-2).join('.'),
+        })
+      : undefined;
+
     // ─── ACM cert (DNS-validated; covers apex + www) ────────────────────────
     const certificate = new acm.Certificate(this, 'LandingCert', {
       domainName: props.domainName,
       subjectAlternativeNames: altDomains,
-      validation: acm.CertificateValidation.fromDns(),
+      // See certValidationInZone: adding the zone here replaces an issued cert,
+      // so only a new stack may ask for it.
+      validation: props.certValidationInZone && zone
+        ? acm.CertificateValidation.fromDns(zone)
+        : acm.CertificateValidation.fromDns(),
     });
 
     // SPA fallback strategy:
@@ -140,16 +166,8 @@ function handler(event) {
     }
 
     // ─── Optional Route 53 alias records ────────────────────────────────────
-    // Cert validation is intentionally still acm.CertificateValidation.fromDns()
-    // (no zone arg) — passing a zone changes the CFN property and forces cert
-    // replacement, which we want to avoid for already-issued certs.
-    if (props.hostedZoneId) {
-      const zoneName =
-        props.hostedZoneName ?? props.domainName.split('.').slice(-2).join('.');
-      const zone = route53.HostedZone.fromHostedZoneAttributes(this, 'Zone', {
-        hostedZoneId: props.hostedZoneId,
-        zoneName,
-      });
+    if (zone) {
+      const zoneName = zone.zoneName;
       const aliasTarget = route53.RecordTarget.fromAlias(
         new targets.CloudFrontTarget(distribution),
       );

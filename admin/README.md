@@ -1,16 +1,23 @@
-# Netrofit Admin (local-only superadmin console)
+# Netrofit Admin (superadmin console)
 
 A tool **for you only** — every tenant in the system, their card pools, their
-user accounts, and the Telegram bot pool. You run it on your laptop; it is **not
-deployed**.
+user accounts, and the Telegram bot pool.
+
+- **Deployed:** <https://dione.netrofit.com>
+- **Local:** `npm start` → <http://localhost:4300>
 
 ## How it works
 
 The Angular app calls the **production API** under one prefix:
 
 ```
-https://xnbgr057y1.execute-api.eu-west-1.amazonaws.com/prod/api/karim-admin-secret
+/api/karim-admin-secret          # deployed — CloudFront proxies it same-origin
+https://xnbgr057y1.execute-api.eu-west-1.amazonaws.com/prod/api/karim-admin-secret   # local
 ```
+
+Which one is compiled in comes from `src/environments/` (`environment.prod.ts`
+replaces `environment.ts` in the production configuration). The deployed build
+therefore needs no CORS entry and never names the API host.
 
 **Everything on that prefix needs a sign-in.** It used to be gated by nothing but
 the obscure path, which was defensible when the payload was aggregate counts. It
@@ -20,7 +27,7 @@ credential. See `aws/lambda/api/src/routes/admin-portal.ts`.
 
 No AWS keys, no local server, no `.env`.
 
-## Run
+## Run locally
 
 ```bash
 cd admin
@@ -30,6 +37,39 @@ npm start        # → http://localhost:4300
 
 Sign in with a portal account (below). Use the search box to filter by company
 name or subscription type.
+
+## Deploy
+
+```bash
+cd admin;  npm run build        # production configuration is the default
+cd ../aws; npx cdk deploy NetrofitAdminStack-prod --profile personal --require-approval never
+```
+
+`NetrofitAdminStack-prod` (defined in `aws/bin/core.ts`, built from the shared
+`LandingStack`) is S3 + CloudFront + an ACM cert, in **us-east-1** — CloudFront
+certs must live there, so it will not appear in `aws cloudformation` calls that
+default to eu-west-1. It uploads `admin/dist/admin/browser`; CDK only ships the
+prebuilt output, it does not build for you.
+
+### DNS
+
+**Fully managed by CDK — nothing to add at a registrar.** `netrofit.com` is a
+Route 53 zone in this same account (`Z09915202RRKLGYSVZZTS`) and the registrar's
+nameservers are delegated to it, so the stack writes both records itself:
+
+| Record | Purpose |
+|---|---|
+| `_<hash>.dione.netrofit.com` CNAME → `_<hash>.acm-validations.aws` | proves domain ownership so ACM issues the cert |
+| `dione.netrofit.com` A + AAAA (alias) → the CloudFront distribution | the site itself |
+
+The validation half is what `certValidationInZone: true` on this stack buys.
+**Do not set it on the other three stacks** — handing ACM the zone changes a
+CloudFormation property on the certificate, which replaces an already-issued one.
+
+If the zone ever moves off Route 53 (Cloudflare, or the registrar's own DNS),
+those two rows become manual: add the CNAME exactly as ACM prints it, and point
+the host at the distribution — a CNAME to `<id>.cloudfront.net`, or an ALIAS /
+flattened record if the provider offers one.
 
 ## Signing in
 

@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../environments/environment';
 
 /** One row of the cross-tenant subscriptions view (see server/index.js). */
 export interface CompanySubscription {
@@ -25,14 +26,14 @@ export interface CompanySubscription {
   course_count: number;
 }
 
-// Obscure, unauthenticated endpoint on the production API. The path is the only
-// gate; the read returns aggregate numbers + company names, which is accepted as
-// safe to expose. The write/delete sub-routes are path-gated the same way.
+// Where the admin API lives. Absolute against the execute-api host in local
+// development; a relative /api path when deployed, where CloudFront proxies it
+// same-origin — see src/environments/.
 //
-// Exported because the Cards section talks to the same endpoint: one constant,
-// so a moved API can never leave half the console pointing at the old one.
-export const ADMIN_ENDPOINT =
-  'https://xnbgr057y1.execute-api.eu-west-1.amazonaws.com/prod/api/karim-admin-secret';
+// Exported because the Cards section and the sign-in talk to the same endpoint:
+// one constant, so a moved API can never leave half the console pointing at the
+// old one.
+export const ADMIN_ENDPOINT = environment.adminEndpoint;
 
 /** A user account inside a tenant, as this console sees it. Never a password. */
 export interface TenantUser {

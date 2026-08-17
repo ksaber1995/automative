@@ -109,4 +109,37 @@ new LandingStack(app, `NetrofitFrontendStack-prod`, {
   },
 });
 
+// The owner's superadmin console at dione.netrofit.com.
+//
+// Public hostname, but not a public tool: everything it talks to sits behind the
+// portal sign-in added in routes/admin-portal.ts, so the login page is the only
+// thing an unauthenticated visitor can reach. The API it calls was already on
+// the public internet — putting the UI beside it adds no new exposure.
+//
+// apiProxy, so the console calls a relative /api/* on its own origin: no CORS,
+// no preflight, and the execute-api hostname stays out of the shipped bundle.
+// No www: nobody types www in front of an admin console.
+new LandingStack(app, `NetrofitAdminStack-prod`, {
+  domainName: 'dione.netrofit.com',
+  wwwDomain: null,
+  sourcePath: path.resolve(__dirname, '../../admin/dist/admin/browser'),
+  apiProxy: {
+    originDomain: 'xnbgr057y1.execute-api.eu-west-1.amazonaws.com',
+    pathPattern: '/api/*',
+    originPath: '/prod',
+  },
+  hostedZoneId: netrofitZoneId,
+  // New stack, new cert — so it can validate itself in the zone instead of
+  // waiting for someone to paste a CNAME. Never turn this on for the three
+  // stacks above; it would replace certs that are already issued.
+  certValidationInZone: true,
+  env: { account, region: 'us-east-1' },
+  description: `Netrofit Admin Console (prod)`,
+  tags: {
+    Environment: 'prod',
+    Application: 'NetrofitAdmin',
+    ManagedBy: 'CDK',
+  },
+});
+
 app.synth();
