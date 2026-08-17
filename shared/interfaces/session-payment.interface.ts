@@ -40,6 +40,15 @@ export interface SessionPaymentWithDetails extends SessionPayment {
   /** Usage of the prepaid package covering this charge (null for single-session charges). */
   pkgSessionsTotal?: number | null;
   pkgSessionsUsed?: number | null;
+  /**
+   * What the covering bundle itself owes. COVERED is not proof of payment: a
+   * tenant converted from monthly billing has unpaid monthly bills that became
+   * unpaid bundles, so a covered session can be entirely uncollected. When
+   * `pkgAmountPaid < pkgAmountDue` the money to ask for is the BUNDLE's balance,
+   * not this session's fee.
+   */
+  pkgAmountDue?: number | null;
+  pkgAmountPaid?: number | null;
   /** Present on attendance-check-in responses only. */
   packageRemaining?: number | null;
   isNew?: boolean;

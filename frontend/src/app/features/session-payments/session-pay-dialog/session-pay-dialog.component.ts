@@ -51,8 +51,13 @@ export class SessionPayDialogComponent {
   });
   visible = signal(false);
 
-  /** SESSION = pay this one session; PACKAGE = buy the next prepaid bundle. */
-  mode = signal<'SESSION' | 'PACKAGE'>('SESSION');
+  /**
+   * SESSION = pay this one session; PACKAGE = buy the NEXT prepaid bundle;
+   * SETTLE = collect what is still owed on the bundle already covering this
+   * session. SETTLE exists because COVERED stopped meaning "paid": a tenant
+   * converted from monthly billing has unpaid bills that became unpaid bundles.
+   */
+  mode = signal<'SESSION' | 'PACKAGE' | 'SETTLE'>('SESSION');
   amount = signal<number | null>(null);
   payDate = signal<Date>(new Date());
   notes = signal('');
@@ -67,6 +72,13 @@ export class SessionPayDialogComponent {
     for (const c of charges) {
       if (!c) continue;
       if (c.paymentStatus === 'COVERED') {
+        // A covered session is only settled if the bundle covering it was paid
+        // for. When it was not, this student owes money and toasting "covered"
+        // would tell the desk the opposite — so it goes in the queue instead.
+        if (this.bundleOwes(c) > 0) {
+          pending.push(c);
+          continue;
+        }
         const remaining = c.packageRemaining;
         this.notify.info(
           this.translate.instant('SESSION_PAYMENTS.COVERED_TOAST', {
@@ -84,9 +96,31 @@ export class SessionPayDialogComponent {
     }
   }
 
+  /** What the bundle covering this charge still owes; 0 when it was paid upfront. */
+  bundleOwes(c: SessionPaymentWithDetails): number {
+    if (c.paymentStatus !== 'COVERED' || !c.packageId) return 0;
+    return Math.max(0, (c.pkgAmountDue ?? 0) - (c.pkgAmountPaid ?? 0));
+  }
+
+  /** True while the open charge is covered by a bundle nobody has paid for. */
+  settlingBundle = computed(() => {
+    const c = this.current();
+    return !!c && this.bundleOwes(c) > 0;
+  });
+
   private loadCurrent(): void {
     const c = this.current();
     if (!c) { this.visible.set(false); return; }
+    // An unpaid covering bundle is the only sensible thing to collect: the
+    // session's own fee is already accounted for against it, so asking for the
+    // fee would take the money twice.
+    if (this.bundleOwes(c) > 0) {
+      this.setMode('SETTLE', c);
+      this.payDate.set(new Date());
+      this.notes.set('');
+      this.visible.set(true);
+      return;
+    }
     // Returning package customers (bought a bundle before, now out of credit)
     // default to buying the next bundle; everyone else defaults to per-session.
     const packageMode = !!c.coursePackageSize && !!c.hadPackage;
@@ -96,17 +130,20 @@ export class SessionPayDialogComponent {
     this.visible.set(true);
   }
 
-  setMode(mode: 'SESSION' | 'PACKAGE', charge?: SessionPaymentWithDetails): void {
+  setMode(mode: 'SESSION' | 'PACKAGE' | 'SETTLE', charge?: SessionPaymentWithDetails): void {
     const c = charge ?? this.current();
     if (!c) return;
     this.mode.set(mode);
     // PACKAGE buys a fresh bundle, so it costs the whole package price.
+    // SETTLE collects the balance of the bundle already covering this session.
     // SESSION settles what is still owed on THIS charge: a student who already
     // paid 50 of 100 is asked for 50, not 100 again. (The dashboard's package
     // top-up has always defaulted to the remainder — only this one didn't.)
-    this.amount.set(mode === 'PACKAGE'
-      ? (c.coursePackagePrice ?? 0)
-      : Math.max(0, (c.amountDue ?? 0) - (c.amountPaid || 0)));
+    this.amount.set(
+      mode === 'PACKAGE' ? (c.coursePackagePrice ?? 0)
+      : mode === 'SETTLE' ? this.bundleOwes(c)
+      : Math.max(0, (c.amountDue ?? 0) - (c.amountPaid || 0)),
+    );
   }
 
   private advance(): void {
@@ -127,6 +164,10 @@ export class SessionPayDialogComponent {
   pay(print = false): void {
     if (this.mode() === 'PACKAGE') {
       this.buyPackage(print);
+      return;
+    }
+    if (this.mode() === 'SETTLE') {
+      this.settleBundle(print);
       return;
     }
     const c = this.current();
@@ -160,6 +201,35 @@ export class SessionPayDialogComponent {
       next: (res: any) => {
         this.submitting.set(false);
         this.notify.success(this.translate.instant('SESSION_PAYMENTS.PACKAGE_SUCCESS'));
+        this.settled.emit();
+        if (print) this.receiptService.openPrint(res?.receipt);
+        this.advance();
+      },
+      error: () => { this.submitting.set(false); },
+    });
+  }
+
+  /**
+   * Collect the outstanding balance of the bundle already covering this session,
+   * rather than the session fee.
+   *
+   * The fee has already been booked against that bundle, so charging it here as
+   * well would take the same money twice — once on the bundle and once on the
+   * session. payPackage credits the bundle, which settles every session it
+   * covers, including this one.
+   */
+  settleBundle(print = false): void {
+    const c = this.current();
+    if (!c || !c.packageId || this.amount() == null) return;
+    this.submitting.set(true);
+    this.service.payPackage(c.packageId, {
+      amount: this.amount() as number,
+      paymentDate: this.formatDate(this.payDate()),
+      notes: this.notes() || undefined,
+    }).subscribe({
+      next: (res: any) => {
+        this.submitting.set(false);
+        this.notify.success(this.translate.instant('SESSION_PAYMENTS.PAY_SUCCESS'));
         this.settled.emit();
         if (print) this.receiptService.openPrint(res?.receipt);
         this.advance();

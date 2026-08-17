@@ -252,6 +252,8 @@ function mapSessionPaymentWithDetailsFromDB(row: any) {
     enrollmentStatus: row.enrollment_status || null,
     pkgSessionsTotal: row.pkg_sessions_total != null ? Number(row.pkg_sessions_total) : null,
     pkgSessionsUsed: row.pkg_sessions_used != null ? Number(row.pkg_sessions_used) : null,
+    pkgAmountDue: row.pkg_amount_due != null ? parseFloat(row.pkg_amount_due) : null,
+    pkgAmountPaid: row.pkg_amount_paid != null ? parseFloat(row.pkg_amount_paid) : null,
     hadPackage: row.had_package === true,
   };
 }
@@ -305,6 +307,13 @@ const DETAILS_SELECT = `
   e.status       AS enrollment_status,
   pkg.sessions_total AS pkg_sessions_total,
   pkg.sessions_used  AS pkg_sessions_used,
+  -- What the covering bundle itself still owes. COVERED used to be shorthand for
+  -- "already paid", because a bundle was always bought upfront. That stopped
+  -- being true when a tenant was converted from monthly billing: their unpaid
+  -- monthly bills became unpaid bundles, so a covered session can sit behind
+  -- money nobody has collected. The desk needs to see that.
+  pkg.amount_due  AS pkg_amount_due,
+  pkg.amount_paid AS pkg_amount_paid,
   EXISTS (
     SELECT 1 FROM session_packages spk2 WHERE spk2.enrollment_id = sp.enrollment_id
   ) AS had_package
@@ -341,7 +350,16 @@ async function fetchDetailsByIds(companyId: string, ids: string[]) {
  * there, so the prompt follows the act of marking present rather than the
  * accident of which screen happened to create the row.
  *
- * PENDING only: COVERED (a prepaid package paid it) and PAID need no collection.
+ * PENDING, plus COVERED where the covering bundle has not itself been paid.
+ *
+ * COVERED used to mean "settled", because a bundle was only ever created by
+ * someone buying one. Converting a tenant from monthly to per-session broke that
+ * assumption: their unpaid monthly bills became unpaid bundles, so a student can
+ * be marked present, have the session covered, and owe every piastre of it. Those
+ * sessions produced no prompt at all — the one case where the desk most needs
+ * one. PAID and WAIVED still need nothing, and a bundle that was genuinely paid
+ * upfront is excluded by the amount comparison.
+ *
  * Tolerant of a database where the per-session schema has not self-applied yet.
  */
 export async function pendingChargesForStudents(
@@ -355,7 +373,10 @@ export async function pendingChargesForStudents(
       `SELECT ${DETAILS_SELECT} ${DETAILS_FROM}
        WHERE sp.company_id = $1 AND sp.session_id = $2
          AND sp.student_id = ANY($3::uuid[])
-         AND sp.payment_status = 'PENDING'`,
+         AND (
+           sp.payment_status = 'PENDING'
+           OR (sp.payment_status = 'COVERED' AND pkg.amount_paid < pkg.amount_due)
+         )`,
       [companyId, sessionId, studentIds]
     );
     return rows.map(mapSessionPaymentWithDetailsFromDB);
