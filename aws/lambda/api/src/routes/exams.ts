@@ -8,6 +8,7 @@ import {
   appendBranchSqlFilter,
 } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
+import { studentIsPresent } from '../db/active-students';
 import { sendExamResultNotifications } from './telegram';
 import { ensureHomeworkGradingColumn } from './companies';
 
@@ -557,13 +558,16 @@ export const examsRoutes = {
       // row carries a class_id the roster narrows to that class's students. The
       // extra $4 is folded into every branch of the UNION.
       //
-      // Membership is decided by the ENROLMENT, never by students.is_active. That
-      // flag means "has left the academy", which is an office fact: a student can
-      // be marked as left while their enrolment in this class is still ACTIVE, and
-      // filtering on it here emptied the roster for a class the attendance page
-      // was still listing two students for. The attendance roster keys off the
-      // enrolment alone, and these two lists have to agree — a student you can
-      // take attendance for is a student whose work you must be able to mark.
+      // Someone marked as having LEFT the academy is not on the roster, the same
+      // rule the attendance sheet applies (see db/active-students). Their
+      // enrolment usually stays ACTIVE — marking them left IS the act staff
+      // perform — so a roster built from enrolments alone keeps listing people
+      // who will never hand anything in. The two lists have to agree: a student
+      // you cannot take attendance for is not one you are asked to mark.
+      //
+      // Anyone already GRADED stays regardless. Their mark is a record of what
+      // happened, and dropping the row would erase a grade from the page it was
+      // entered on the day the office ticked "left".
       //
       // SUBSTITUTING STUDENTS: someone who sat this class's lesson as a
       // substitute (their own group was cancelled, they came to another) was in
@@ -603,6 +607,7 @@ export const examsRoutes = {
          JOIN (${enrolledSql}) en ON en.student_id = s.id
          LEFT JOIN exam_results r ON r.exam_id = $3 AND r.student_id = s.id
          WHERE s.company_id = $2
+           AND (${studentIsPresent('s')} OR r.exam_id IS NOT NULL)
          ORDER BY s.name`,
         rosterParams,
       );
@@ -904,7 +909,9 @@ export const examsRoutes = {
 
       // "Everyone else was absent" must mean everyone on THIS row's roster — for a
       // class-scoped row that is the class, not the whole course, or it would stamp
-      // an absence on students who were never expected to sit it.
+      // an absence on students who were never expected to sit it. Students who
+      // have left are off the roster too, so they are skipped here as well:
+      // otherwise the button silently marks people the teacher cannot see.
       const byClass = !!exam.class_id;
       const classClause = byClass ? 'AND class_id = $4' : '';
       const absentParams: any[] = [params.id, context.companyId, exam.course_id];
@@ -925,7 +932,7 @@ export const examsRoutes = {
                 WHERE se.class_id = $4 AND se.company_id = $2
                   AND sa.attendance_type IN ('SUBSTITUTION', 'TRIAL')` : ''}
               ) en
-         JOIN students s ON s.id = en.student_id AND s.company_id = $2
+         JOIN students s ON s.id = en.student_id AND s.company_id = $2 AND ${studentIsPresent('s')}
          WHERE NOT EXISTS (SELECT 1 FROM exam_results r WHERE r.exam_id = $1 AND r.student_id = en.student_id)
          ON CONFLICT (exam_id, student_id) DO NOTHING
          RETURNING student_id`,
