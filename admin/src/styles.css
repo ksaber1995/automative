@@ -15,3 +15,52 @@ html, body {
   background: #f1f5f9;
   color: #0f172a;
 }
+
+/* ---- Cards section ------------------------------------------------------
+   Design tokens and the handful of shared primitives the ported card-pool
+   report uses, lifted from the standalone `cards/` app.
+
+   Scoped to `.cards-scope` rather than `:root` on purpose: in `cards/` these
+   sit on the root and own the whole page, but here they would repaint the rest
+   of the console. Every card component renders inside that wrapper, and custom
+   properties inherit down the DOM — including into the client sheet, which is
+   position:fixed but still a descendant.
+
+   The primitives (.badge/.off/.legend/.dot/a.link) have to be global for the
+   same reason they were in `cards/`: Angular scopes a component's own styles,
+   so a class used across several templates can't live in any one of them.
+
+   Light only. `cards/` follows the OS colour scheme, but the console's chrome
+   is light-only, and a dark report inside a light shell reads as a bug. */
+.cards-scope {
+  --page:        #f9f9f7;
+  --surface:     #fcfcfb;
+  --text:        #0b0b0b;
+  --text-2:      #52514e;
+  --muted:       #898781;
+  --grid:        #e1e0d9;
+  --border:      rgba(11,11,11,0.10);
+  --linked:      #2a78d6;  /* blue — cards handed out */
+  --unlinked:    #c9c8c1;  /* neutral — still in the pool */
+  --good:        #0ca30c;
+  --danger:      #d03b3b;
+  --shadow:      0 1px 2px rgba(11,11,11,0.04), 0 1px 12px rgba(11,11,11,0.03);
+
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.cards-scope .badge {
+  font-size: 11px; padding: 1px 8px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--text-2);
+  display: inline-block; font-weight: 400; background: none;
+}
+.cards-scope .off { color: var(--muted); }
+.cards-scope a.link { color: var(--linked); }
+
+.cards-scope .legend { display: flex; gap: 16px; color: var(--text-2); font-size: 12px; }
+.cards-scope .legend span { display: inline-flex; align-items: center; gap: 6px; }
+.cards-scope .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin: 0; }
+.cards-scope .dot.l { background: var(--linked); }
+.cards-scope .dot.u { background: var(--unlinked); }

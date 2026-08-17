@@ -7,6 +7,7 @@ import {
   TenantUser, USER_ROLES,
 } from './subscriptions.service';
 import { QrGeneratorComponent } from './qr-generator.component';
+import { CardsPageComponent } from './cards/cards-page.component';
 
 /**
  * The vendor's debugging login. It is the reason the move-between-tenants
@@ -18,7 +19,7 @@ const DEBUG_EMAIL = 'master@master.com';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgSelectModule, QrGeneratorComponent],
+  imports: [CommonModule, FormsModule, NgSelectModule, QrGeneratorComponent, CardsPageComponent],
   template: `
     <div class="app">
       <aside class="sidebar">
@@ -29,6 +30,9 @@ const DEBUG_EMAIL = 'master@master.com';
           </button>
           <button class="navitem" [class.on]="view() === 'users'" (click)="showUsers()">
             <span>Users</span><span class="navcount">{{ users().length }}</span>
+          </button>
+          <button class="navitem" [class.on]="view() === 'cards'" (click)="view.set('cards')">
+            <span>Cards</span><span class="navcount">{{ activeClientCount() }}</span>
           </button>
           <button class="navitem" [class.on]="view() === 'bots'" (click)="view.set('bots')">
             <span>Telegram bots</span><span class="navcount">{{ poolTotal() }}</span>
@@ -555,6 +559,10 @@ const DEBUG_EMAIL = 'master@master.com';
         </div>
       }
 
+      @if (view() === 'cards') {
+        <app-cards-page />
+      }
+
       @if (view() === 'qr') {
         <app-qr-generator />
       }
@@ -722,7 +730,7 @@ export class AppComponent implements OnInit {
   private service = inject(SubscriptionsService);
 
   /** Which section the sidebar is showing. */
-  view = signal<'companies' | 'bots' | 'users' | 'qr'>('companies');
+  view = signal<'companies' | 'cards' | 'bots' | 'users' | 'qr'>('companies');
 
   rows = signal<CompanySubscription[]>([]);
   loading = signal(true);
@@ -769,6 +777,15 @@ export class AppComponent implements OnInit {
   statusCount(status: string): number {
     return this.rows().filter((r) => (r.subscription_type || '').toUpperCase() === status).length;
   }
+
+  /**
+   * The Cards badge. Read off the companies list already in hand rather than
+   * asking the section — it lists exactly the ACTIVE-subscription tenants, and
+   * the number should be there before anyone opens it.
+   */
+  activeClientCount = computed(
+    () => this.rows().filter((r) => (r.subscription_type || '').toUpperCase() === 'ACTIVE').length,
+  );
 
   /** Sidebar "Refresh all" — reload every section. */
   refreshAll(): void {

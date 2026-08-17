@@ -28,7 +28,10 @@ export interface CompanySubscription {
 // Obscure, unauthenticated endpoint on the production API. The path is the only
 // gate; the read returns aggregate numbers + company names, which is accepted as
 // safe to expose. The write/delete sub-routes are path-gated the same way.
-const ADMIN_ENDPOINT =
+//
+// Exported because the Cards section talks to the same endpoint: one constant,
+// so a moved API can never leave half the console pointing at the old one.
+export const ADMIN_ENDPOINT =
   'https://xnbgr057y1.execute-api.eu-west-1.amazonaws.com/prod/api/karim-admin-secret';
 
 /** A user account inside a tenant, as this console sees it. Never a password. */
