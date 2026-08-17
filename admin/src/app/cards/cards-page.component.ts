@@ -4,12 +4,25 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CardsService } from './cards.service';
-import { ClientRow, SortKey, SortState } from './models';
+import { ClientRow, DEFAULT_SORT, SORT_KEYS, SortKey, SortState } from './models';
 import { KpiTileComponent } from './kpi-tile.component';
 import { PoolBarComponent } from './pool-bar.component';
 import { ClientTableComponent } from './client-table.component';
 import { ClientDrawerComponent } from './client-drawer.component';
 import { boolParam, readBool, syncQueryParams } from '../shared/query-sync';
+
+/**
+ * Read a `?sort=` value back into a SortState, falling back to the default for
+ * anything unrecognised. A column that no longer exists — or a hand-edited URL —
+ * must land on a sane order rather than sort by a key `shown` cannot index.
+ */
+function parseSort(value: string | null): SortState {
+  if (!value) return DEFAULT_SORT;
+  const [rawKey, rawDir] = value.split('.');
+  const key = SORT_KEYS.find((k) => k === rawKey);
+  if (!key) return DEFAULT_SORT;
+  return { key, dir: rawDir === 'asc' ? 1 : -1 };
+}
 
 /**
  * The Cards section: KPIs, the pool bar, the client table, and the per-client
@@ -198,7 +211,7 @@ export class CardsPageComponent {
   protected needsPrinting = signal(false);
   /** Whole pool handed out, so the client needs a new run minted. */
   protected poolExhausted = signal(false);
-  protected sort = signal<SortState>({ key: 'total', dir: -1 });
+  protected sort = signal<SortState>(DEFAULT_SORT);
 
   /** Any filter beyond the default is on — drives the empty-state wording. */
   protected filtersActive = computed(() =>
@@ -286,6 +299,10 @@ export class CardsPageComponent {
         get: () => boolParam(this.poolExhausted(), false),
         set: (v) => this.poolExhausted.set(readBool(v, false)),
       },
+      // One key rather than two, so the pair can never arrive half-applied —
+      // `?sort=linked` with no direction would otherwise mean "linked, sorted
+      // the way the last column was".
+      { key: 'sort', get: () => this.sortParam(), set: (v) => this.sort.set(parseSort(v)) },
     ]);
 
     this.load();
@@ -395,6 +412,13 @@ export class CardsPageComponent {
         this.rows.update((list) => list.map((r) => (r.id === row.id ? row : r)));
       },
     });
+  }
+
+  /** `total.desc`, or null while the table is on its default order. */
+  private sortParam(): string | null {
+    const { key, dir } = this.sort();
+    if (key === DEFAULT_SORT.key && dir === DEFAULT_SORT.dir) return null;
+    return `${key}.${dir === 1 ? 'asc' : 'desc'}`;
   }
 
   /** Same column flips direction; a new column starts ascending for text, descending for numbers. */

@@ -181,7 +181,7 @@ and can be sent to someone as a link:
 |---|---|
 | `/companies` | `q`, `status` |
 | `/users` | `q`, `tenant` |
-| `/cards` | `q`, `type`, `withCards`, `needsPrinting`, `exhausted`, `client` |
+| `/cards` | `q`, `type`, `withCards`, `needsPrinting`, `exhausted`, `sort`, `client` |
 
 A key is written only when it differs from the default, so the common case stays
 a clean `/cards` — `withCards` defaults on and appears only when switched off.
@@ -189,8 +189,11 @@ The plumbing is `shared/query-sync.ts`; writes `merge` (so the Cards sheet's
 `client` and the filters can share a URL) and `replaceUrl` (so typing in a search
 box does not push a history entry per keystroke).
 
-Sorting is deliberately **not** in the URL — it is a way of reading a table
-rather than a way of choosing what is in it.
+`sort` is one key, not two — `?sort=linked.asc`. Column and direction travel
+together so the pair can never arrive half-applied, and an unrecognised value
+falls back to the default (`total.desc`) rather than sorting by a column that no
+longer exists. `SORT_KEYS` in `cards/models.ts` is the runtime list it is checked
+against, and the `SortKey` type is derived from it so the two cannot drift.
 
 Deep links survive a reload because CloudFront rewrites anything that is not
 `/api/*` and has no file extension to `/index.html` (the SPA fallback function in

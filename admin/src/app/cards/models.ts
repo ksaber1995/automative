@@ -107,10 +107,22 @@ export interface ClientRow {
   poolValue: number;
 }
 
-export type SortKey = 'name' | 'type' | 'activeStudents' | 'students' | 'total' | 'linked' | 'unlinked';
+/**
+ * The sortable columns, as a runtime list so a `?sort=` value arriving from the
+ * address bar can be checked against something rather than cast. The type is
+ * derived from it, so the two can never drift.
+ */
+export const SORT_KEYS = [
+  'name', 'type', 'activeStudents', 'students', 'total', 'linked', 'unlinked',
+] as const;
+
+export type SortKey = (typeof SORT_KEYS)[number];
 
 export interface SortState {
   key: SortKey;
   /** 1 ascending, -1 descending. */
   dir: 1 | -1;
 }
+
+/** What the table sorts by until someone says otherwise: biggest pool first. */
+export const DEFAULT_SORT: SortState = { key: 'total', dir: -1 };
