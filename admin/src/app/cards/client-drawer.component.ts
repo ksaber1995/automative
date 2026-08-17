@@ -3,7 +3,7 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PoolBarComponent } from './pool-bar.component';
 import { CardsService } from './cards.service';
-import { AdminQrCard, CardStatus, ClientRow } from './models';
+import { AdminQrCard, CardStatus, ClientRow, PrintLink } from './models';
 import { CARD_SERIAL_BASE_V2, downloadCardsZip, serialLabel } from './card-export.util';
 
 /**
@@ -124,6 +124,73 @@ import { CARD_SERIAL_BASE_V2, downloadCardsZip, serialLabel } from './card-expor
             }
             @if (genError(); as e) {
               <p class="hint err">{{ e }}</p>
+            }
+          </section>
+
+          <!-- ── The printer's link ───────────────────────────────────── -->
+          <section class="panel">
+            <h3>Send to the printer</h3>
+            <p class="hint">
+              A link the print shop can open with no login: the cards to print, and
+              this client's shipping address. The set is fixed when the link is
+              made, so minting more cards later will not enlarge it.
+            </p>
+
+            <div class="actions">
+              <button class="primary" [disabled]="!unprintedCount() || creatingLink()" (click)="createPrintLink()">
+                {{ creatingLink() ? 'Creating…' : 'Create link for ' + (unprintedCount() | number) + ' cards' }}
+              </button>
+              @if (!unprintedCount()) {
+                <span class="progress">Nothing waiting to print.</span>
+              }
+            </div>
+
+            @if (!c.address) {
+              <p class="hint err">
+                This client has no shipping address. The printer's page will say so —
+                set one above before sending the link.
+              </p>
+            }
+            @if (linkError(); as e) { <p class="hint err">{{ e }}</p> }
+
+            @if (printLinks().length) {
+              <div class="tscroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Link</th><th class="num">Cards</th><th>Made</th>
+                      <th>Opened</th><th>Downloaded</th><th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (l of printLinks(); track l.id) {
+                      <tr [class.dim]="!l.open">
+                        <td>
+                          <button class="linkish" [title]="l.url" (click)="copyLink(l)">
+                            {{ copiedId() === l.id ? 'Copied!' : 'Copy link' }}
+                          </button>
+                          @if (!l.open) { <span class="off"> · {{ l.revokedAt ? 'revoked' : 'expired' }}</span> }
+                        </td>
+                        <td class="num">{{ l.cardCount | number }}</td>
+                        <td>{{ (l.createdAt | date: 'MMM d') || '—' }}</td>
+                        <!-- Whether the printer actually picked it up, which is the
+                             question the office asks two days later. -->
+                        <td>{{ l.firstOpenedAt ? (l.firstOpenedAt | date: 'MMM d, HH:mm') : '—' }}</td>
+                        <td>
+                          @if (l.downloadCount) {
+                            {{ l.lastDownloadedAt | date: 'MMM d, HH:mm' }} ({{ l.downloadCount }}×)
+                          } @else { — }
+                        </td>
+                        <td>
+                          @if (l.open) {
+                            <button (click)="revokeLink(l)">Revoke</button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
             }
           </section>
 
@@ -302,6 +369,14 @@ import { CARD_SERIAL_BASE_V2, downloadCardsZip, serialLabel } from './card-expor
     td.mono { font-family: ui-monospace, monospace; font-weight: 600; }
     .empty { color: var(--muted); font-size: 13px; padding: 14px 2px; margin: 0; }
 
+    button.linkish {
+      font: inherit; color: var(--linked); background: none; border: none;
+      padding: 0; cursor: pointer; text-decoration: underline;
+    }
+    /* A spent link stays listed — it is the record of what was sent — but must
+       not read as one you could still use. */
+    tbody tr.dim { opacity: .55; }
+
     .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
     @media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
     .kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 13px; margin: 0; }
@@ -367,6 +442,65 @@ export class ClientDrawerComponent {
 
   protected label = serialLabel;
 
+  // ── The printer's link ─────────────────────────────────────────────────────
+  protected printLinks = signal<PrintLink[]>([]);
+  protected creatingLink = signal(false);
+  protected linkError = signal<string | null>(null);
+  /** Which row just said "Copied!", so the feedback lands on the right one. */
+  protected copiedId = signal<string | null>(null);
+  private copyTimer?: ReturnType<typeof setTimeout>;
+
+  private loadPrintLinks(companyId: string): void {
+    this.service.listPrintLinks(companyId).subscribe({
+      next: (res) => this.printLinks.set(res.links),
+      // Quiet: an empty list and a failed fetch look the same here, and the
+      // section is not the reason anyone opened this sheet.
+      error: () => this.printLinks.set([]),
+    });
+  }
+
+  protected createPrintLink(): void {
+    const c = this.client();
+    if (!c || this.creatingLink()) return;
+    this.creatingLink.set(true);
+    this.linkError.set(null);
+    this.service.createPrintLink(c.id, {}).subscribe({
+      next: (link) => {
+        this.creatingLink.set(false);
+        this.loadPrintLinks(c.id);
+        // Straight to the clipboard: the only thing anyone does next is paste it.
+        this.copyLink(link);
+      },
+      error: (err: any) => {
+        this.creatingLink.set(false);
+        this.linkError.set(err?.error?.message || 'Could not create the link.');
+      },
+    });
+  }
+
+  protected copyLink(link: PrintLink): void {
+    navigator.clipboard?.writeText(link.url).then(
+      () => {
+        this.copiedId.set(link.id);
+        if (this.copyTimer) clearTimeout(this.copyTimer);
+        this.copyTimer = setTimeout(() => this.copiedId.set(null), 2000);
+      },
+      // Clipboard access can be refused; the URL is in the title attribute, so
+      // it is still reachable by hand.
+      () => this.linkError.set('Could not copy — hover the link to see the URL.'),
+    );
+  }
+
+  protected revokeLink(link: PrintLink): void {
+    const c = this.client();
+    if (!c) return;
+    if (!confirm(`Revoke this link? The printer will not be able to open it again.`)) return;
+    this.service.revokePrintLink(link.id).subscribe({
+      next: () => this.loadPrintLinks(c.id),
+      error: (err: any) => this.linkError.set(err?.error?.message || 'Could not revoke the link.'),
+    });
+  }
+
   constructor() {
     // Re-fetch whenever the sheet opens on a client, or the tab changes.
     effect(() => {
@@ -378,6 +512,7 @@ export class ClientDrawerComponent {
       this.printedCount.set(c.printed);
       this.unprintedCount.set(c.unprinted);
       this.loadCards(c.id, status);
+      this.loadPrintLinks(c.id);
     });
 
     // Seed the address editor from whichever client is open. Deliberately a

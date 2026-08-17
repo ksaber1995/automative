@@ -52,6 +52,29 @@ export interface AdminQrCard {
   linked: boolean;
 }
 
+/**
+ * A link handed to an outside print shop: the cards, and where to ship them.
+ * `open` folds "not revoked and not past its date" into the one flag the UI
+ * should branch on.
+ */
+export interface PrintLink {
+  id: string;
+  token: string;
+  /** What gets pasted into a message to the printer. */
+  url: string;
+  note: string | null;
+  cardCount: number;
+  createdBy: string | null;
+  createdAt: string | null;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  /** So the office can see the printer actually opened it. */
+  firstOpenedAt: string | null;
+  lastDownloadedAt: string | null;
+  downloadCount: number;
+  open: boolean;
+}
+
 /** Which slice of a client's pool to fetch. */
 export type CardStatus = 'unprinted' | 'printed' | 'free' | 'linked' | 'all';
 

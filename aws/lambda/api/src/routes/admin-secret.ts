@@ -4,6 +4,14 @@ import { query, queryOne, getClient } from '../db/connection';
 import { DEBUG_ACCOUNT_EMAIL, isDebugAccount } from '../utils/debug-account';
 import { ensureCompanyTypeConstraint, ensureCompanySmsColumns, smsIsActive } from './companies';
 import { withPortalGuard, PortalPermission } from './admin-portal';
+import { createPrintJob, ensurePrintJobSchema, mapPrintJob } from './print-jobs';
+
+/**
+ * Where the print-shop page is served. The links go to outsiders, so they point
+ * at the customer-facing app rather than the admin console — the printer has no
+ * business knowing dione exists.
+ */
+const APP_ORIGIN = process.env.FRONTEND_BASE_URL || 'https://app.netrofit.com';
 
 /** The roles a user account can hold (mirrors the users.role CHECK constraint). */
 export const ADMIN_ROLES = [
@@ -326,6 +334,86 @@ const unguardedAdminSecretRoutes = {
     } catch (error: any) {
       console.error('karim-admin-secret set sms access failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Set SMS access failed' } };
+    }
+  },
+
+  /**
+   * POST /api/karim-admin-secret/companies/:companyId/print-links
+   *   { ids?, note?, expiresInDays? }
+   *
+   * Make a link for the print shop: the cards, and the address to ship them to.
+   * Omitting `ids` takes everything currently waiting to print.
+   *
+   * The set is pinned now rather than resolved on each visit, so minting another
+   * run tomorrow does not quietly enlarge a job the printer has already quoted
+   * for. See routes/print-jobs.ts.
+   */
+  createPrintLink: async ({ params, body }: {
+    params: { companyId: string };
+    body?: { ids?: string[]; note?: string | null; expiresInDays?: number | null };
+  }) => {
+    try {
+      const company = await queryOne<any>('SELECT id, address FROM companies WHERE id = $1', [params.companyId]);
+      if (!company) return { status: 404 as const, body: { message: 'Company not found' } };
+
+      const job = await createPrintJob({
+        companyId: params.companyId,
+        ids: body?.ids,
+        note: body?.note ?? null,
+        expiresInDays: body?.expiresInDays ?? null,
+      });
+      if (!job) {
+        return { status: 400 as const, body: { message: 'No cards are waiting to print for this client' } };
+      }
+
+      return {
+        status: 201 as const,
+        body: {
+          ...mapPrintJob(job, APP_ORIGIN),
+          // Surfaced so the console can warn before the link is sent: a printer
+          // with no address has nowhere to ship, and the page will say so.
+          hasAddress: !!(company.address ?? '').trim(),
+        },
+      };
+    } catch (error: any) {
+      console.error('karim-admin-secret create print link failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Create print link failed' } };
+    }
+  },
+
+  /** GET /api/karim-admin-secret/companies/:companyId/print-links */
+  listPrintLinks: async ({ params }: { params: { companyId: string } }) => {
+    try {
+      await ensurePrintJobSchema();
+      const rows = await query<any>(
+        `SELECT * FROM qr_card_print_jobs WHERE company_id = $1 ORDER BY created_at DESC LIMIT 50`,
+        [params.companyId],
+      );
+      return { status: 200 as const, body: { links: rows.map((r) => mapPrintJob(r, APP_ORIGIN)) } };
+    } catch (error: any) {
+      console.error('karim-admin-secret list print links failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'List print links failed' } };
+    }
+  },
+
+  /**
+   * POST /api/karim-admin-secret/print-links/:id/revoke
+   * Kill a link that was sent to the wrong printer, or is simply finished.
+   * Immediate: the public page checks revoked_at on every request.
+   */
+  revokePrintLink: async ({ params }: { params: { id: string } }) => {
+    try {
+      await ensurePrintJobSchema();
+      const row = await queryOne<any>(
+        `UPDATE qr_card_print_jobs SET revoked_at = NOW()
+          WHERE id = $1 AND revoked_at IS NULL RETURNING *`,
+        [params.id],
+      );
+      if (!row) return { status: 404 as const, body: { message: 'Link not found or already revoked' } };
+      return { status: 200 as const, body: mapPrintJob(row, APP_ORIGIN) };
+    } catch (error: any) {
+      console.error('karim-admin-secret revoke print link failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Revoke print link failed' } };
     }
   },
 
@@ -1006,6 +1094,11 @@ const ADMIN_SECRET_PERMISSIONS: { [K in keyof typeof unguardedAdminSecretRoutes]
   // Selling a tenant a feature is the same kind of act as extending their
   // subscription, so it rides on the same grant.
   setSmsAccess: 'companies.write',
+
+  // Handing a batch of cards to an outside printer is part of running the pool.
+  createPrintLink: 'cards.write',
+  listPrintLinks: 'cards.read',
+  revokePrintLink: 'cards.write',
   deleteCompany: 'companies.delete',
 
   listTelegramBots: 'bots.read',

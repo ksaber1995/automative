@@ -32,6 +32,14 @@ export const routes: Routes = [
     loadComponent: () => import('./features/public/receipt/receipt.component').then(m => m.ReceiptComponent)
   },
   {
+    // The print shop's page: the cards to print and the address to ship them to.
+    // Public and chrome-free like the two above — the printer is not a user of
+    // this system and the link is the whole credential. Served from the customer
+    // app rather than the admin console so an outsider never sees dione.
+    path: 'p/print/:token',
+    loadComponent: () => import('./features/public/print-job/print-job.component').then(m => m.PrintJobComponent)
+  },
+  {
     path: '',
     component: LayoutComponent,
     canActivate: [authGuard],

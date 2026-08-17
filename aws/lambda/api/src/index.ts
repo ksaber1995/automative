@@ -53,6 +53,7 @@ import { adminSecretRoutes } from './routes/admin-secret';
 import { adminPortalRoutes } from './routes/admin-portal';
 import { smsRoutes } from './routes/sms';
 import { sweepOverduePaymentSms } from './services/sms/triggers';
+import { printJobRoutes } from './routes/print-jobs';
 import { companiesRoutes } from './routes/companies';
 import { debugRoutes } from './routes/debug';
 import { usersRoutes } from './routes/users';
@@ -172,6 +173,7 @@ const router = {
   subscriptions: subscriptionsRoutes,
   adminSecret: adminSecretRoutes,
   adminPortal: adminPortalRoutes,
+  printJobs: printJobRoutes,
   sms: {
     status: smsRoutes.status,
     getSettings: smsRoutes.getSettings,

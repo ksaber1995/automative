@@ -2112,6 +2112,28 @@ const AdminPortalUserSchema = z.object({
   created_at: z.string().nullable(),
 });
 
+/**
+ * A print-shop link as the console sees it. The `url` is what gets pasted into a
+ * message to the printer; `open` folds "not revoked and not expired" into the
+ * one flag the UI should branch on.
+ */
+const PrintLinkSchema = z.object({
+  id: z.string(),
+  token: z.string(),
+  url: z.string(),
+  note: z.string().nullable(),
+  cardCount: z.number(),
+  createdBy: z.string().nullable(),
+  createdAt: z.string().nullable(),
+  expiresAt: z.string().nullable(),
+  revokedAt: z.string().nullable(),
+  /** So the office can see the printer actually opened it. */
+  firstOpenedAt: z.string().nullable(),
+  lastDownloadedAt: z.string().nullable(),
+  downloadCount: z.number(),
+  open: z.boolean(),
+});
+
 export const contract = c.router({
   // Lookups (auth-only, no granular permission) — see routes/lookups.ts
   lookups: {
@@ -3694,6 +3716,46 @@ export const contract = c.router({
 
   // Public, unauthenticated student profile (resolved by QR token). No
   // `authorization` header → auth is NOT required. See routes/public-students.ts.
+  // The print shop's page. No login: whoever holds the link is the audience, and
+  // the token is the whole credential — see routes/print-jobs.ts.
+  printJobs: {
+    get: {
+      method: 'GET',
+      path: '/api/public/print-jobs/:token',
+      pathParams: z.object({ token: z.string().min(32).max(64) }),
+      responses: {
+        200: z.object({
+          academyName: z.string(),
+          /** The point of the whole link. Null when nobody has set one. */
+          address: z.string().nullable(),
+          contactPhone: z.string().nullable(),
+          note: z.string().nullable(),
+          expiresAt: z.string().nullable(),
+          /** The tenant's own artwork, so the printer gets real cards. */
+          cardDesign: z.any().nullable(),
+          // LINKED cards are never included: once handed to a student, a card's
+          // token is the credential to their public profile.
+          cards: z.array(z.object({ token: z.string(), serial: z.number() })),
+        }),
+        404: ApiErrorSchema,
+        429: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    markDownloaded: {
+      method: 'POST',
+      path: '/api/public/print-jobs/:token/downloaded',
+      pathParams: z.object({ token: z.string().min(32).max(64) }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        404: ApiErrorSchema,
+        429: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+  },
+
   publicStudents: {
     /**
      * An unlinked pool card, by token. Lets a scanned blank card say whose it is
@@ -6299,6 +6361,45 @@ export const contract = c.router({
       body: z.object({ address: z.string().nullish() }),
       responses: {
         200: z.object({ success: z.boolean(), address: z.string().nullable() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    // A link for the print shop: the cards plus the shipping address. The set is
+    // pinned at creation, so a later run cannot enlarge a job already quoted for.
+    createPrintLink: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/companies/:companyId/print-links',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      body: z.object({
+        /** Omit for everything currently waiting to print. */
+        ids: z.array(UUIDSchema).optional(),
+        note: z.string().nullish(),
+        expiresInDays: z.number().int().positive().nullish(),
+      }).optional(),
+      responses: {
+        201: PrintLinkSchema.extend({ hasAddress: z.boolean() }),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    listPrintLinks: {
+      method: 'GET',
+      path: '/api/karim-admin-secret/companies/:companyId/print-links',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      responses: {
+        200: z.object({ links: z.array(PrintLinkSchema) }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    revokePrintLink: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/print-links/:id/revoke',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: PrintLinkSchema,
         404: z.object({ message: z.string() }),
         500: z.object({ message: z.string() }),
       },

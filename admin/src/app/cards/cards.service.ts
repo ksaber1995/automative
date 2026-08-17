@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, of, from } from 'rxjs';
 import { catchError, map, mergeMap, toArray } from 'rxjs/operators';
 import { ADMIN_ENDPOINT } from '../subscriptions.service';
-import { AdminCompany, AdminQrCard, CardStatus, ClientRow, GenerateCardsRequest, QrCardStats } from './models';
+import { AdminCompany, AdminQrCard, CardStatus, ClientRow, GenerateCardsRequest, PrintLink, QrCardStats } from './models';
 
 /**
  * How many per-client card-pool requests to have in flight at once. This fans
@@ -106,6 +106,27 @@ export class CardsService {
       `${this.base}/companies/${companyId}/qr-cards/mark-printed`,
       { ids, printed },
     );
+  }
+
+  /**
+   * Make a link for the print shop. Omitting `ids` takes everything currently
+   * waiting to print; the set is pinned server-side so a later run cannot
+   * enlarge a job the printer has already quoted for.
+   */
+  createPrintLink(companyId: string, body: { ids?: string[]; note?: string | null; expiresInDays?: number | null }):
+    Observable<PrintLink & { hasAddress: boolean }> {
+    return this.http.post<PrintLink & { hasAddress: boolean }>(
+      `${this.base}/companies/${companyId}/print-links`, body,
+    );
+  }
+
+  listPrintLinks(companyId: string): Observable<{ links: PrintLink[] }> {
+    return this.http.get<{ links: PrintLink[] }>(`${this.base}/companies/${companyId}/print-links`);
+  }
+
+  /** Kill a link sent to the wrong printer. Takes effect on the next request. */
+  revokePrintLink(id: string): Observable<PrintLink> {
+    return this.http.post<PrintLink>(`${this.base}/print-links/${id}/revoke`, {});
   }
 
   /** Fresh pool numbers for one client, after minting or marking. */
