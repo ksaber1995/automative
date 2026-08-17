@@ -354,6 +354,11 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
     const paid = p.amountPaid || 0;
     const refunded = p.refundedAmount || 0;
     if (p.status === 'REFUNDED' || (refunded > 0 && paid - refunded <= 0)) return 'REFUNDED';
+    // Nothing owed is settled, not pending. A bundle for a student on a zero
+    // price costs 0, and `paid <= 0` below is true of it forever — so it sat in
+    // the unpaid tab permanently, with nothing anyone could ever collect to
+    // clear it. Checked before `paid`, because both are 0.
+    if (due <= 0) return 'PAID';
     if (paid <= 0) return 'PENDING';
     if (paid < due) return 'PARTIAL';
     return 'PAID';
@@ -369,6 +374,10 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
       case 'COVERED': return 'PAID';
       case 'WAIVED': return 'WAIVED';
       default: {
+        // Same rule as packages: a charge for nothing is already settled, and
+        // would otherwise show as OVERDUE the day after the lesson with no
+        // amount anyone could collect.
+        if ((p.amountDue ?? 0) <= 0) return 'PAID';
         if ((p.amountPaid || 0) > 0) return 'PARTIAL';
         return this.isPastSession(p) ? 'OVERDUE' : 'PENDING';
       }

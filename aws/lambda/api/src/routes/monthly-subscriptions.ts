@@ -13,6 +13,29 @@ import { studentIsPresent, studentIsPresentById } from '../db/active-students';
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
 
+/**
+ * The bill's subject is STILL billed monthly.
+ *
+ * Every query that CREATES or PROJECTS a bill already filters on
+ * `payment_type = 'MONTHLY_SUBSCRIPTION'`, but the two that READ stored bills —
+ * `list` and `stats` — did not, and that gap showed. Converting a tenant from
+ * monthly to per-session turns each bill into a prepaid bundle carrying the same
+ * balance; with the bills still listed here, the identical debt appeared on both
+ * the monthly page and the bundles page, and the two pages disagreed on the
+ * count. One debt, one place.
+ *
+ * The rows are NOT deleted. Their collection ledger
+ * (monthly_subscription_installments) is what revenue is built from, and cascading
+ * a delete through it would erase money that really was taken.
+ *
+ * COALESCE ends in MONTHLY_SUBSCRIPTION on purpose: a bill whose course or master
+ * course has since been deleted keeps showing, because hiding a debt nobody can
+ * explain is worse than showing an orphan. Expects `c` = courses and
+ * `mc` = master_courses to be joined.
+ */
+const SUBJECT_STILL_MONTHLY =
+  `COALESCE(c.payment_type, mc.payment_type, 'MONTHLY_SUBSCRIPTION') = 'MONTHLY_SUBSCRIPTION'`;
+
 /** "March 2026" — the period a monthly receipt is for. */
 function monthLabel(year: any, month: any): string {
   const m = Number(month);
@@ -634,6 +657,7 @@ export const monthlySubscriptionsRoutes = {
       const conditions: string[] = [
         'msp.company_id = $1',
         '(msp.billing_year * 12 + msp.billing_month) BETWEEN $2 AND $3',
+        SUBJECT_STILL_MONTHLY,
       ];
       const params: any[] = [context.companyId, fromKey, toKey];
 
@@ -812,6 +836,8 @@ export const monthlySubscriptionsRoutes = {
       const conditions: string[] = [
         'msp.company_id = $1',
         '(msp.billing_year * 12 + msp.billing_month) BETWEEN $2 AND $3',
+        // Must agree with list() or the counters contradict the table they sit above.
+        SUBJECT_STILL_MONTHLY,
       ];
       const params: any[] = [context.companyId, fromKey, toKey];
 
@@ -837,6 +863,11 @@ export const monthlySubscriptionsRoutes = {
          FROM monthly_subscription_payments msp
          LEFT JOIN enrollments e ON e.id = msp.enrollment_id
          LEFT JOIN master_enrollments me ON me.id = msp.master_enrollment_id
+         -- Joined only so SUBJECT_STILL_MONTHLY can be applied here too; list()
+         -- already had both, which is why the gap showed up as two pages
+         -- disagreeing rather than as a wrong total.
+         LEFT JOIN courses c ON c.id = msp.course_id
+         LEFT JOIN master_courses mc ON mc.id = me.master_course_id
          JOIN students s ON s.id = msp.student_id
          WHERE ${conditions.join(' AND ')}`,
         params
