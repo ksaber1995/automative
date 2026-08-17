@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { environment } from '../../../../environments/environment';
@@ -36,66 +37,67 @@ interface PrintJob {
 @Component({
   selector: 'app-print-job',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TranslateModule],
   template: `
     <div class="wrap">
       @if (loading()) {
-        <p class="state">Loading…</p>
+        <p class="state">{{ 'PRINT_JOB.LOADING' | translate }}</p>
       } @else if (error()) {
         <div class="card">
-          <h1>Link not available</h1>
-          <p class="muted">
-            This print link is no longer valid. It may have expired or been cancelled.
-            Please ask for a new one.
-          </p>
+          <h1>{{ 'PRINT_JOB.UNAVAILABLE_TITLE' | translate }}</h1>
+          <p class="muted">{{ 'PRINT_JOB.UNAVAILABLE_BODY' | translate }}</p>
         </div>
       } @else if (job(); as j) {
         <div class="card">
-          <div class="eyebrow">Card print job</div>
+          <div class="eyebrow">{{ 'PRINT_JOB.EYEBROW' | translate }}</div>
           <h1>{{ j.academyName }}</h1>
           @if (j.note) { <p class="note">{{ j.note }}</p> }
 
           <div class="grid">
             <div class="stat">
-              <span class="l">Cards</span>
+              <span class="l">{{ 'PRINT_JOB.CARDS' | translate }}</span>
               <span class="v">{{ j.cards.length }}</span>
             </div>
             @if (range(); as r) {
               <div class="stat">
-                <span class="l">Numbers</span>
-                <span class="v mono">{{ r }}</span>
+                <span class="l">{{ 'PRINT_JOB.NUMBERS' | translate }}</span>
+                <!-- Always LTR: a serial range reads left-to-right even on an
+                     RTL page, or "0500 – 0599" comes out backwards. -->
+                <span class="v mono" dir="ltr">{{ r }}</span>
               </div>
             }
           </div>
 
           <!-- The reason this page exists. -->
           <section class="ship">
-            <h2>Ship to</h2>
+            <h2>{{ 'PRINT_JOB.SHIP_TO' | translate }}</h2>
             @if (j.address) {
               <p class="address">{{ j.address }}</p>
             } @else {
-              <p class="warn">
-                No delivery address has been set for this academy. Please ask them
-                for one before shipping.
-              </p>
+              <p class="warn">{{ 'PRINT_JOB.NO_ADDRESS' | translate }}</p>
             }
             @if (j.contactPhone) {
-              <p class="muted">Contact: <a [href]="'tel:' + j.contactPhone">{{ j.contactPhone }}</a></p>
+              <p class="muted">
+                {{ 'PRINT_JOB.CONTACT' | translate }}:
+                <a [href]="'tel:' + j.contactPhone" dir="ltr">{{ j.contactPhone }}</a>
+              </p>
             }
           </section>
 
           @if (exporting()) {
-            <p class="state">Preparing {{ done() }} / {{ total() }}…</p>
+            <p class="state">{{ 'PRINT_JOB.PREPARING' | translate: { done: done(), total: total() } }}</p>
           } @else {
             <button class="download" [disabled]="!j.cards.length" (click)="download()">
-              Download {{ j.cards.length }} cards (.zip)
+              {{ 'PRINT_JOB.DOWNLOAD' | translate: { count: j.cards.length } }}
             </button>
           }
 
-          @if (failed(); as f) { <p class="warn">{{ f }}</p> }
+          @if (failed(); as f) { <p class="warn">{{ f | translate }}</p> }
 
           @if (j.expiresAt) {
-            <p class="foot">This link stops working on {{ j.expiresAt | date: 'mediumDate' }}.</p>
+            <p class="foot">
+              {{ 'PRINT_JOB.EXPIRES' | translate: { date: (j.expiresAt | date: 'mediumDate') } }}
+            </p>
           }
         </div>
       }
@@ -130,6 +132,7 @@ interface PrintJob {
 export class PrintJobComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private http = inject(HttpClient);
+  private translate = inject(TranslateService);
 
   protected job = signal<PrintJob | null>(null);
   protected loading = signal(true);
@@ -142,6 +145,16 @@ export class PrintJobComponent implements OnInit {
   private token = '';
 
   ngOnInit(): void {
+    // Arabic, always. The audience is an Egyptian print shop, never a signed-in
+    // user with a stored preference.
+    //
+    // translate.use, NOT languageService.setLanguage: the latter writes to
+    // localStorage, so opening a print link in your own browser would flip the
+    // whole app to Arabic afterwards. This is scoped to the page and forgotten.
+    this.translate.use('ar');
+    document.documentElement.lang = 'ar';
+    document.documentElement.dir = 'rtl';
+
     this.token = this.route.snapshot.paramMap.get('token') ?? '';
     this.http.get<PrintJob>(`${environment.apiUrl}/public/print-jobs/${this.token}`).subscribe({
       next: (j) => { this.job.set(j); this.loading.set(false); },
@@ -178,7 +191,7 @@ export class PrintJobComponent implements OnInit {
       // is only usable if both sides are actually present; the same guard the
       // in-app export uses, and for the same reason — this batch gets printed.
       if (template === 'custom' && !canExportCustom(design)) {
-        this.failed.set('This academy uses custom card artwork, but it is incomplete. Please ask them to finish it before printing.');
+        this.failed.set('PRINT_JOB.CUSTOM_ART_MISSING');
         return;
       }
 
@@ -210,7 +223,7 @@ export class PrintJobComponent implements OnInit {
         next: () => {}, error: () => {},
       });
     } catch {
-      this.failed.set('Could not build the download. Please try again, or ask for a new link.');
+      this.failed.set('PRINT_JOB.DOWNLOAD_FAILED');
     } finally {
       this.exporting.set(false);
     }

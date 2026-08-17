@@ -880,6 +880,22 @@
     "QR_CARDS": "QR cards",
     "RECEIPTS": "Receipts"
   },
+  "PRINT_JOB": {
+    "LOADING": "Loading…",
+    "UNAVAILABLE_TITLE": "Link not available",
+    "UNAVAILABLE_BODY": "This print link is no longer valid. It may have expired or been cancelled. Please ask for a new one.",
+    "EYEBROW": "Card print job",
+    "CARDS": "Cards",
+    "NUMBERS": "Numbers",
+    "SHIP_TO": "Ship to",
+    "NO_ADDRESS": "No delivery address has been set for this academy. Please ask them for one before shipping.",
+    "CONTACT": "Contact",
+    "PREPARING": "Preparing {{done}} / {{total}}…",
+    "DOWNLOAD": "Download {{count}} cards (.zip)",
+    "CUSTOM_ART_MISSING": "This academy uses custom card artwork, but it is incomplete. Please ask them to finish it before printing.",
+    "DOWNLOAD_FAILED": "Could not build the download. Please try again, or ask for a new link.",
+    "EXPIRES": "This link stops working on {{date}}."
+  },
   "MESSAGING": {
     "TAB_WHATSAPP": "WhatsApp Templates",
     "TAB_TELEGRAM": "Telegram",
