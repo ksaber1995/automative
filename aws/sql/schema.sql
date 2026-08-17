@@ -43,6 +43,14 @@ CREATE TABLE companies (
     -- staff member to click through one by one. Off by default — sticky once
     -- toggled, in either direction, until an admin changes it again.
     auto_confirm_session_payments BOOLEAN NOT NULL DEFAULT FALSE,
+    -- SMS entitlement (migration 097), sold per tenant and switched on from the
+    -- admin console. Two columns because "activated" and "paid up to" are
+    -- different facts: a lapsed tenant keeps the flag but stops being entitled,
+    -- so re-selling is a date change rather than a re-activation.
+    -- NULL expiration means no end date, NOT expired — test the pair, never the
+    -- date alone (smsIsActive in routes/companies.ts).
+    sms_activated BOOLEAN NOT NULL DEFAULT FALSE,
+    sms_expiration DATE,
     is_active BOOLEAN DEFAULT true,
     onboarding_completed BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

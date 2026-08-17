@@ -6044,6 +6044,11 @@ export const contract = c.router({
             company_type: z.string().nullable(),
             /** Where this tenant's printed cards ship to (companies.address). */
             address: z.string().nullable(),
+            /** SMS entitlement: the flag, the end date, and whether it is in force today. */
+            sms_activated: z.boolean(),
+            /** YYYY-MM-DD, or null for no end date — which is NOT the same as expired. */
+            sms_expiration: z.string().nullable(),
+            sms_active: z.boolean(),
             mobile: z.string().nullable(),
             subscription_type: z.string().nullable(),
             price: z.number().nullable(),
@@ -6294,6 +6299,29 @@ export const contract = c.router({
       body: z.object({ address: z.string().nullish() }),
       responses: {
         200: z.object({ success: z.boolean(), address: z.string().nullable() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    // Switch a tenant's SMS entitlement on/off and set the date it runs to.
+    // Omitting `expiration` leaves the stored date alone; sending null clears it,
+    // which means "no end date" and NOT "expired".
+    setSmsAccess: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/companies/:companyId/sms',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      body: z.object({
+        activated: z.boolean(),
+        expiration: z.string().nullish(),
+      }),
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          sms_activated: z.boolean(),
+          sms_expiration: z.string().nullable(),
+          sms_active: z.boolean(),
+        }),
+        400: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
         500: z.object({ message: z.string() }),
       },

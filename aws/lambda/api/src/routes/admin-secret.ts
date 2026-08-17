@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { ensureQrCardSchema, nextCardSerial, firstTakenCardNumber, CARD_SERIAL_BASE_V2 } from './qr-cards';
 import { query, queryOne, getClient } from '../db/connection';
 import { DEBUG_ACCOUNT_EMAIL, isDebugAccount } from '../utils/debug-account';
-import { ensureCompanyTypeConstraint } from './companies';
+import { ensureCompanyTypeConstraint, ensureCompanySmsColumns, smsIsActive } from './companies';
 import { withPortalGuard, PortalPermission } from './admin-portal';
 
 /** The roles a user account can hold (mirrors the users.role CHECK constraint). */
@@ -37,6 +37,12 @@ const SUBSCRIPTIONS_SQL = `
     -- postal address is not worth normalising for a handful of clients, and the
     -- print shop reads it as one block anyway.
     c.address                                                  AS address,
+    -- SMS entitlement: the two stored facts, plus whether they add up to "may
+    -- send right now". The console shows the derived one and edits the other
+    -- two, so it can never disagree with whatever ends up doing the sending.
+    c.sms_activated                                            AS sms_activated,
+    c.sms_expiration                                           AS sms_expiration,
+    ${smsIsActive('c')}                                        AS sms_active,
     NULLIF(CONCAT('+', u.country_code, u.phone), '+')          AS mobile,
     u.email                                                    AS owner_email,
     s.status                                                   AS subscription_type,
@@ -68,6 +74,8 @@ function toIso(value: any): string | null {
 const unguardedAdminSecretRoutes = {
   getSubscriptions: async () => {
     try {
+      // The SELECT reads the SMS columns, so they have to exist before it runs.
+      await ensureCompanySmsColumns();
       const rows = await query<any>(SUBSCRIPTIONS_SQL);
       const body = rows.map((r) => ({
         company_id: r.company_id,
@@ -78,6 +86,11 @@ const unguardedAdminSecretRoutes = {
         company_type: r.company_type ?? null,
         // Blank reads as unset, so a stored empty string can't look like an address.
         address: (r.address ?? '').trim() || null,
+        sms_activated: r.sms_activated === true,
+        // Date only — the time of day is noise on an entitlement that runs to
+        // the end of a day.
+        sms_expiration: r.sms_expiration ? toIso(r.sms_expiration)?.slice(0, 10) ?? null : null,
+        sms_active: r.sms_active === true,
         mobile: r.mobile ?? null,
         owner_email: r.owner_email ?? null,
         subscription_type: r.subscription_type ?? null,
@@ -251,6 +264,68 @@ const unguardedAdminSecretRoutes = {
     } catch (error: any) {
       console.error('karim-admin-secret set company address failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Set address failed' } };
+    }
+  },
+
+  /**
+   * POST /api/karim-admin-secret/companies/:companyId/sms  { activated, expiration? }
+   * Switch a tenant's SMS entitlement on or off, and set the date it runs to.
+   *
+   * `expiration` is a plain YYYY-MM-DD, or null for no end date — which means
+   * "until someone turns it off", NOT "already expired". Omitting the field
+   * leaves whatever date is stored alone, so flipping the flag back on does not
+   * silently wipe the date it was sold with.
+   *
+   * Returns the derived `sms_active` as well as the two stored values, so the
+   * caller never has to re-implement the rule about what an empty date means.
+   */
+  setSmsAccess: async ({ params, body }: {
+    params: { companyId: string };
+    body: { activated: boolean; expiration?: string | null };
+  }) => {
+    try {
+      await ensureCompanySmsColumns();
+      const company = await queryOne<any>('SELECT id FROM companies WHERE id = $1', [params.companyId]);
+      if (!company) return { status: 404 as const, body: { message: 'Company not found' } };
+
+      const activated = body?.activated === true;
+
+      // Absent = leave the stored date alone; present-but-null = clear it.
+      const setsExpiration = body != null && 'expiration' in body;
+      let expiration: string | null = null;
+      if (setsExpiration && body.expiration != null) {
+        const raw = String(body.expiration).trim();
+        // Rejected rather than coerced: a date the caller did not mean is worse
+        // than an error, because it silently sells a tenant the wrong window.
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw) || isNaN(new Date(raw).getTime())) {
+          return { status: 400 as const, body: { message: 'expiration must be a YYYY-MM-DD date, or null for no end date' } };
+        }
+        expiration = raw;
+      }
+
+      const row = await queryOne<any>(
+        setsExpiration
+          ? `UPDATE companies SET sms_activated = $2, sms_expiration = $3::date, updated_at = NOW()
+              WHERE id = $1
+              RETURNING sms_activated, sms_expiration, ${smsIsActive('companies')} AS sms_active`
+          : `UPDATE companies SET sms_activated = $2, updated_at = NOW()
+              WHERE id = $1
+              RETURNING sms_activated, sms_expiration, ${smsIsActive('companies')} AS sms_active`,
+        setsExpiration ? [params.companyId, activated, expiration] : [params.companyId, activated],
+      );
+
+      return {
+        status: 200 as const,
+        body: {
+          success: true,
+          sms_activated: row?.sms_activated === true,
+          sms_expiration: row?.sms_expiration ? toIso(row.sms_expiration)?.slice(0, 10) ?? null : null,
+          sms_active: row?.sms_active === true,
+        },
+      };
+    } catch (error: any) {
+      console.error('karim-admin-secret set sms access failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Set SMS access failed' } };
     }
   },
 
@@ -928,6 +1003,9 @@ const ADMIN_SECRET_PERMISSIONS: { [K in keyof typeof unguardedAdminSecretRoutes]
   setCompanyType: 'companies.write',
   // The shipping address is edited from the cards sheet and is a company field.
   setCompanyAddress: ['cards.write', 'companies.write'],
+  // Selling a tenant a feature is the same kind of act as extending their
+  // subscription, so it rides on the same grant.
+  setSmsAccess: 'companies.write',
   deleteCompany: 'companies.delete',
 
   listTelegramBots: 'bots.read',

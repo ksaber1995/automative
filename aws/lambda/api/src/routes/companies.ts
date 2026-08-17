@@ -174,6 +174,48 @@ export async function ensureFreeTrialLimitColumn(): Promise<void> {
   return freeTrialLimitColumnInitPromise;
 }
 
+/**
+ * Whether this tenant may send SMS, and until when (migration 097).
+ *
+ * Sold per tenant and switched on from the admin console, the same shape as the
+ * QR card pool: off until someone turns it on. Two columns rather than one
+ * because "activated" and "paid up to" are different facts — a lapsed tenant
+ * keeps the flag but stops being entitled, and re-selling is then a date change
+ * rather than a re-activation.
+ *
+ * `sms_expiration` NULL means no end date, not "expired": a tenant switched on
+ * without one stays on until someone switches them off. Callers must therefore
+ * test the pair, never the date alone — see smsIsActive below.
+ */
+let smsColumnsInitPromise: Promise<void> | null = null;
+export async function ensureCompanySmsColumns(): Promise<void> {
+  if (!smsColumnsInitPromise) {
+    smsColumnsInitPromise = (async () => {
+      try {
+        await query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS sms_activated BOOLEAN NOT NULL DEFAULT FALSE`);
+        await query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS sms_expiration DATE`);
+      } catch (e) {
+        smsColumnsInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return smsColumnsInitPromise;
+}
+
+/**
+ * SQL for "this tenant may send SMS right now" — the flag AND an expiry that has
+ * not passed. `alias` is the companies alias in the query.
+ *
+ * Exported so the eventual sender and any UI both ask the question the same way;
+ * spelling it out twice is how the console ends up claiming SMS is on for a
+ * tenant whose date ran out last week.
+ */
+export function smsIsActive(alias = 'c'): string {
+  return `(${alias}.sms_activated = true
+           AND (${alias}.sms_expiration IS NULL OR ${alias}.sms_expiration >= CURRENT_DATE))`;
+}
+
 // Student ID card back face — one shared design per company. Same idempotent
 // runtime-migration approach as above.
 let cardDesignColumnInitPromise: Promise<void> | null = null;

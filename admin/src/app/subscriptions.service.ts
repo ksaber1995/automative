@@ -16,6 +16,12 @@ export interface CompanySubscription {
   mobile: string | null;
   /** Owner (registrant) user's email. */
   owner_email: string | null;
+  /** SMS entitlement: switched on, until when, and whether that adds up today. */
+  sms_activated: boolean;
+  /** YYYY-MM-DD, or null for no end date — which is NOT the same as expired. */
+  sms_expiration: string | null;
+  /** The derived answer the server computes; never re-derive it here. */
+  sms_active: boolean;
   subscription_type: string | null;
   price: number | null;
   start_date: string | null;
@@ -71,6 +77,26 @@ export class SubscriptionsService {
     return this.http.post<{ success: boolean; end_date: string | null; subscription_type?: string | null }>(
       `${ADMIN_ENDPOINT}/companies/${companyId}/extend`,
       { months },
+    );
+  }
+
+  /**
+   * Switch a tenant's SMS entitlement on or off, and set the date it runs to.
+   *
+   * Pass `expiration: null` for no end date, or omit it entirely to leave the
+   * stored date untouched — flipping the flag back on should not wipe the date
+   * the tenant was sold.
+   */
+  setSmsAccess(
+    companyId: string,
+    activated: boolean,
+    expiration?: string | null,
+  ): Observable<{ success: boolean; sms_activated: boolean; sms_expiration: string | null; sms_active: boolean }> {
+    const body: { activated: boolean; expiration?: string | null } = { activated };
+    if (expiration !== undefined) body.expiration = expiration;
+    return this.http.post<{ success: boolean; sms_activated: boolean; sms_expiration: string | null; sms_active: boolean }>(
+      `${ADMIN_ENDPOINT}/companies/${companyId}/sms`,
+      body,
     );
   }
 

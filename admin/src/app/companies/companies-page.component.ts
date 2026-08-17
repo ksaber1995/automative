@@ -22,6 +22,12 @@ import { syncQueryParams } from '../shared/query-sync';
   standalone: true,
   imports: [CommonModule, FormsModule],
   styleUrls: ['../shared/admin-ui.css'],
+  styles: [`
+    .sms-cell { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .sms-until { font-size: 12px; white-space: nowrap; }
+    .sms-toggle { display: flex; align-items: center; gap: 8px; margin: 6px 0 4px; font-size: 14px; cursor: pointer; }
+    .lbl { display: block; font-size: 12px; font-weight: 700; color: #334155; margin: 14px 0 5px; }
+  `],
   template: `
     <header>
       <div>
@@ -85,6 +91,7 @@ import { syncQueryParams } from '../shared/query-sync';
               <th>Start</th>
               <th>End</th>
               <th>Status</th>
+              <th>SMS</th>
               <th>QR cards</th>
               <th>Actions</th>
             </tr>
@@ -127,6 +134,30 @@ import { syncQueryParams } from '../shared/query-sync';
                 <td>
                   <span class="dot" [class.off]="!r.company_active"></span>
                   {{ r.company_active ? 'Active' : 'Inactive' }}
+                </td>
+                <td>
+                  <!-- The derived state, not the raw flag: a tenant switched on
+                       whose date ran out last week is OFF, and saying "on" here
+                       would be the console disagreeing with the sender. -->
+                  <div class="sms-cell">
+                    @if (r.sms_active) {
+                      <span class="badge">on</span>
+                    } @else if (r.sms_activated) {
+                      <span class="badge expired" title="Activated, but the end date has passed">lapsed</span>
+                    } @else {
+                      <span class="sub">off</span>
+                    }
+                    @if (r.sms_expiration) {
+                      <span class="sub sms-until">to {{ formatDate(r.sms_expiration) }}</span>
+                    } @else if (r.sms_active) {
+                      <span class="sub sms-until">no end date</span>
+                    }
+                    @if (auth.can('companies.write')) {
+                      <button class="act" [disabled]="busyId() === r.company_id" (click)="openSms(r)">
+                        {{ r.sms_activated ? 'Edit' : 'Activate' }}
+                      </button>
+                    }
+                  </div>
                 </td>
                 <td>
                   @if (!auth.can('cards.read')) {
@@ -192,10 +223,43 @@ import { syncQueryParams } from '../shared/query-sync';
               </tr>
             }
             @if (filtered().length === 0) {
-              <tr><td colspan="15" class="state">No matches.</td></tr>
+              <tr><td colspan="16" class="state">No matches.</td></tr>
             }
           </tbody>
         </table>
+      </div>
+    }
+
+    <!-- SMS entitlement -->
+    @if (smsRow(); as row) {
+      <div class="overlay" (click)="closeSms()">
+        <div class="modal" (click)="$event.stopPropagation()">
+          <h2>SMS for {{ row.company_name }}</h2>
+          <p class="modal-sub">
+            Whether this tenant may send SMS, and the date it runs to.
+          </p>
+
+          <label class="sms-toggle">
+            <input type="checkbox" [ngModel]="smsActivated()" (ngModelChange)="smsActivated.set($event)" />
+            <span>SMS activated</span>
+          </label>
+
+          <label class="lbl">Runs until</label>
+          <input class="search" type="date" [ngModel]="smsExpiration()" (ngModelChange)="smsExpiration.set($event)" />
+          <p class="modal-sub">
+            Leave the date empty for <strong>no end date</strong> — that is not the same as expired.
+            A tenant with no end date stays on until switched off here.
+          </p>
+
+          @if (smsError(); as e) { <div class="error">{{ e }}</div> }
+
+          <div class="modal-foot">
+            <button class="act" [disabled]="busyId() === row.company_id" (click)="closeSms()">Cancel</button>
+            <button class="act activate" [disabled]="busyId() === row.company_id" (click)="confirmSms(row)">
+              {{ busyId() === row.company_id ? 'Saving…' : 'Save' }}
+            </button>
+          </div>
+        </div>
       </div>
     }
 
@@ -533,6 +597,49 @@ export class CompaniesPageComponent {
         this.store.loadCompanies(true);
       },
       error: (err) => this.fail('Delete failed', err),
+    });
+  }
+
+  // ── SMS entitlement ────────────────────────────────────────────────────────
+  protected smsRow = signal<CompanySubscription | null>(null);
+  protected smsActivated = signal(false);
+  /** '' means no end date. The <input type="date"> speaks YYYY-MM-DD, as does the API. */
+  protected smsExpiration = signal('');
+  protected smsError = signal<string | null>(null);
+
+  protected openSms(r: CompanySubscription): void {
+    this.smsError.set(null);
+    this.smsActivated.set(r.sms_activated);
+    this.smsExpiration.set(r.sms_expiration ?? '');
+    this.smsRow.set(r);
+  }
+
+  protected closeSms(): void {
+    if (this.busyId()) return;
+    this.smsRow.set(null);
+  }
+
+  protected confirmSms(r: CompanySubscription): void {
+    this.smsError.set(null);
+    this.busyId.set(r.company_id);
+    // Always sends `expiration`, including as null: this dialog shows the date,
+    // so whatever is in the box is what the operator means — including having
+    // cleared it.
+    this.service.setSmsAccess(r.company_id, this.smsActivated(), this.smsExpiration() || null).subscribe({
+      next: (res) => {
+        this.busyId.set(null);
+        this.smsRow.set(null);
+        this.store.showFlash(
+          res.sms_active
+            ? `SMS on for ${r.company_name}${res.sms_expiration ? ` until ${this.formatDate(res.sms_expiration)}` : ''}.`
+            : `SMS off for ${r.company_name}.`,
+        );
+        this.store.loadCompanies(true);
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.smsError.set(err?.error?.message || 'Could not save the SMS settings.');
+      },
     });
   }
 
