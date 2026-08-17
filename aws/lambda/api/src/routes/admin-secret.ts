@@ -3,6 +3,7 @@ import { ensureQrCardSchema, nextCardSerial, firstTakenCardNumber, CARD_SERIAL_B
 import { query, queryOne, getClient } from '../db/connection';
 import { DEBUG_ACCOUNT_EMAIL, isDebugAccount } from '../utils/debug-account';
 import { ensureCompanyTypeConstraint } from './companies';
+import { withPortalGuard, PortalPermission } from './admin-portal';
 
 /** The roles a user account can hold (mirrors the users.role CHECK constraint). */
 export const ADMIN_ROLES = [
@@ -11,17 +12,18 @@ export const ADMIN_ROLES = [
 ];
 
 /**
- * Intentionally-obscure, unauthenticated read-only endpoint for the owner's
- * local admin console and cards report. Returns one cross-tenant row per
- * company: subscription "type" (status), price, employee/branch/student/course
- * counts, start/end dates, and — because those tools need them — the owner's
- * email, the account mobile, and the tenant's postal address.
+ * The owner's cross-tenant view: one row per company with subscription status,
+ * price, employee/branch/student/course counts, start/end dates, and — because
+ * the console and the cards report need them — the owner's email, the account
+ * mobile, and the tenant's postal address.
  *
- * No auth: the obscure path is the only gate. That was accepted when the payload
- * was aggregate numbers and company names; it now carries contact and address
- * details for every tenant, so the path is genuinely the only thing protecting
- * personal data. Worth revisiting if this endpoint ever outgrows two local-only
- * tools. Read-only: a single SELECT, no writes.
+ * This used to be gated by nothing but the obscure path, which was accepted
+ * while the payload was aggregate numbers. It carries personal data for every
+ * tenant and sits alongside routes that can delete a company, so the path is no
+ * longer treated as a credential: every route in this file now requires a portal
+ * sign-in (see the guard at the bottom, and routes/admin-portal.ts).
+ *
+ * Read-only: a single SELECT, no writes.
  */
 const SUBSCRIPTIONS_SQL = `
   SELECT
@@ -63,7 +65,7 @@ function toIso(value: any): string | null {
   return isNaN(d.getTime()) ? String(value) : d.toISOString();
 }
 
-export const adminSecretRoutes = {
+const unguardedAdminSecretRoutes = {
   getSubscriptions: async () => {
     try {
       const rows = await query<any>(SUBSCRIPTIONS_SQL);
@@ -908,3 +910,45 @@ export const adminSecretRoutes = {
     }
   },
 };
+
+/**
+ * What each route asks of the caller. Any-of, so a route reachable from two
+ * sections doesn't demand both grants.
+ *
+ * Typed against the route object, so a new route added above without a line
+ * here is a compile error rather than an endpoint that quietly ships open.
+ */
+const ADMIN_SECRET_PERMISSIONS: { [K in keyof typeof unguardedAdminSecretRoutes]: PortalPermission | PortalPermission[] } = {
+  // The tenant list is the spine of both the Companies table and the Cards
+  // report, so either grant opens it.
+  getSubscriptions: ['companies.read', 'cards.read'],
+  extendSubscription: 'companies.write',
+  activateSubscription: 'companies.write',
+  deactivateSubscription: 'companies.write',
+  setCompanyType: 'companies.write',
+  // The shipping address is edited from the cards sheet and is a company field.
+  setCompanyAddress: ['cards.write', 'companies.write'],
+  deleteCompany: 'companies.delete',
+
+  listTelegramBots: 'bots.read',
+  addTelegramBot: 'bots.write',
+
+  qrCardStats: 'cards.read',
+  listQrCards: 'cards.read',
+  setQrCardsEnabled: 'cards.write',
+  generateQrCards: 'cards.write',
+  markQrCardsPrinted: 'cards.write',
+  deleteQrCards: 'cards.write',
+
+  listUsers: 'tenant_users.read',
+  createUser: 'tenant_users.write',
+  deleteUser: 'tenant_users.write',
+  moveUserCompany: 'tenant_users.write',
+};
+
+/**
+ * Every route above, behind the portal sign-in. Nothing on this prefix is
+ * reachable with the path alone any more — see routes/admin-portal.ts for why,
+ * and for the one route that is still open (the login itself).
+ */
+export const adminSecretRoutes = withPortalGuard(unguardedAdminSecretRoutes, ADMIN_SECRET_PERMISSIONS);

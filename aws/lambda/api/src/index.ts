@@ -50,6 +50,7 @@ import { enrollmentsRoutes } from './routes/enrollments';
 import { subscriptionsRoutes } from './routes/subscriptions';
 import { migrationsRoutes } from './routes/migrations';
 import { adminSecretRoutes } from './routes/admin-secret';
+import { adminPortalRoutes } from './routes/admin-portal';
 import { companiesRoutes } from './routes/companies';
 import { debugRoutes } from './routes/debug';
 import { usersRoutes } from './routes/users';
@@ -168,6 +169,7 @@ const router = {
   debug: debugRoutes,
   subscriptions: subscriptionsRoutes,
   adminSecret: adminSecretRoutes,
+  adminPortal: adminPortalRoutes,
   migrations: migrationsRoutes,
   users: usersRoutes,
   demoLeads: demoLeadsRoutes,

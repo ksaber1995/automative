@@ -1,7 +1,10 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgSelectModule } from '@ng-select/ng-select';
+import { PortalAuthService } from './auth/portal-auth.service';
+import { LoginComponent } from './auth/login.component';
+import { PortalUsersComponent } from './portal-users/portal-users.component';
 import {
   CompanySubscription, PoolBot, PoolType, POOL_TYPES, SubscriptionsService,
   TenantUser, USER_ROLES,
@@ -19,31 +22,75 @@ const DEBUG_EMAIL = 'master@master.com';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgSelectModule, QrGeneratorComponent, CardsPageComponent],
+  imports: [
+    CommonModule, FormsModule, NgSelectModule,
+    QrGeneratorComponent, CardsPageComponent, LoginComponent, PortalUsersComponent,
+  ],
   template: `
+    <!-- Until the stored token has been checked, show neither the console nor
+         the login form — a valid session would otherwise flash the login page on
+         every reload. -->
+    @if (!auth.ready()) {
+      <div class="booting">Checking your session…</div>
+    } @else if (!auth.signedIn()) {
+      <app-login />
+    } @else {
     <div class="app">
       <aside class="sidebar">
         <div class="brand">Netrofit <span>Admin</span></div>
         <nav>
-          <button class="navitem" [class.on]="view() === 'companies'" (click)="view.set('companies')">
-            <span>Companies</span><span class="navcount">{{ rows().length }}</span>
-          </button>
-          <button class="navitem" [class.on]="view() === 'users'" (click)="showUsers()">
-            <span>Users</span><span class="navcount">{{ users().length }}</span>
-          </button>
-          <button class="navitem" [class.on]="view() === 'cards'" (click)="view.set('cards')">
-            <span>Cards</span><span class="navcount">{{ activeClientCount() }}</span>
-          </button>
-          <button class="navitem" [class.on]="view() === 'bots'" (click)="view.set('bots')">
-            <span>Telegram bots</span><span class="navcount">{{ poolTotal() }}</span>
-          </button>
+          @if (auth.can('companies.read')) {
+            <button class="navitem" [class.on]="view() === 'companies'" (click)="view.set('companies')">
+              <span>Companies</span><span class="navcount">{{ rows().length }}</span>
+            </button>
+          }
+          @if (auth.can('tenant_users.read')) {
+            <button class="navitem" [class.on]="view() === 'users'" (click)="showUsers()">
+              <span>Users</span><span class="navcount">{{ users().length }}</span>
+            </button>
+          }
+          @if (auth.can('cards.read')) {
+            <button class="navitem" [class.on]="view() === 'cards'" (click)="view.set('cards')">
+              <span>Cards</span><span class="navcount">{{ activeClientCount() }}</span>
+            </button>
+          }
+          @if (auth.can('bots.read')) {
+            <button class="navitem" [class.on]="view() === 'bots'" (click)="view.set('bots')">
+              <span>Telegram bots</span><span class="navcount">{{ poolTotal() }}</span>
+            </button>
+          }
+          <!-- No permission: it renders images from text typed into the page and
+               reads nothing from the API. -->
           <button class="navitem" [class.on]="view() === 'qr'" (click)="view.set('qr')">
             <span>QR generator</span>
           </button>
+          @if (auth.can('portal_users.read')) {
+            <button class="navitem" [class.on]="view() === 'portal'" (click)="view.set('portal')">
+              <span>Portal users</span>
+            </button>
+          }
         </nav>
+
+        <div class="who">
+          <div class="who-name">{{ auth.user()?.name || auth.user()?.email }}</div>
+          <div class="who-role">{{ auth.user()?.role }}</div>
+          <div class="who-acts">
+            <button class="linkish" (click)="openChangePassword()">Password</button>
+            <button class="linkish" (click)="auth.logout()">Sign out</button>
+          </div>
+        </div>
         <button class="refresh side" (click)="refreshAll()">Refresh all</button>
       </aside>
       <main class="main">
+
+      @if (!visibleViews().length) {
+        <div class="state">
+          <h1>Nothing to show</h1>
+          <p class="sub">
+            Your account can sign in but has no permissions yet. Ask an owner to grant some.
+          </p>
+        </div>
+      }
 
       @if (view() === 'companies') {
       <header>
@@ -67,14 +114,16 @@ const DEBUG_EMAIL = 'master@master.com';
               {{ poolAvailable() }} available · {{ poolTotal() }} total — create bots in &#64;BotFather, paste each token here.
             </p>
           </div>
-          <div style="display:flex; gap:8px; flex:1; min-width:280px; max-width:560px;">
-            <input class="search" type="text"
-              [ngModel]="poolToken()" (ngModelChange)="poolToken.set($event)"
-              placeholder="Paste a bot token from @BotFather…" />
-            <button class="act activate" [disabled]="addingBot() || !poolToken().trim()" (click)="addBot()">
-              {{ addingBot() ? 'Adding…' : 'Add bot' }}
-            </button>
-          </div>
+          @if (auth.can('bots.write')) {
+            <div style="display:flex; gap:8px; flex:1; min-width:280px; max-width:560px;">
+              <input class="search" type="text"
+                [ngModel]="poolToken()" (ngModelChange)="poolToken.set($event)"
+                placeholder="Paste a bot token from @BotFather…" />
+              <button class="act activate" [disabled]="addingBot() || !poolToken().trim()" (click)="addBot()">
+                {{ addingBot() ? 'Adding…' : 'Add bot' }}
+              </button>
+            </div>
+          }
         </div>
         @if (bots().length) {
           <div style="margin-top:12px; display:flex; flex-wrap:wrap; gap:8px;">
@@ -185,18 +234,26 @@ const DEBUG_EMAIL = 'master@master.com';
                     {{ r.company_active ? 'Active' : 'Inactive' }}
                   </td>
                   <td>
-                    @if (qrStats()[r.company_id]; as q) {
+                    @if (!auth.can('cards.read')) {
+                      <span class="sub">—</span>
+                    } @else if (qrStats()[r.company_id]; as q) {
                       <div class="qr-cell">
-                        <button class="act" [class.activate]="!q.qr_cards_enabled"
-                          [disabled]="busyId() === r.company_id"
-                          (click)="toggleQrCards(r)">
-                          {{ q.qr_cards_enabled ? 'Disable' : 'Enable' }}
-                        </button>
-                        @if (q.qr_cards_enabled) {
-                          <button class="act" [disabled]="busyId() === r.company_id" (click)="openQrCards(r)">
-                            + Cards
+                        @if (auth.can('cards.write')) {
+                          <button class="act" [class.activate]="!q.qr_cards_enabled"
+                            [disabled]="busyId() === r.company_id"
+                            (click)="toggleQrCards(r)">
+                            {{ q.qr_cards_enabled ? 'Disable' : 'Enable' }}
                           </button>
+                        }
+                        @if (q.qr_cards_enabled) {
+                          @if (auth.can('cards.write')) {
+                            <button class="act" [disabled]="busyId() === r.company_id" (click)="openQrCards(r)">
+                              + Cards
+                            </button>
+                          }
                           <span class="qr-count">{{ q.linked }} / {{ q.total }}</span>
+                        } @else if (!auth.can('cards.write')) {
+                          <span class="sub">off</span>
                         }
                       </div>
                     } @else {
@@ -207,27 +264,34 @@ const DEBUG_EMAIL = 'master@master.com';
                   </td>
                   <td>
                     <div class="actions">
-                      @if (r.subscription_type !== 'ACTIVE') {
-                        <button class="act activate" [disabled]="busyId() === r.company_id" (click)="activate(r)">
-                          Activate
+                      @if (auth.can('companies.write')) {
+                        @if (r.subscription_type !== 'ACTIVE') {
+                          <button class="act activate" [disabled]="busyId() === r.company_id" (click)="activate(r)">
+                            Activate
+                          </button>
+                        }
+                        @if (r.subscription_type !== 'EXPIRED') {
+                          <button class="act" [disabled]="busyId() === r.company_id" (click)="openDeactivate(r)">
+                            Deactivate
+                          </button>
+                        }
+                        <button class="act" [disabled]="busyId() === r.company_id" (click)="openExtend(r)">
+                          Extend
+                        </button>
+                        @if (r.company_type === 'ACADEMY' || r.company_type === 'TEACHER') {
+                          <button class="act" [disabled]="busyId() === r.company_id" (click)="openType(r)">
+                            Make {{ r.company_type === 'ACADEMY' ? 'Teacher' : 'Academy' }}
+                          </button>
+                        }
+                      }
+                      @if (auth.can('companies.delete')) {
+                        <button class="act danger" [disabled]="busyId() === r.company_id" (click)="openDelete(r)">
+                          Delete
                         </button>
                       }
-                      @if (r.subscription_type !== 'EXPIRED') {
-                        <button class="act" [disabled]="busyId() === r.company_id" (click)="openDeactivate(r)">
-                          Deactivate
-                        </button>
+                      @if (!auth.can('companies.write') && !auth.can('companies.delete')) {
+                        <span class="sub">read only</span>
                       }
-                      <button class="act" [disabled]="busyId() === r.company_id" (click)="openExtend(r)">
-                        Extend
-                      </button>
-                      @if (r.company_type === 'ACADEMY' || r.company_type === 'TEACHER') {
-                        <button class="act" [disabled]="busyId() === r.company_id" (click)="openType(r)">
-                          Make {{ r.company_type === 'ACADEMY' ? 'Teacher' : 'Academy' }}
-                        </button>
-                      }
-                      <button class="act danger" [disabled]="busyId() === r.company_id" (click)="openDelete(r)">
-                        Delete
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -266,7 +330,9 @@ const DEBUG_EMAIL = 'master@master.com';
               <option [value]="c.company_id">{{ c.company_name }}</option>
             }
           </select>
-          <button class="act activate" (click)="openCreateUser()">+ New user</button>
+          @if (auth.can('tenant_users.write')) {
+            <button class="act activate" (click)="openCreateUser()">+ New user</button>
+          }
           <span class="count">{{ visibleUsers().length }} / {{ users().length }}</span>
         </div>
 
@@ -302,7 +368,7 @@ const DEBUG_EMAIL = 'master@master.com';
                     </td>
                     <td>{{ formatDate(u.created_at) }}</td>
                     <td>
-                      @if (isDebugUser(u)) {
+                      @if (isDebugUser(u) && auth.can('tenant_users.write')) {
                         <button class="act" [disabled]="busyId() === u.id" (click)="openMoveUser(u)">
                           Move
                         </button>
@@ -567,11 +633,51 @@ const DEBUG_EMAIL = 'master@master.com';
         <app-qr-generator />
       }
 
+      @if (view() === 'portal') {
+        <app-portal-users />
+      }
+
+      <!-- Changing your own password. Needs the current one, so an unlocked
+           laptop is not enough to lock the owner out. -->
+      @if (passwordOpen()) {
+        <div class="overlay" (click)="closeChangePassword()">
+          <div class="modal" (click)="$event.stopPropagation()">
+            <h2>Change your password</h2>
+            <p class="modal-sub">You will stay signed in on this browser.</p>
+            <input class="search" type="password" autocomplete="current-password"
+              [ngModel]="currentPassword()" (ngModelChange)="currentPassword.set($event)"
+              placeholder="Current password" />
+            <input class="search" type="password" autocomplete="new-password" style="margin-top:10px"
+              [ngModel]="newPassword()" (ngModelChange)="newPassword.set($event)"
+              placeholder="New password (at least 8 characters)" />
+            @if (passwordError(); as e) { <div class="error" style="margin-top:12px">{{ e }}</div> }
+            <div class="modal-foot">
+              <button class="act" [disabled]="savingPassword()" (click)="closeChangePassword()">Cancel</button>
+              <button class="act activate" [disabled]="savingPassword()" (click)="submitPassword()">
+                {{ savingPassword() ? 'Saving…' : 'Change password' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
       </main>
     </div>
+    }
   `,
   styles: [`
+    .booting { padding: 80px 20px; text-align: center; color: #64748b; font-size: 14px; }
     .app { display: flex; align-items: stretch; min-height: 100vh; }
+    /* Pushed to the bottom of the sidebar, above "Refresh all". */
+    .who { margin-top: auto; padding: 12px 12px 10px; border-top: 1px solid rgba(255,255,255,.10); }
+    .who-name { font-size: 13px; font-weight: 700; color: #fff; word-break: break-all; }
+    .who-role { font-size: 11px; color: #818cf8; font-weight: 700; letter-spacing: .04em; margin-top: 1px; }
+    .who-acts { display: flex; gap: 12px; margin-top: 7px; }
+    .linkish {
+      border: 0; background: none; padding: 0; cursor: pointer; color: #cbd5e1;
+      font-size: 12px; font-family: inherit; text-decoration: underline;
+    }
+    .linkish:hover { color: #fff; }
     .sidebar {
       width: 236px; flex: 0 0 236px; background: #0f172a; color: #e2e8f0;
       padding: 20px 14px; display: flex; flex-direction: column; gap: 6px;
@@ -591,7 +697,8 @@ const DEBUG_EMAIL = 'master@master.com';
       background: rgba(255, 255, 255, .15); border-radius: 999px; padding: 1px 8px;
       font-size: 12px; font-variant-numeric: tabular-nums;
     }
-    .refresh.side { margin-top: auto; background: rgba(255, 255, 255, .08); border-color: transparent; color: #e2e8f0; }
+    /* .who owns the auto margin that pushes the block to the bottom now. */
+    .refresh.side { margin-top: 8px; background: rgba(255, 255, 255, .08); border-color: transparent; color: #e2e8f0; }
     .refresh.side:hover { background: rgba(255, 255, 255, .16); }
     .main { flex: 1 1 auto; min-width: 0; padding: 30px 28px 60px; }
     .lic-toolbar { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
@@ -726,11 +833,30 @@ const DEBUG_EMAIL = 'master@master.com';
     }
   `],
 })
-export class AppComponent implements OnInit {
+export class AppComponent {
   private service = inject(SubscriptionsService);
+  /** Public: the template reads it directly to gate the shell and the nav. */
+  readonly auth = inject(PortalAuthService);
 
   /** Which section the sidebar is showing. */
-  view = signal<'companies' | 'cards' | 'bots' | 'users' | 'qr'>('companies');
+  view = signal<'companies' | 'cards' | 'bots' | 'users' | 'qr' | 'portal'>('companies');
+
+  /**
+   * The sections this account may open, in sidebar order. Drives both the
+   * "nothing to show" state and the landing section — defaulting to Companies
+   * would strand someone who was only given Cards on an empty page.
+   */
+  visibleViews = computed(() => {
+    const can = (p: string) => this.auth.can(p);
+    return ([
+      ['companies', can('companies.read')],
+      ['users', can('tenant_users.read')],
+      ['cards', can('cards.read')],
+      ['bots', can('bots.read')],
+      ['qr', true],
+      ['portal', can('portal_users.read')],
+    ] as const).filter(([, allowed]) => allowed).map(([v]) => v);
+  });
 
   rows = signal<CompanySubscription[]>([]);
   loading = signal(true);
@@ -787,15 +913,75 @@ export class AppComponent implements OnInit {
     () => this.rows().filter((r) => (r.subscription_type || '').toUpperCase() === 'ACTIVE').length,
   );
 
-  /** Sidebar "Refresh all" — reload every section. */
+  /** Sidebar "Refresh all" — reload every section this account can see. */
   refreshAll(): void {
-    this.load();
-    this.loadBots();
+    if (this.auth.can(['companies.read', 'cards.read', 'tenant_users.read'])) this.load();
+    if (this.auth.can('bots.read')) this.loadBots();
   }
 
-  ngOnInit() {
-    this.load();
-    this.loadBots();
+  constructor() {
+    this.auth.restore();
+
+    // The data loads used to run from ngOnInit. They cannot any more: every one
+    // of them now needs a token, and firing them before the session is known
+    // would 401 on the way in and clear it. This runs once a user appears —
+    // whether from a stored token or a fresh sign-in.
+    let loadedFor: string | null = null;
+    effect(() => {
+      const user = this.auth.user();
+      if (!user) { loadedFor = null; return; }
+      if (loadedFor === user.id) return;
+      loadedFor = user.id;
+
+      // Land on a section they can actually open.
+      const allowed = this.visibleViews();
+      if (allowed.length && !allowed.includes(this.view())) this.view.set(allowed[0]);
+
+      // The tenant list backs Companies, the Cards report AND the Users page's
+      // tenant picker, so any of the three is reason to fetch it.
+      if (this.auth.can(['companies.read', 'cards.read', 'tenant_users.read'])) this.load();
+      if (this.auth.can('bots.read')) this.loadBots();
+    });
+  }
+
+  // ── Your own password ───────────────────────────────────────────────────────
+  passwordOpen = signal(false);
+  currentPassword = signal('');
+  newPassword = signal('');
+  savingPassword = signal(false);
+  passwordError = signal<string | null>(null);
+
+  openChangePassword() {
+    this.currentPassword.set('');
+    this.newPassword.set('');
+    this.passwordError.set(null);
+    this.passwordOpen.set(true);
+  }
+
+  closeChangePassword() {
+    if (this.savingPassword()) return;
+    this.passwordOpen.set(false);
+  }
+
+  submitPassword() {
+    if (this.savingPassword()) return;
+    if (this.newPassword().length < 8) {
+      this.passwordError.set('The new password must be at least 8 characters.');
+      return;
+    }
+    this.savingPassword.set(true);
+    this.passwordError.set(null);
+    this.auth.changeOwnPassword(this.currentPassword(), this.newPassword()).subscribe({
+      next: () => {
+        this.savingPassword.set(false);
+        this.passwordOpen.set(false);
+        this.showFlash('Password changed.');
+      },
+      error: (err) => {
+        this.savingPassword.set(false);
+        this.passwordError.set(err?.error?.message || 'Could not change the password.');
+      },
+    });
   }
 
   loadBots() {

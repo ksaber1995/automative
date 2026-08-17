@@ -12,9 +12,15 @@ Only **active (paying)** clients are shown — those with an `ACTIVE` subscripti
 > column is `true` for every tenant (deactivating a client only expires the
 > subscription), so filtering on it would be a no-op.
 
+> **This app no longer works on its own.** Every `/api/karim-admin-secret` route
+> now requires an admin-portal sign-in (see `admin/README.md`), and nothing here
+> sends a token — so every request comes back `401`. The whole of this report was
+> ported into the admin console as its **Cards** section; use that. This
+> directory is kept only as the source the port was made from.
+
 ## What it reads
 
-It calls the same unauthenticated owner endpoint the admin console uses:
+It calls the same owner endpoint the admin console uses:
 
 ```
 https://xnbgr057y1.execute-api.eu-west-1.amazonaws.com/prod/api/karim-admin-secret

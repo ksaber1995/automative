@@ -2094,6 +2094,24 @@ const AdminUserSchema = z.object({
   created_at: z.string().nullable(),
 });
 
+/**
+ * A sign-in to the admin console itself — not a tenant user. Never carries the
+ * password hash.
+ *
+ * `role` is OWNER or MEMBER: OWNER holds every permission implicitly (including
+ * ones added later), so `permissions` is only meaningful for a MEMBER.
+ */
+const AdminPortalUserSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  name: z.string().nullable(),
+  role: z.string(),
+  permissions: z.array(z.string()),
+  is_active: z.boolean(),
+  last_login_at: z.string().nullable(),
+  created_at: z.string().nullable(),
+});
+
 export const contract = c.router({
   // Lookups (auth-only, no granular permission) — see routes/lookups.ts
   lookups: {
@@ -5998,8 +6016,19 @@ export const contract = c.router({
     },
   },
 
-  // Obscure, unauthenticated read-only endpoint for the owner's local admin
-  // console (cross-tenant company/subscription numbers). The path is the secret.
+  // The owner's admin console (cross-tenant company/subscription numbers, card
+  // pools, tenant accounts, the Telegram bot pool).
+  //
+  // EVERY route in this group requires an admin-portal bearer token — see the
+  // `adminPortal` group below and routes/admin-portal.ts. The obscure path is no
+  // longer treated as the credential.
+  //
+  // The per-route `responses` maps below therefore all have two more members
+  // than they list: 401 (not signed in / expired) and 403 (signed in, but
+  // without the permission that route asks for). They are not enumerated one by
+  // one because response validation is off (`responseValidation` is not set on
+  // createLambdaHandler), so this map is documentation rather than a runtime
+  // gate, and twenty near-identical edits would bury the routes themselves.
   adminSecret: {
     getSubscriptions: {
       method: 'GET',
@@ -6308,6 +6337,118 @@ export const contract = c.router({
         200: z.object({ success: z.boolean(), bot_username: z.string(), total: z.number(), available: z.number() }),
         400: z.object({ message: z.string() }),
         500: z.object({ message: z.string() }),
+      },
+    },
+  },
+
+  // Who may sign in to the admin console, and what they may do once in.
+  //
+  // `login` is the ONE route on the karim-admin-secret prefix reachable without
+  // a token. There is deliberately no registration route: accounts are made by
+  // an existing portal user, or by hand in the database.
+  adminPortal: {
+    login: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/portal/login',
+      body: z.object({ email: z.string(), password: z.string() }),
+      responses: {
+        200: z.object({
+          token: z.string(),
+          user: AdminPortalUserSchema,
+          /** Every permission key that exists, so the console can render them all. */
+          allPermissions: z.array(z.string()),
+        }),
+        401: ApiErrorSchema,
+        429: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    // The console rebuilds its sidebar from this on every load, so a permission
+    // revoked since sign-in disappears without waiting for the token to expire.
+    me: {
+      method: 'GET',
+      path: '/api/karim-admin-secret/portal/me',
+      responses: {
+        200: z.object({ user: AdminPortalUserSchema, allPermissions: z.array(z.string()) }),
+        401: ApiErrorSchema,
+        403: ApiErrorSchema,
+      },
+    },
+    changeOwnPassword: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/portal/password',
+      body: z.object({ currentPassword: z.string(), newPassword: z.string() }),
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        400: ApiErrorSchema,
+        401: ApiErrorSchema,
+        403: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    listUsers: {
+      method: 'GET',
+      path: '/api/karim-admin-secret/portal/users',
+      responses: {
+        200: z.object({ users: z.array(AdminPortalUserSchema), allPermissions: z.array(z.string()) }),
+        401: ApiErrorSchema,
+        403: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    createUser: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/portal/users',
+      body: z.object({
+        email: z.string(),
+        password: z.string(),
+        name: z.string().nullable().optional(),
+        role: z.string().optional(),
+        permissions: z.array(z.string()).optional(),
+      }),
+      responses: {
+        201: AdminPortalUserSchema,
+        400: ApiErrorSchema,
+        401: ApiErrorSchema,
+        403: ApiErrorSchema,
+        409: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    // Everything optional — only what is sent changes. An empty `password` is
+    // "leave it alone", not "blank it".
+    updateUser: {
+      method: 'PATCH',
+      path: '/api/karim-admin-secret/portal/users/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({
+        name: z.string().nullable().optional(),
+        role: z.string().optional(),
+        permissions: z.array(z.string()).optional(),
+        isActive: z.boolean().optional(),
+        password: z.string().optional(),
+      }),
+      responses: {
+        200: AdminPortalUserSchema,
+        400: ApiErrorSchema,
+        401: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        409: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    deleteUser: {
+      method: 'DELETE',
+      path: '/api/karim-admin-secret/portal/users/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        401: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        409: ApiErrorSchema,
+        500: ApiErrorSchema,
       },
     },
   },
