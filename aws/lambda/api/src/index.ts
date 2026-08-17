@@ -271,12 +271,17 @@ const router = {
 };
 
 // Allowed CORS origins — keep in sync with CDK defaultCorsPreflightOptions.
+//
+// localhost:4300 (the admin console) and localhost:4800 (the cards report) were
+// here while both were local-only tools with no home of their own. The console
+// now lives at dione.netrofit.com and calls the API same-origin through
+// CloudFront, so neither port needs an entry — and the admin routes additionally
+// refuse a localhost Origin outright (see routes/admin-portal.ts), which closes
+// the door 4200 would otherwise leave ajar.
 const ALLOWED_ORIGINS = [
   'https://app.netrofit.com',   // prod frontend
   'https://dev.netrofit.com',   // dev frontend
-  'http://localhost:4200',      // local Angular dev server
-  'http://localhost:4300',      // local admin console
-  'http://localhost:4800',      // local cards report (cards/)
+  'http://localhost:4200',      // local Angular dev server (customer app only)
 ];
 
 function getAllowedOrigin(requestOrigin: string | null | undefined): string | null {

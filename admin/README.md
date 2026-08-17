@@ -35,6 +35,24 @@ npm install      # first time only
 npm start        # → http://localhost:4300
 ```
 
+> **`npm start` no longer reaches the production API.** Now that the console has
+> a home of its own, localhost is not a place it is served from: `localhost:4300`
+> and `localhost:4800` were removed from the API's CORS allowlist, and the
+> `karim-admin-secret` routes additionally refuse any request announcing a
+> localhost `Origin` — so the customer app's `:4200` dev server cannot reach them
+> either. Expect `403 ADMIN_PORTAL.LOCAL_ORIGIN`.
+>
+> That is a browser-path control, not a security boundary: `Origin` is just a
+> header, absent on curl and forgeable by anything that is not a browser. The
+> portal sign-in is what actually protects these routes. What it buys is that the
+> only *browser* that can drive this console is one on dione.netrofit.com.
+>
+> To work on the UI locally, either point `environment.ts` at a dev API, or add
+> `http://localhost:4300` back to `ALLOWED_ORIGINS`
+> (`aws/lambda/api/src/index.ts` **and** `aws/lib/core-stack.ts`), relax
+> `isLocalOrigin` in `routes/admin-portal.ts`, and redeploy the API — then put
+> both back.
+
 Sign in with a portal account (below). Use the search box to filter by company
 name or subscription type.
 

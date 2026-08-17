@@ -12,11 +12,17 @@ Only **active (paying)** clients are shown — those with an `ACTIVE` subscripti
 > column is `true` for every tenant (deactivating a client only expires the
 > subscription), so filtering on it would be a no-op.
 
-> **This app no longer works on its own.** Every `/api/karim-admin-secret` route
-> now requires an admin-portal sign-in (see `admin/README.md`), and nothing here
-> sends a token — so every request comes back `401`. The whole of this report was
-> ported into the admin console as its **Cards** section; use that. This
-> directory is kept only as the source the port was made from.
+> **This app no longer works, and cannot be made to work from localhost.** Two
+> things stand in the way, both deliberate:
+>
+> 1. Every `/api/karim-admin-secret` route requires an admin-portal sign-in (see
+>    `admin/README.md`) and nothing here sends a token.
+> 2. `http://localhost:4800` was removed from the API's CORS allowlist, and those
+>    routes now refuse any request announcing a localhost `Origin`.
+>
+> The whole of this report was ported into the admin console as its **Cards**
+> section, at <https://dione.netrofit.com>. This directory is kept only as the
+> source the port was made from.
 
 ## What it reads
 
@@ -34,8 +40,9 @@ No backend deploy is needed — it uses routes that are already live.
 
 ## Running it
 
-The API's CORS allowlist only permits a few origins, so the dev server **must stay on
-port 4800**:
+*(Historical — port 4800 is no longer in the API's CORS allowlist, so this now
+fails at the first request. See the note at the top.)*
+
 
 ```
 cd cards
@@ -50,10 +57,10 @@ npm run build        # production build into dist/cards
 npm run watch        # rebuild on change (development configuration)
 ```
 
-> `http://localhost:4800` must be in the API's CORS allowlist for this to work.
-> It's in `aws/lambda/api/src/index.ts` (`ALLOWED_ORIGINS`) and `aws/lib/core-stack.ts`
-> (`allowOrigins`); a change there only takes effect after the prod API is redeployed.
-> (The admin console uses a different port, `4300`.)
+> `http://localhost:4800` used to be in the API's CORS allowlist
+> (`aws/lambda/api/src/index.ts` `ALLOWED_ORIGINS` and `aws/lib/core-stack.ts`
+> `allowOrigins`). It was removed once the console moved to dione.netrofit.com,
+> so this no longer works even with a token.
 
 ## Layout
 

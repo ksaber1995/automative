@@ -152,6 +152,54 @@ function bearer(authHeader?: string): string | null {
   return parts.length === 2 && parts[0] === 'Bearer' ? parts[1] : null;
 }
 
+// ─── Where the console may be served from ───────────────────────────────────
+
+/**
+ * A page running on the developer's own machine, by the Origin it announces.
+ *
+ * These routes existed for two local-only tools, so localhost was in the CORS
+ * allowlist. The console has its own home now (dione.netrofit.com, calling the
+ * API same-origin), so nothing legitimate is served from localhost any more.
+ *
+ * Belt and braces with the allowlist rather than a replacement for it: dropping
+ * the entry is what actually stops the browser, and this stops a localhost page
+ * that borrows an origin still on the list — the customer app's :4200 dev
+ * server, which has no business on this prefix either.
+ *
+ * NOT a security boundary, and must not be mistaken for one. Origin is a header:
+ * absent on curl, and anything a non-browser client cares to send. The portal
+ * sign-in is what protects these routes; this only ensures the browser path
+ * matches where the console is actually deployed.
+ */
+function isLocalOrigin(origin: string | undefined): boolean {
+  if (!origin) return false;   // curl, server-to-server — auth is the gate there
+  let host: string;
+  try {
+    host = new URL(origin).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return host === 'localhost'
+    || host.endsWith('.localhost')
+    || host === '127.0.0.1'
+    || host === '::1'
+    || host === '[::1]'
+    || host === '0.0.0.0';
+}
+
+/** The refusal, or null when the caller's origin is acceptable. */
+function localOriginRefusal(headers: { origin?: string; Origin?: string } | undefined) {
+  const origin = headers?.origin ?? headers?.Origin;
+  if (!isLocalOrigin(origin)) return null;
+  return {
+    status: 403 as const,
+    body: {
+      code: 'ADMIN_PORTAL.LOCAL_ORIGIN',
+      message: 'The admin console is served from dione.netrofit.com. Use it there.',
+    },
+  };
+}
+
 // ─── The guard ──────────────────────────────────────────────────────────────
 
 export interface PortalUser {
@@ -209,8 +257,13 @@ type GuardResult =
  * and not in twelve hours' time.
  */
 export async function resolvePortalUser(
-  headers: { authorization?: string } | undefined,
+  headers: { authorization?: string; origin?: string } | undefined,
 ): Promise<GuardResult> {
+  // Before anything else, and before touching the database: a page on localhost
+  // is not where this console lives.
+  const refused = localOriginRefusal(headers);
+  if (refused) return { ok: false, response: refused };
+
   await ensureAdminPortalSchema();
 
   const token = bearer(headers?.authorization);
@@ -317,7 +370,14 @@ export const adminPortalRoutes = {
    *
    * The one route on this prefix that is reachable without a token.
    */
-  login: async ({ body }: { body: { email: string; password: string } }) => {
+  login: async ({ body, headers }: {
+    body: { email: string; password: string };
+    headers?: { origin?: string };
+  }) => {
+    // The one unguarded route, so it needs the origin check of its own — without
+    // it a localhost page could still mint a token and use it from curl.
+    const refused = localOriginRefusal(headers);
+    if (refused) return refused;
     try {
       await ensureAdminPortalSchema();
       const email = normaliseEmail(body?.email);
