@@ -60,7 +60,17 @@ nameservers are delegated to it, so the stack writes both records itself:
 | Record | Purpose |
 |---|---|
 | `_<hash>.dione.netrofit.com` CNAME → `_<hash>.acm-validations.aws` | proves domain ownership so ACM issues the cert |
+| `_<hash>.www.dione.netrofit.com` CNAME → `_<hash>.acm-validations.aws` | same, for the www SAN |
 | `dione.netrofit.com` A + AAAA (alias) → the CloudFront distribution | the site itself |
+| `www.dione.netrofit.com` A + AAAA (alias) → the same distribution | the www alias |
+
+Both names serve the console; neither redirects to the other.
+
+Adding or removing a name is **not** a DNS change — it is a certificate change,
+and ACM cannot extend an issued cert, so CloudFormation replaces it. Change
+`domainName`/`wwwDomain` on the stack and redeploy; do not point DNS at a name
+the certificate does not cover, or browsers get a TLS mismatch instead of a
+clean NXDOMAIN.
 
 The validation half is what `certValidationInZone: true` on this stack buys.
 **Do not set it on the other three stacks** — handing ACM the zone changes a

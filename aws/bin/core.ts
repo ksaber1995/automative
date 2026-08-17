@@ -118,10 +118,14 @@ new LandingStack(app, `NetrofitFrontendStack-prod`, {
 //
 // apiProxy, so the console calls a relative /api/* on its own origin: no CORS,
 // no preflight, and the execute-api hostname stays out of the shipped bundle.
-// No www: nobody types www in front of an admin console.
+//
+// www.dione is a SAN on the same cert and an alias to the same distribution, so
+// both names serve the console rather than one of them failing the TLS
+// handshake. Adding it after the fact replaced the certificate — ACM cannot
+// extend an issued one with a new name.
 new LandingStack(app, `NetrofitAdminStack-prod`, {
   domainName: 'dione.netrofit.com',
-  wwwDomain: null,
+  wwwDomain: 'www.dione.netrofit.com',
   sourcePath: path.resolve(__dirname, '../../admin/dist/admin/browser'),
   apiProxy: {
     originDomain: 'xnbgr057y1.execute-api.eu-west-1.amazonaws.com',
