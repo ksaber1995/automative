@@ -63,11 +63,52 @@ export class DuesListComponent implements OnInit {
 
   // Client-side filter by billing model (One-time / Monthly / Session).
   filterType = signal<'ALL' | 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION'>('ALL');
+
+  /** Inclusive date range, either end optional. Both are day-precision. */
+  dateFrom = signal<Date | null>(null);
+  dateTo = signal<Date | null>(null);
+
+  /**
+   * The date this row is ABOUT — the same one its date column shows: the month
+   * owed for a monthly bill, the enrolment date for everything else.
+   *
+   * Filtering on anything else (created_at, say) would put rows outside a range
+   * the table appears to place inside it, which is worse than having no filter.
+   * Returned as YYYY-MM-DD so comparisons are plain string compares — those are
+   * chronological for this format and immune to timezone drift.
+   */
+  private rowDate(due: DueEnrollment): string | null {
+    if (due.type === 'MONTHLY' && due.billingYear && due.billingMonth) {
+      return `${due.billingYear}-${String(due.billingMonth).padStart(2, '0')}-01`;
+    }
+    return due.enrollmentDate ? String(due.enrollmentDate).slice(0, 10) : null;
+  }
+
   displayedDues = computed(() => {
     const t = this.filterType();
-    const all = this.dues();
-    return t === 'ALL' ? all : all.filter(d => d.paymentType === t);
+    const from = this.dateFrom() ? toLocalYmd(this.dateFrom()!) : null;
+    const to = this.dateTo() ? toLocalYmd(this.dateTo()!) : null;
+
+    let list = this.dues();
+    if (t !== 'ALL') list = list.filter(d => d.paymentType === t);
+    if (from || to) {
+      list = list.filter(d => {
+        const day = this.rowDate(d);
+        // A row with no date cannot be placed in a range. Dropping it is the
+        // honest answer; showing it would claim it falls inside one.
+        if (!day) return false;
+        if (from && day < from) return false;
+        if (to && day > to) return false;
+        return true;
+      });
+    }
+    return list;
   });
+
+  /** Any filter beyond the defaults is on — drives the Clear button's state. */
+  hasFilters = computed(() =>
+    !!this.filterBranch || this.filterType() !== 'ALL' || !!this.dateFrom() || !!this.dateTo(),
+  );
 
   // Totals follow the active type filter, so the header matches the table.
   totalFinal = computed(() => this.displayedDues().reduce((s, d) => s + d.finalPrice, 0));
@@ -136,6 +177,10 @@ export class DuesListComponent implements OnInit {
 
   clearFilters() {
     this.filterBranch = null;
+    this.filterType.set('ALL');
+    this.dateFrom.set(null);
+    this.dateTo.set(null);
+    // Only the branch is server-side, so this is the one that needs a refetch.
     this.load();
   }
 

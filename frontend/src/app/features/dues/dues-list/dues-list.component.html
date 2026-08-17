@@ -15,7 +15,7 @@
 
   <!-- Filters -->
   <p-card>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
       @if (branchState.showBranchPicker()) {
         <div>
           <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'DUES.LIST.FILTER_BRANCH' | translate }}</label>
@@ -42,9 +42,39 @@
           [style]="{ width: '100%' }"
         ></p-select>
       </div>
+      <!-- Date range. Filters on the same date each row's own column shows: the
+           month owed for a monthly bill, the enrolment date otherwise. -->
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'DUES.LIST.FILTER_FROM' | translate }}</label>
+        <p-datepicker
+          [ngModel]="dateFrom()"
+          (ngModelChange)="dateFrom.set($event)"
+          dateFormat="yy-mm-dd"
+          [showIcon]="true"
+          [showButtonBar]="true"
+          [maxDate]="dateTo() || undefined"
+          [placeholder]="'DUES.LIST.ANY_DATE' | translate"
+          [style]="{ width: '100%' }"
+          [inputStyle]="{ width: '100%' }"
+        ></p-datepicker>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'DUES.LIST.FILTER_TO' | translate }}</label>
+        <p-datepicker
+          [ngModel]="dateTo()"
+          (ngModelChange)="dateTo.set($event)"
+          dateFormat="yy-mm-dd"
+          [showIcon]="true"
+          [showButtonBar]="true"
+          [minDate]="dateFrom() || undefined"
+          [placeholder]="'DUES.LIST.ANY_DATE' | translate"
+          [style]="{ width: '100%' }"
+          [inputStyle]="{ width: '100%' }"
+        ></p-datepicker>
+      </div>
       <div class="flex items-end">
         <button pButton [label]="'DUES.LIST.CLEAR_FILTERS' | translate" icon="pi pi-filter-slash"
-          class="p-button-outlined" (click)="clearFilters()"></button>
+          class="p-button-outlined" [disabled]="!hasFilters()" (click)="clearFilters()"></button>
       </div>
     </div>
   </p-card>
