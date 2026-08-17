@@ -8,6 +8,8 @@ import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as ses from 'aws-cdk-lib/aws-ses';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as targets from 'aws-cdk-lib/aws-events-targets';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
@@ -191,6 +193,37 @@ export class CoreStack extends cdk.Stack {
       },
     });
 
+    // SMS gateway credentials — ONE platform account for every tenant, which is
+    // the whole reason companies.sms_activated exists: we pay the gateway and
+    // sell the entitlement, rather than each academy holding their own keys.
+    //
+    // Blank placeholders pasted in by hand, same as the Meta credentials above
+    // and for the same reason: CloudFormation only writes generateSecretString
+    // on CREATE, so a redeploy can never blank a value that was filled in later.
+    // Until they are filled in, getSmsProvider returns a provider that refuses
+    // to send and records the refusal — deliberately not a silent no-op.
+    //
+    // `sender` is the alphanumeric sender ID, which Egyptian networks require to
+    // be pre-registered with the aggregator; `environment` is SMSMisr's live/test
+    // switch ('1' live, '2' test — test accepts messages and bills nothing).
+    const smsSecret = new secretsmanager.Secret(this, 'SmsPlatformSecret', {
+      secretName: `/${stage}/automate-magic/sms/platform`,
+      description: 'SMS gateway credentials (platform-wide; tenants are entitled via companies.sms_activated)',
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({
+          provider: 'smsmisr',
+          username: '',
+          password: '',
+          sender: '',
+          environment: '2',
+        }),
+        generateStringKey: '_unused',
+        excludePunctuation: true,
+        includeSpace: false,
+        passwordLength: 32,
+      },
+    });
+
     // Aurora Serverless v2 Cluster
     this.database = new rds.DatabaseCluster(this, 'AutomateMagicAuroraDB', {
       engine: rds.DatabaseClusterEngine.auroraPostgres({
@@ -242,6 +275,7 @@ export class CoreStack extends cdk.Stack {
     jwtRefreshSecret.grantRead(lambdaRole);
     whatsappSecret.grantRead(lambdaRole);
     pushVapidSecret.grantRead(lambdaRole);
+    smsSecret.grantRead(lambdaRole);
 
     // Per-tenant WhatsApp credentials. Unlike every other secret here these are
     // created at runtime — a tenant connects their number through Embedded Signup
@@ -353,6 +387,7 @@ export class CoreStack extends cdk.Stack {
         WA_TENANT_SECRET_PREFIX: `/${stage}/automate-magic/whatsapp/tenant/`,
         // Web Push VAPID keypair for parent PWA notifications.
         PUSH_VAPID_SECRET_ARN: pushVapidSecret.secretArn,
+        SMS_PLATFORM_SECRET_ARN: smsSecret.secretArn,
       },
       vpc,
       vpcSubnets: {
@@ -363,6 +398,27 @@ export class CoreStack extends cdk.Stack {
       memorySize: 1024,
       role: lambdaRole,
     });
+
+    // =============================================
+    // Daily overdue-payment SMS sweep
+    // =============================================
+    // The only trigger with nothing to hang off: bills materialise on demand and
+    // nothing in the app notices one going late, so it needs a timer. Targets
+    // the API Lambda, which recognises the EventBridge shape and runs the sweep
+    // instead of the HTTP router (see isScheduledEvent in lambda/api/src/index.ts).
+    //
+    // 07:00 UTC is 09:00 in Africa/Cairo — a working hour, and deliberately not
+    // the middle of the night for the parent receiving it.
+    //
+    // Prod only. A dev copy would text real parents from a real gateway using
+    // the same platform credentials, and nobody would notice until they replied.
+    if (stage === 'prod') {
+      new events.Rule(this, 'OverduePaymentSmsSchedule', {
+        description: 'Daily overdue-payment SMS sweep (tenants who are entitled AND opted in)',
+        schedule: events.Schedule.cron({ minute: '0', hour: '7' }),
+        targets: [new targets.LambdaFunction(this.apiLambda)],
+      });
+    }
 
     // =============================================
     // API Gateway

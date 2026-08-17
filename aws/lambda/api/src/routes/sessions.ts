@@ -7,6 +7,7 @@ import { chargeAbsencesAtSessionEnd } from './session-payments';
 import { ensureClassDayTimesSchema } from './classes';
 import { claimPendingSubstitutions, ensureSubstitutionLinkSchema, substitutionCoversExists } from '../db/substitutions';
 import { joinedBySession } from '../db/enrollment-start';
+import { sendAbsenceSms } from '../services/sms/triggers';
 
 let sessionSchemaInitPromise: Promise<void> | null = null;
 async function ensureSessionRoomNullable(): Promise<void> {
@@ -967,6 +968,12 @@ export const sessionsRoutes = {
       } catch (billErr) {
         console.error('Per-session absence charge (session end) error:', billErr);
       }
+
+      // Absence SMS, for tenants entitled to SMS who have switched that kind on.
+      // Here rather than at check-in time because "absent" only becomes true
+      // once the register is closed. Best-effort and silent: it never throws,
+      // and ending the session must succeed whatever the gateway is doing.
+      await sendAbsenceSms(context.companyId, params.id);
 
       return { status: 200 as const, body: mapSessionFromDB(session) };
     } catch (error) {

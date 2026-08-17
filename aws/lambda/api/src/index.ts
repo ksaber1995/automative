@@ -51,6 +51,8 @@ import { subscriptionsRoutes } from './routes/subscriptions';
 import { migrationsRoutes } from './routes/migrations';
 import { adminSecretRoutes } from './routes/admin-secret';
 import { adminPortalRoutes } from './routes/admin-portal';
+import { smsRoutes } from './routes/sms';
+import { sweepOverduePaymentSms } from './services/sms/triggers';
 import { companiesRoutes } from './routes/companies';
 import { debugRoutes } from './routes/debug';
 import { usersRoutes } from './routes/users';
@@ -170,6 +172,14 @@ const router = {
   subscriptions: subscriptionsRoutes,
   adminSecret: adminSecretRoutes,
   adminPortal: adminPortalRoutes,
+  sms: {
+    status: smsRoutes.status,
+    getSettings: smsRoutes.getSettings,
+    updateSettings: smsRoutes.updateSettings,
+    send: smsRoutes.send,
+    listMessages: smsRoutes.listMessages,
+    preview: smsRoutes.preview,
+  },
   migrations: migrationsRoutes,
   users: usersRoutes,
   demoLeads: demoLeadsRoutes,
@@ -370,10 +380,32 @@ function extractClientIp(event: ApiGatewayEvent): string | null {
   return (event as APIGatewayProxyEvent).requestContext?.identity?.sourceIp ?? null;
 }
 
+/**
+ * An EventBridge tick, not an HTTP request.
+ *
+ * The overdue-payment SMS is the one trigger with nothing to hang off: bills
+ * materialise on demand and nothing in the app notices one going late, so it
+ * needs a timer. Routing that through this Lambda rather than adding a second
+ * one keeps the database pool, the secrets and the whole SMS service in one
+ * place — at the cost of this shape check, which is why it is spelled out
+ * rather than inferred.
+ */
+function isScheduledEvent(event: any): boolean {
+  return event?.source === 'aws.events' && !('rawPath' in event) && !('httpMethod' in event);
+}
+
 export const handler = async (
   event: ApiGatewayEvent,
   context: Context
 ): Promise<ApiGatewayResponse> => {
+  if (isScheduledEvent(event)) {
+    const result = await sweepOverduePaymentSms();
+    console.log('Overdue payment SMS sweep:', result);
+    // Nothing reads this — EventBridge discards the return value. Shaped like a
+    // response only because the handler's signature says so.
+    return { statusCode: 200, body: JSON.stringify(result) } as ApiGatewayResponse;
+  }
+
   // Log the incoming request
   const isV2 = 'rawPath' in event;
   console.log('Incoming request:', {

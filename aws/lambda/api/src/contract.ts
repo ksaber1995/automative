@@ -6481,6 +6481,134 @@ export const contract = c.router({
     },
   },
 
+  // SMS. Entitlement is sold from the admin console (companies.sms_activated,
+  // migration 097); these are the tenant's own screens — which kinds go out
+  // automatically, what they say, sending by hand, and what has been sent.
+  sms: {
+    status: {
+      method: 'GET',
+      path: '/api/sms/status',
+      responses: {
+        200: z.object({
+          /** Entitled AND not expired — the only flag the UI should branch on. */
+          active: z.boolean(),
+          activated: z.boolean(),
+          expiration: z.string().nullable(),
+          sentThisMonth: z.number(),
+          /** Billable segments, which Arabic doubles for the same wording. */
+          segmentsThisMonth: z.number(),
+        }),
+        403: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    getSettings: {
+      method: 'GET',
+      path: '/api/sms/settings',
+      responses: {
+        200: z.object({
+          templates: z.array(z.object({
+            type: z.string(),
+            enabled: z.boolean(),
+            body: z.string(),
+            isDefault: z.boolean(),
+            segments: z.number(),
+            unicode: z.boolean(),
+            length: z.number(),
+          })),
+        }),
+        403: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    updateSettings: {
+      method: 'PUT',
+      path: '/api/sms/settings',
+      body: z.object({
+        templates: z.array(z.object({
+          type: z.string(),
+          enabled: z.boolean().optional(),
+          // null or blank restores the shipped default.
+          body: z.string().nullish(),
+        })),
+      }),
+      responses: {
+        200: z.object({
+          templates: z.array(z.object({
+            type: z.string(),
+            enabled: z.boolean(),
+            body: z.string(),
+            isDefault: z.boolean(),
+            segments: z.number(),
+            unicode: z.boolean(),
+            length: z.number(),
+          })),
+        }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    send: {
+      method: 'POST',
+      path: '/api/sms/send',
+      body: z.object({
+        studentIds: z.array(UUIDSchema),
+        body: z.string(),
+        /** Send to the parent's number instead of the student's. */
+        toParent: z.boolean().optional(),
+      }),
+      responses: {
+        // Per-recipient outcomes: one bad number must not lose the batch.
+        200: z.object({
+          sent: z.number(),
+          failed: z.number(),
+          results: z.array(z.object({
+            studentId: z.string(),
+            name: z.string(),
+            sent: z.boolean(),
+            message: z.string(),
+          })),
+        }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    listMessages: {
+      method: 'GET',
+      path: '/api/sms/messages',
+      query: z.object({ limit: z.string().optional() }),
+      responses: {
+        200: z.object({
+          messages: z.array(z.object({
+            id: z.string(),
+            type: z.string(),
+            toPhone: z.string(),
+            body: z.string(),
+            segments: z.number(),
+            status: z.string(),
+            error: z.string().nullable(),
+            studentName: z.string().nullable(),
+            createdAt: z.string().nullable(),
+          })),
+        }),
+        403: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+    preview: {
+      method: 'POST',
+      path: '/api/sms/preview',
+      body: z.object({ body: z.string() }),
+      responses: {
+        200: z.object({ segments: z.number(), unicode: z.boolean(), length: z.number() }),
+        403: ApiErrorSchema,
+        500: ApiErrorSchema,
+      },
+    },
+  },
+
   // Migration routes (one-time use)
   migrations: {
     addMonthlySubscriptionRefunds: {

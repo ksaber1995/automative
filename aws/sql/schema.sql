@@ -1818,6 +1818,70 @@ CREATE TABLE whatsapp_templates (
 
 CREATE INDEX idx_whatsapp_templates_company ON whatsapp_templates(company_id);
 
+-- =============================================
+-- SMS (migration 098)
+-- =============================================
+-- Unlike whatsapp_templates above — which only holds bodies the FRONTEND
+-- substitutes before opening wa.me, so nothing is ever sent by us — these are
+-- really sent by the server and every one costs money. Hence `enabled` (each
+-- tenant chooses which kinds go out on their own) and the sms_messages audit.
+--
+-- Entitlement is separate again: companies.sms_activated / sms_expiration
+-- (migration 097), sold from the admin console.
+CREATE TABLE sms_templates (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id  UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    type        VARCHAR(32) NOT NULL,
+    -- Automatic sending for this type. MANUAL ignores it — a click is its own opt-in.
+    enabled     BOOLEAN NOT NULL DEFAULT FALSE,
+    -- NULL means "use the shipped default", which then keeps improving with the
+    -- app instead of being frozen at whatever it said the day someone saved.
+    body        TEXT,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (company_id, type)
+);
+
+-- Every message, sent or refused. The platform holds one gateway account and
+-- pays for all of it, so "who sent what and did it go" has to be answerable per
+-- tenant. Failures are rows too — they are what people come here to read.
+CREATE TABLE sms_messages (
+    id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id    UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    student_id    UUID REFERENCES students(id) ON DELETE SET NULL,
+    type          VARCHAR(32) NOT NULL,
+    -- Normalised to 20XXXXXXXXXX before the gateway ever sees it.
+    to_phone      VARCHAR(20) NOT NULL,
+    body          TEXT NOT NULL,
+    -- Arabic is UCS-2: 70 characters a segment, so a three-line message is
+    -- three or four paid ones. This is the number the bill is made of.
+    segments      SMALLINT NOT NULL DEFAULT 1,
+    status        VARCHAR(16) NOT NULL DEFAULT 'SENT' CHECK (status IN ('SENT', 'FAILED')),
+    provider      VARCHAR(32),
+    provider_message_id VARCHAR(64),
+    provider_code VARCHAR(16),
+    error         TEXT,
+    -- NULL for anything a trigger or the daily sweep sent.
+    created_by    UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    -- The day this went out, stored rather than derived — see the index below.
+    sent_on       DATE NOT NULL DEFAULT CURRENT_DATE
+);
+
+CREATE INDEX idx_sms_messages_company_date ON sms_messages (company_id, created_at DESC);
+CREATE INDEX idx_sms_messages_student ON sms_messages (student_id);
+
+-- Stops a trigger sending the same thing twice: same student, same kind, same
+-- day. Re-ending a session or re-saving an exam is the failure mode that costs
+-- money and annoys parents, and it is easier to prevent here than to remember
+-- at every call site.
+--
+-- Keyed on the stored sent_on, NOT created_at::date — that cast depends on the
+-- session TimeZone, so it is only STABLE and Postgres refuses it in an index.
+CREATE UNIQUE INDEX idx_sms_messages_daily_dedupe
+    ON sms_messages (company_id, student_id, type, sent_on)
+    WHERE student_id IS NOT NULL AND status = 'SENT' AND type <> 'MANUAL';
+
 CREATE TRIGGER update_whatsapp_templates_updated_at
     BEFORE UPDATE ON whatsapp_templates
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

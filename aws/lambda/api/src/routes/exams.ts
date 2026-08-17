@@ -9,6 +9,7 @@ import {
 } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 import { studentIsPresent } from '../db/active-students';
+import { sendExamResultsSms } from '../services/sms/triggers';
 import { sendExamResultNotifications } from './telegram';
 import { ensureHomeworkGradingColumn } from './companies';
 
@@ -492,6 +493,18 @@ export const examsRoutes = {
 
       const row = await update('exams', params.id, updateData);
       if (!row) return apiError(404, 'ERRORS.EXAMS.NOT_FOUND', 'Exam not found');
+
+      // Results SMS, on the SCHEDULED → DONE transition only.
+      //
+      // That transition is the teacher saying the marking is finished. Firing on
+      // each grade instead would be one text per keystroke, and a parent
+      // watching a mark get corrected in real time. Re-saving a DONE exam sends
+      // nothing: the state has not changed, and the daily guard in sendSms
+      // covers the rest. Best-effort — it never throws.
+      if (body.status === 'DONE' && existing.status !== 'DONE') {
+        await sendExamResultsSms(context.companyId, params.id);
+      }
+
       // Re-read with course + class name for a consistent response shape.
       const full = await queryOne(
         `SELECT e.*, c.name AS course_name, cl.name AS class_name,
