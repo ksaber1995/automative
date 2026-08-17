@@ -77,7 +77,7 @@ export interface QrCheckinResult {
 
 /** One thing a student still owes for the class a session belongs to. */
 export interface SessionDueItem {
-  kind: 'MONTHLY' | 'SESSION' | 'ENROLLMENT';
+  kind: 'MONTHLY' | 'SESSION' | 'ENROLLMENT' | 'PACKAGE';
   /** Pre-rendered for SESSION ("#12"); MONTHLY is formatted from the year/month. */
   label: string;
   amount: number;
@@ -86,6 +86,12 @@ export interface SessionDueItem {
   enrollmentId: string;
   billingYear?: number;
   billingMonth?: number;
+  /**
+   * PACKAGE only: sessions sat against a bundle nobody paid for, and the bundle's
+   * size. The sat count is how many lessons the student has had without paying.
+   */
+  sessionsUsed?: number;
+  sessionsTotal?: number;
 }
 
 export interface StudentSessionDues {

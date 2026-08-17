@@ -954,6 +954,9 @@
         [placeholder]="'SESSIONS_DASHBOARD.PLACEHOLDER_CLASS' | translate"
         [disabled]="!sessionForm.get('branchId')?.value || loadingDialogClasses()"
         [style]="{ width: '100%' }"
+        [filter]="true"
+        filterBy="displayName"
+        [filterPlaceholder]="'SESSIONS_DASHBOARD.SEARCH_CLASS' | translate"
         (onChange)="onDialogClassChange()"
       >
         <ng-template pTemplate="item" let-cls>

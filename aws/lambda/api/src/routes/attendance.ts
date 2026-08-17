@@ -174,7 +174,7 @@ export async function absenceStats(
 
 /** One thing a student still owes for a class. */
 export interface DueItem {
-  kind: 'MONTHLY' | 'SESSION' | 'ENROLLMENT';
+  kind: 'MONTHLY' | 'SESSION' | 'ENROLLMENT' | 'PACKAGE';
   label: string;
   amount: number;
   /** null for a monthly month with no stored bill yet — paying it creates one. */
@@ -182,6 +182,13 @@ export interface DueItem {
   enrollmentId: string;
   billingYear?: number;
   billingMonth?: number;
+  /**
+   * PACKAGE only: how many of the bundle's sessions have been sat, and how many
+   * it holds. The sat ones are the sessions the student has had and not paid for,
+   * which is the number the desk asks about.
+   */
+  sessionsUsed?: number;
+  sessionsTotal?: number;
 }
 
 /**
@@ -339,6 +346,44 @@ export async function classDues(
         amount: parseFloat(r.amount_due) - parseFloat(r.amount_paid || 0),
         paymentId: r.id,
         enrollmentId: r.enrollment_id,
+      });
+    }
+
+    // Bundles that were never paid for.
+    //
+    // The query above deliberately skips COVERED sessions, on the grounds that a
+    // prepaid bundle absorbed them. That holds only while a bundle must be bought
+    // to exist. It stopped holding when a tenant was converted from monthly
+    // billing: their unpaid bills became unpaid bundles, so a student could sit
+    // eight lessons, have every one marked COVERED, owe the whole bundle, and be
+    // shown a green "no dues" badge.
+    //
+    // Reported as ONE item per bundle, not one per covered session: the debt IS
+    // the bundle, and its sessions are already booked against it. Listing the
+    // sessions separately would ask for the same money twice.
+    const unpaidBundles = await query<any>(
+      `SELECT sp.id, sp.enrollment_id, e.student_id,
+              sp.amount_due, sp.amount_paid, sp.sessions_total, sp.sessions_used
+         FROM session_packages sp
+         JOIN enrollments e ON e.id = sp.enrollment_id
+        WHERE sp.company_id = $2 AND e.class_id = $1 AND e.status = 'ACTIVE'
+          AND sp.status <> 'REFUNDED'
+          AND sp.amount_due > sp.amount_paid
+          AND ${studentIsPresentById('e.student_id')}
+        ORDER BY sp.purchased_at`,
+      [classId, context.companyId]
+    );
+    for (const b of unpaidBundles) {
+      push(b.student_id, b.enrollment_id, {
+        kind: 'PACKAGE',
+        // The UI phrases this from sessionsUsed/sessionsTotal so it reads in the
+        // user's language; the raw label is a fallback.
+        label: `${Number(b.sessions_used ?? 0)}/${Number(b.sessions_total ?? 0)}`,
+        amount: parseFloat(b.amount_due) - parseFloat(b.amount_paid || 0),
+        paymentId: b.id,
+        enrollmentId: b.enrollment_id,
+        sessionsUsed: Number(b.sessions_used ?? 0),
+        sessionsTotal: Number(b.sessions_total ?? 0),
       });
     }
   } else if (paymentType === 'ONE_TIME') {

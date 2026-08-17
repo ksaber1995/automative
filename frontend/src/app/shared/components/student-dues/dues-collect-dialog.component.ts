@@ -149,6 +149,10 @@ export class DuesCollectDialogComponent {
           });
     } else if (it.kind === 'SESSION') {
       req$ = this.sessionPayments.recordPayment(it.paymentId!, { amount, paymentDate, notes });
+    } else if (it.kind === 'PACKAGE') {
+      // Credit the BUNDLE, which settles every session already booked against it.
+      // paymentId is the package id here, not a session charge.
+      req$ = this.sessionPayments.payPackage(it.paymentId!, { amount, paymentDate, notes });
     } else {
       req$ = this.enrollmentService.addPayment(it.enrollmentId, { amount, paymentDate, notes });
     }
