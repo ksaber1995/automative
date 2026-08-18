@@ -20,6 +20,9 @@
       </p>
     </div>
     <div class="flex items-center gap-3">
+      @if (exam()?.isOnline) {
+        <p-tag icon="pi pi-desktop" [value]="'EXAMS.ONLINE.BADGE' | translate" severity="info"></p-tag>
+      }
       <p-tag
         [value]="(exam()?.isHomework ? 'EXAMS.KIND.HOMEWORK' : 'EXAMS.KIND.EXAM') | translate"
         [severity]="exam()?.isHomework ? 'warn' : 'secondary'"
@@ -63,8 +66,105 @@
     </div>
   </div>
 
-  <!-- QR recording panel -->
-  @if (canWrite()) {
+  <!-- Attempts monitor — an online exam grades itself, so instead of the QR
+       recording panel the teacher gets a live view of who is sitting it. -->
+  @if (isOnline()) {
+    <p-card styleClass="mb-6">
+      <div class="flex flex-col gap-4">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <!-- The access code, big enough to read out to a room. -->
+          <div>
+            <span class="block text-sm font-medium text-gray-700 mb-1">{{ 'EXAMS.ONLINE.ACCESS_CODE' | translate }}</span>
+            <div class="flex items-center gap-2">
+              @if (exam()?.accessCode) {
+                <span class="font-mono text-3xl font-bold tracking-widest">{{ exam()?.accessCode }}</span>
+                <p-button [text]="true" size="small"
+                  [icon]="codeCopied() ? 'pi pi-check' : 'pi pi-copy'"
+                  [pTooltip]="'EXAMS.ONLINE.COPY_CODE' | translate"
+                  (onClick)="copyAccessCode()"></p-button>
+                @if (canWrite()) {
+                  <p-button [text]="true" size="small" icon="pi pi-refresh"
+                    [loading]="regeneratingCode()"
+                    [pTooltip]="'EXAMS.ONLINE.REGENERATE_CODE' | translate"
+                    (onClick)="regenerateCode()"></p-button>
+                }
+              } @else {
+                <span class="text-gray-400">{{ 'EXAMS.ONLINE.NO_CODE' | translate }}</span>
+              }
+            </div>
+          </div>
+          <!-- The window and the headline count. -->
+          <div class="text-end">
+            @if (exam()?.opensAt || exam()?.closesAt) {
+              <p class="text-sm text-gray-500 mb-1">
+                {{ exam()?.opensAt | date: 'short' }} — {{ exam()?.closesAt | date: 'short' }}
+              </p>
+            }
+            <p class="font-semibold">
+              {{ 'EXAMS.ONLINE.SUBMITTED_COUNT' | translate: { submitted: submittedCount(), total: attemptsTotal() } }}
+            </p>
+          </div>
+        </div>
+        <p-progressBar [value]="submittedPct()" [showValue]="false" styleClass="!h-2"></p-progressBar>
+
+        <p-table [value]="attempts()" dataKey="studentId" [loading]="attemptsLoading()" responsiveLayout="scroll">
+          <ng-template pTemplate="header">
+            <tr>
+              <th>{{ 'EXAMS.DETAIL.COL_STUDENT' | translate }}</th>
+              <th>{{ 'EXAMS.ONLINE.COL_STATUS' | translate }}</th>
+              <th>{{ 'EXAMS.ONLINE.COL_STARTED' | translate }}</th>
+              <th>{{ 'EXAMS.ONLINE.COL_ANSWERED' | translate }}</th>
+              <th>{{ 'EXAMS.ONLINE.COL_SCORE' | translate }}</th>
+              <th>{{ 'EXAMS.ONLINE.COL_TIME_LEFT' | translate }}</th>
+              @if (canDelete()) { <th style="width: 70px;"></th> }
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-row>
+            <tr>
+              <td class="font-medium">
+                {{ row.name }}
+                @if (row.code != null) { <span class="text-gray-400 text-sm ms-1">#{{ row.code }}</span> }
+              </td>
+              <td>
+                <p-tag [value]="('EXAMS.ONLINE.STATUS.' + row.status) | translate"
+                       [severity]="attemptStatusSeverity(row.status)"></p-tag>
+              </td>
+              <td>{{ row.startedAt ? (row.startedAt | date: 'shortTime') : '—' }}</td>
+              <td>
+                @if (row.status === 'NOT_STARTED') { — }
+                @else { {{ row.answeredCount }}@if (row.total != null) { / {{ row.total }} } }
+              </td>
+              <td class="font-semibold">
+                @if (row.score != null) { {{ row.score }}/{{ row.total }} } @else { — }
+              </td>
+              <td class="font-mono">{{ timeLeft(row) || '—' }}</td>
+              @if (canDelete()) {
+                <td class="text-center">
+                  @if (row.status !== 'NOT_STARTED') {
+                    <p-button [text]="true" size="small" [rounded]="true" icon="pi pi-replay"
+                      severity="danger"
+                      [loading]="resettingId() === row.studentId"
+                      [pTooltip]="'EXAMS.ONLINE.RESET_ATTEMPT' | translate"
+                      (onClick)="confirmResetAttempt(row)"></p-button>
+                  }
+                </td>
+              }
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="emptymessage">
+            <tr>
+              <td [attr.colspan]="canDelete() ? 7 : 6" class="text-center py-6 text-gray-500">
+                {{ 'EXAMS.ONLINE.MONITOR_EMPTY' | translate }}
+              </td>
+            </tr>
+          </ng-template>
+        </p-table>
+      </div>
+    </p-card>
+  }
+
+  <!-- QR recording panel — hand-marking, which an online exam has no use for. -->
+  @if (canWrite() && !isOnline()) {
     <p-card styleClass="mb-6">
       <div class="flex flex-col gap-4">
         <div class="flex flex-wrap items-end gap-3">
@@ -315,3 +415,5 @@
     </div>
   </div>
 </p-dialog>
+
+<p-confirmDialog></p-confirmDialog>

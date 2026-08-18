@@ -22,6 +22,12 @@ export interface CompanySubscription {
   sms_expiration: string | null;
   /** The derived answer the server computes; never re-derive it here. */
   sms_active: boolean;
+  /**
+   * Online exams — lessons, question banks and the student exam portal. One flag,
+   * off by default, switched on per tenant from this console. The tenant's app
+   * reads it at login, so a change only shows up after they sign in again.
+   */
+  online_exams_enabled: boolean;
   subscription_type: string | null;
   price: number | null;
   start_date: string | null;
@@ -119,6 +125,17 @@ export class SubscriptionsService {
   qrCardStats(companyId: string): Observable<{ qr_cards_enabled: boolean; total: number; linked: number }> {
     return this.http.get<{ qr_cards_enabled: boolean; total: number; linked: number }>(
       `${ADMIN_ENDPOINT}/companies/${companyId}/qr-cards`,
+    );
+  }
+
+  /**
+   * Turn online exams on or off for one client. Off by default — the feature ships
+   * dark and is switched on one tenant at a time.
+   */
+  setOnlineExams(companyId: string, enabled: boolean): Observable<{ success: boolean; online_exams_enabled: boolean }> {
+    return this.http.post<{ success: boolean; online_exams_enabled: boolean }>(
+      `${ADMIN_ENDPOINT}/companies/${companyId}/online-exams`,
+      { enabled },
     );
   }
 

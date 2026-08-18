@@ -93,6 +93,7 @@ import { syncQueryParams } from '../shared/query-sync';
               <th>Status</th>
               <th>SMS</th>
               <th>QR cards</th>
+              <th>Online exams</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -187,6 +188,26 @@ import { syncQueryParams } from '../shared/query-sync';
                       Check
                     </button>
                   }
+                </td>
+                <td>
+                  <!-- Online exams: lessons, question banks and the student exam
+                       portal. One flag, off by default — the feature ships dark and
+                       is switched on one tenant at a time. The tenant has to
+                       re-login before their sidebar notices. -->
+                  <div class="qr-cell">
+                    @if (r.online_exams_enabled) {
+                      <span class="badge">on</span>
+                    } @else {
+                      <span class="sub">off</span>
+                    }
+                    @if (auth.can('companies.write')) {
+                      <button class="act" [class.activate]="!r.online_exams_enabled"
+                        [disabled]="busyId() === r.company_id"
+                        (click)="toggleOnlineExams(r)">
+                        {{ r.online_exams_enabled ? 'Disable' : 'Enable' }}
+                      </button>
+                    }
+                  </div>
                 </td>
                 <td>
                   <div class="actions">
@@ -708,6 +729,31 @@ export class CompaniesPageComponent {
         this.loadQrStats(r.company_id);
       },
       error: (err) => this.fail('QR cards', err),
+    });
+  }
+
+  /**
+   * Switch online exams — lessons, question banks and the student exam portal — on
+   * or off for one tenant. The flag rides on the companies row, so the list is
+   * reloaded rather than patched locally.
+   *
+   * The tenant's own app reads this at login, so their sidebar only changes after
+   * they sign in again. Worth saying out loud when handing a tenant the feature.
+   */
+  protected toggleOnlineExams(r: CompanySubscription): void {
+    const next = !r.online_exams_enabled;
+    this.busyId.set(r.company_id);
+    this.service.setOnlineExams(r.company_id, next).subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.store.showFlash(
+          next
+            ? `Online exams enabled for ${r.company_name}. They must re-login to see it.`
+            : `Online exams disabled for ${r.company_name}.`,
+        );
+        this.store.loadCompanies(true);
+      },
+      error: (err) => this.fail('Online exams', err),
     });
   }
 

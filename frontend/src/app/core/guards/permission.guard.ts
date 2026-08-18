@@ -128,6 +128,30 @@ export const qrPoolGuard = () => {
 };
 
 /**
+ * Online exams (Lessons, question banks, and later the exams themselves) are
+ * switched on per tenant from the admin console. A tenant without the flag does
+ * not have the feature at all, so the URL is blocked the same way the sidebar
+ * entry is hidden — see `AuthService.canUseOnlineExams`. The API refuses the
+ * endpoints on the same flag.
+ */
+export const onlineExamsGuard = () => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+
+  if (!authService.isAuthenticated()) {
+    router.navigate(['/auth/login']);
+    return false;
+  }
+
+  if (authService.canUseOnlineExams()) {
+    return true;
+  }
+
+  router.navigate([getFirstAccessiblePath(authService)]);
+  return false;
+};
+
+/**
  * Role-restricted guard. Only allows users whose role is in the allowed list.
  * Used for admin-only pages that don't map to a granular resource.
  */

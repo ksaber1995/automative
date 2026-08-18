@@ -250,6 +250,9 @@ export class LayoutComponent implements OnInit, OnDestroy {
       { labelKey: 'NAV.TIMETABLE', icon: 'pi pi-calendar-clock', routerLink: ['/timetable'], visible: auth.canRead('academy') },
       { labelKey: 'NAV.EVENTS', icon: 'pi pi-flag', routerLink: ['/events'], visible: auth.canRead('academy') && !auth.isTeacher() && !auth.isBasicAcademy() },
       { labelKey: 'NAV.EXAMS', icon: 'pi pi-file-edit', routerLink: ['/exams'], visible: auth.canRead('academy') },
+      // Lessons are the base of the online-exams feature, switched on per tenant
+      // from the admin console — hidden entirely for everyone else.
+      { labelKey: 'NAV.LESSONS', icon: 'pi pi-list-check', routerLink: ['/lessons'], visible: auth.canRead('academy') && auth.canUseOnlineExams() },
       { labelKey: 'NAV.EDUCATIONAL_BOOKS', icon: 'pi pi-book', routerLink: ['/educational-books'], visible: auth.canRead('product_sales') },
     ].filter(c => c.visible);
     if (academic.length) {

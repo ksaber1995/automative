@@ -111,10 +111,21 @@
         <tr>
           <td class="font-medium">{{ item.name }}</td>
           <td>
-            <p-tag
-              [value]="(item.isHomework ? 'EXAMS.KIND.HOMEWORK' : 'EXAMS.KIND.EXAM') | translate"
-              [severity]="item.isHomework ? 'warn' : 'secondary'"
-            ></p-tag>
+            <div class="flex items-center gap-1 flex-wrap">
+              <p-tag
+                [value]="(item.isHomework ? 'EXAMS.KIND.HOMEWORK' : 'EXAMS.KIND.EXAM') | translate"
+                [severity]="item.isHomework ? 'warn' : 'secondary'"
+              ></p-tag>
+              <!-- Sat on a screen and auto-marked, so it behaves quite differently
+                   from a paper exam on the same list. -->
+              @if (item.isOnline) {
+                <p-tag
+                  icon="pi pi-desktop"
+                  [value]="'EXAMS.ONLINE.BADGE' | translate"
+                  severity="info"
+                ></p-tag>
+              }
+            </div>
           </td>
           <td>{{ item.courseName || '—' }}</td>
           <!-- No class = course-wide, every class of the course sits it. -->

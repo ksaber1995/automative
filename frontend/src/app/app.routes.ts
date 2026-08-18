@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
-import { permissionGuard, roleGuard, notTeacherGuard, qrPoolGuard, cashGuard } from './core/guards/permission.guard';
+import { permissionGuard, roleGuard, notTeacherGuard, qrPoolGuard, cashGuard, onlineExamsGuard } from './core/guards/permission.guard';
 import { LayoutComponent } from './core/layout/layout.component';
 import { UserRole } from '@shared/enums/user-role.enum';
 
@@ -140,6 +140,14 @@ export const routes: Routes = [
         canActivate: [permissionGuard('academy')],
         data: { breadcrumb: 'BREADCRUMBS.EXAMS' },
         loadChildren: () => import('./features/exams/exams.routes').then(m => m.EXAMS_ROUTES)
+      },
+      {
+        path: 'lessons',
+        // Online-exams feature: switched on per tenant from the admin console, so
+        // the URL is blocked for everyone else exactly as the sidebar entry hides.
+        canActivate: [permissionGuard('academy'), onlineExamsGuard],
+        data: { breadcrumb: 'BREADCRUMBS.LESSONS' },
+        loadChildren: () => import('./features/lessons/lessons.routes').then(m => m.LESSONS_ROUTES)
       },
       {
         path: 'classes',

@@ -57,6 +57,22 @@ export const RATE_LIMITS = {
   // Per-company cap so one tenant can't monopolize the Lambda's burst
   // budget. Scales with team size — bump if a real company hits it.
   AUTHED_COMPANY: { name: 'authed:company', limit: 15000, windowMs: 15 * 60_000 },
+
+  // Student exam portal (exams.netrofit.com) — see online_exams.md §0.5.
+  // Claim/reset starts with a card scan, so there is no legitimate burst; a
+  // front desk walking a class through first claims is 20 in 15 min, which fits.
+  STUDENT_CLAIM_IP: { name: 'student-claim:ip', limit: 20, windowMs: 15 * 60_000 },
+  // Login: per-IP and per-identifier, mirroring AUTH_IP/AUTH_EMAIL — neither a
+  // single IP nor a single targeted username can be ground through.
+  STUDENT_LOGIN_IP: { name: 'student-login:ip', limit: 60, windowMs: 15 * 60_000 },
+  STUDENT_LOGIN_IDENT: { name: 'student-login:ident', limit: 20, windowMs: 15 * 60_000 },
+  // Per-student cap across the authenticated portal endpoints. Roomy enough for
+  // the answer autosave (one call per tap through a whole paper) while still
+  // flagging a runaway client.
+  STUDENT_AUTHED: { name: 'student-authed:student', limit: 1200, windowMs: 15 * 60_000 },
+  // Answer autosave specifically — one call per tap, re-answers included, so it
+  // has to be roomy; keyed by student.
+  STUDENT_EXAM_ANSWER: { name: 'student-exam-answer:student', limit: 600, windowMs: 15 * 60_000 },
 } as const satisfies Record<string, RateLimitBucket>;
 
 interface Counter {

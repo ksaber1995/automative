@@ -34,6 +34,7 @@ import { CameraScanDialogComponent } from '../../../shared/components/camera-sca
 import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
 import { SessionHomeworkPanelComponent } from '../session-homework/session-homework-panel.component';
 import { CompanyService } from '../../../core/services/company.service';
+import { LessonService } from '../../lessons/services/lesson.service';
 
 interface TeacherRow {
   employeeId: string;
@@ -98,6 +99,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private templatesSvc = inject(WhatsappTemplatesService);
   private companyService = inject(CompanyService);
+  private lessonService = inject(LessonService);
   private globalScan = inject(GlobalScanService);
   // Stable reference so the app-wide scan handler can be unregistered on destroy.
   // Only ONE global scan handler can be registered at a time, so this page keeps
@@ -125,6 +127,16 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   editingNumber = signal(false);
   numberDraft = signal<number | null>(null);
   savingNumber = signal(false);
+
+  // ── Which lesson this session covered (online-exams tenants only) ───────────
+  // Tagged from here rather than when the session is opened, because most sessions
+  // open themselves — on the schedule, or when the first student scans in — so
+  // nobody was around to be asked. Here the teacher is on the lesson's own screen.
+  editingLesson = signal(false);
+  lessonDraft = signal<string | null>(null);
+  savingLesson = signal(false);
+  loadingLessons = signal(false);
+  lessonOptions = signal<{ id: string; name: string }[]>([]);
   // Web Audio context for the check-in beep. Browsers block audio until a user
   // gesture, so it is primed from the roster interactions (there is no scanner
   // button to prime it any more).
@@ -885,6 +897,53 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
         this.notificationService.success(this.translate.instant('SESSIONS_DASHBOARD.MSG_SESSION_NUMBER_SAVED'));
       },
       error: () => this.savingNumber.set(false),
+    });
+  }
+
+  // ── Lesson tag ──────────────────────────────────────────────────────────────
+
+  /** Whether to offer the lesson tag at all: the feature, and permission to write. */
+  canTagLesson(): boolean {
+    return this.auth.canUseOnlineExams() && this.auth.canWrite('academy');
+  }
+
+  startEditLesson() {
+    this.lessonDraft.set(this.session()?.lessonId ?? null);
+    this.editingLesson.set(true);
+    if (this.lessonOptions().length === 0) this.loadLessonOptions();
+  }
+
+  cancelEditLesson() {
+    this.editingLesson.set(false);
+  }
+
+  private loadLessonOptions() {
+    const courseId = this.session()?.courseId;
+    if (!courseId) return;
+    this.loadingLessons.set(true);
+    this.lessonService.getAll({ courseId }).subscribe({
+      next: (lessons) => {
+        this.lessonOptions.set(lessons.map((l) => ({ id: l.id, name: l.name })));
+        this.loadingLessons.set(false);
+      },
+      error: () => this.loadingLessons.set(false),
+    });
+  }
+
+  saveLesson() {
+    const lessonId = this.lessonDraft();
+    this.savingLesson.set(true);
+    this.sessionService.update(this.sessionId, { lessonId: lessonId ?? null }).subscribe({
+      next: (s) => {
+        // The update response is the plain session row, with no lesson name on it —
+        // so carry the name across from the option that was just picked rather than
+        // re-fetching the whole session for one label.
+        const name = lessonId ? this.lessonOptions().find((l) => l.id === lessonId)?.name ?? null : null;
+        this.session.set({ ...s, courseId: this.session()?.courseId, lessonName: name });
+        this.savingLesson.set(false);
+        this.editingLesson.set(false);
+      },
+      error: () => this.savingLesson.set(false),
     });
   }
 }

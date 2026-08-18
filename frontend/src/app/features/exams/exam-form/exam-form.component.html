@@ -102,9 +102,212 @@
         }
       </div>
 
-      <!-- Total marks (out of) — replaced by the scale when this homework will be
-           marked by rating, because "out of" is not a question that applies then. -->
-      @if (useRating()) {
+      <!-- Online exam. Hidden entirely for tenants without the feature, so nothing
+           here exists for them to wonder about. -->
+      @if (canUseOnlineExams()) {
+        <div class="rounded-lg border border-indigo-100 bg-indigo-50/50 p-4">
+          <div class="flex items-start gap-3">
+            <p-checkbox inputId="isOnline" formControlName="isOnline" [binary]="true"></p-checkbox>
+            <div class="flex-1">
+              <label for="isOnline" class="block text-sm font-medium text-gray-900 cursor-pointer">
+                {{ 'EXAMS.ONLINE.TOGGLE' | translate }}
+              </label>
+              <small class="text-gray-500">{{ 'EXAMS.ONLINE.TOGGLE_HINT' | translate }}</small>
+            </div>
+          </div>
+
+          @if (isOnline()) {
+            <div class="grid grid-cols-1 gap-5 mt-5 pt-5 border-t border-indigo-100">
+              <!-- Which lessons the paper is drawn from. Stored as ids, never as a
+                   rule, so the scope can't widen after the fact. -->
+              <div>
+                <label for="lessonIds" class="block text-sm font-medium text-gray-700 mb-2">
+                  {{ 'EXAMS.ONLINE.LESSONS' | translate }} <span class="text-red-500">*</span>
+                </label>
+                <p-multiselect
+                  inputId="lessonIds"
+                  formControlName="lessonIds"
+                  [options]="lessons()"
+                  optionLabel="name"
+                  optionValue="id"
+                  [filter]="true"
+                  filterBy="name"
+                  [loading]="loadingLessons()"
+                  [disabled]="scopeLocked()"
+                  display="chip"
+                  [placeholder]="'EXAMS.ONLINE.LESSONS_PLACEHOLDER' | translate"
+                  [style]="{ width: '100%' }"
+                  styleClass="w-full"
+                ></p-multiselect>
+
+                <div class="flex flex-wrap gap-2 mt-2">
+                  <p-button
+                    type="button"
+                    size="small"
+                    [text]="true"
+                    [label]="'EXAMS.ONLINE.SELECT_ALL_LESSONS' | translate"
+                    [disabled]="scopeLocked() || lessons().length === 0"
+                    (onClick)="selectAllLessons()"
+                  ></p-button>
+                  <p-button
+                    type="button"
+                    size="small"
+                    [text]="true"
+                    [loading]="loadingTaught()"
+                    [label]="'EXAMS.ONLINE.SELECT_TAUGHT_LESSONS' | translate"
+                    [disabled]="scopeLocked() || !form.get('classId')?.value"
+                    [pTooltip]="!form.get('classId')?.value ? ('EXAMS.ONLINE.TAUGHT_NEEDS_CLASS' | translate) : ''"
+                    (onClick)="selectTaughtLessons()"
+                  ></p-button>
+                </div>
+
+                @if (lessons().length === 0 && !loadingLessons()) {
+                  <small class="block text-amber-600 mt-1">{{ 'EXAMS.ONLINE.NO_LESSONS' | translate }}</small>
+                }
+              </div>
+
+              <!-- Paper length, against the pool it draws from. -->
+              <div>
+                <label for="questionCount" class="block text-sm font-medium text-gray-700 mb-2">
+                  {{ 'EXAMS.ONLINE.QUESTION_COUNT' | translate }} <span class="text-red-500">*</span>
+                </label>
+                <p-inputNumber
+                  inputId="questionCount"
+                  formControlName="questionCount"
+                  [min]="1"
+                  [max]="poolSize() || 1"
+                  [showButtons]="false"
+                  [useGrouping]="false"
+                  [disabled]="scopeLocked()"
+                  [style]="{ width: '100%' }"
+                  styleClass="w-full"
+                ></p-inputNumber>
+                <small class="text-gray-500">
+                  {{ 'EXAMS.ONLINE.POOL_AVAILABLE' | translate: { count: poolSize() } }}
+                </small>
+                @if (questionCountTooHigh()) {
+                  <small class="block text-red-500">
+                    {{ 'EXAMS.ONLINE.POOL_EXCEEDED' | translate: { count: poolSize() } }}
+                  </small>
+                }
+                <small class="block text-gray-400">{{ 'EXAMS.ONLINE.QUESTION_COUNT_HINT' | translate }}</small>
+              </div>
+
+              <!-- Duration + window -->
+              <div>
+                <label for="durationMinutes" class="block text-sm font-medium text-gray-700 mb-2">
+                  {{ 'EXAMS.ONLINE.DURATION' | translate }} <span class="text-red-500">*</span>
+                </label>
+                <p-inputNumber
+                  inputId="durationMinutes"
+                  formControlName="durationMinutes"
+                  [min]="1"
+                  [showButtons]="false"
+                  [useGrouping]="false"
+                  [suffix]="' ' + ('EXAMS.ONLINE.MINUTES' | translate)"
+                  [style]="{ width: '100%' }"
+                  styleClass="w-full"
+                ></p-inputNumber>
+                <small class="text-gray-400">{{ 'EXAMS.ONLINE.DURATION_HINT' | translate }}</small>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label for="opensAt" class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ 'EXAMS.ONLINE.OPENS_AT' | translate }}
+                  </label>
+                  <p-datepicker
+                    inputId="opensAt"
+                    formControlName="opensAt"
+                    [showTime]="true"
+                    hourFormat="24"
+                    dateFormat="yy-mm-dd"
+                    [showIcon]="true"
+                    [showClear]="true"
+                    [style]="{ width: '100%' }"
+                    styleClass="w-full"
+                  ></p-datepicker>
+                </div>
+                <div>
+                  <label for="closesAt" class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ 'EXAMS.ONLINE.CLOSES_AT' | translate }}
+                  </label>
+                  <p-datepicker
+                    inputId="closesAt"
+                    formControlName="closesAt"
+                    [showTime]="true"
+                    hourFormat="24"
+                    dateFormat="yy-mm-dd"
+                    [showIcon]="true"
+                    [showClear]="true"
+                    [style]="{ width: '100%' }"
+                    styleClass="w-full"
+                  ></p-datepicker>
+                </div>
+              </div>
+              <small class="text-gray-400 -mt-3">{{ 'EXAMS.ONLINE.WINDOW_HINT' | translate }}</small>
+
+              <!-- Options -->
+              <div class="flex flex-col gap-3">
+                <div class="flex items-start gap-3">
+                  <p-checkbox inputId="shuffleOptions" formControlName="shuffleOptions" [binary]="true"></p-checkbox>
+                  <label for="shuffleOptions" class="text-sm text-gray-700 cursor-pointer">
+                    {{ 'EXAMS.ONLINE.SHUFFLE_OPTIONS' | translate }}
+                  </label>
+                </div>
+                <div class="flex items-start gap-3">
+                  <p-checkbox inputId="showAnswers" formControlName="showAnswers" [binary]="true"></p-checkbox>
+                  <div>
+                    <label for="showAnswers" class="text-sm text-gray-700 cursor-pointer">
+                      {{ 'EXAMS.ONLINE.SHOW_ANSWERS' | translate }}
+                    </label>
+                    <small class="block text-gray-400">{{ 'EXAMS.ONLINE.SHOW_ANSWERS_HINT' | translate }}</small>
+                  </div>
+                </div>
+              </div>
+
+              <!-- The access code exists after the first save; it is generated
+                   server-side so it can't be typed into something guessable. -->
+              @if (isEditMode() && accessCode()) {
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ 'EXAMS.ONLINE.ACCESS_CODE' | translate }}
+                  </label>
+                  <div class="flex items-center gap-3 flex-wrap">
+                    <span class="font-mono text-2xl font-bold tracking-widest text-indigo-700">{{ accessCode() }}</span>
+                    <p-button
+                      type="button"
+                      size="small"
+                      [outlined]="true"
+                      severity="secondary"
+                      icon="pi pi-refresh"
+                      [loading]="regeneratingCode()"
+                      [label]="'EXAMS.ONLINE.REGENERATE_CODE' | translate"
+                      (onClick)="regenerateCode()"
+                    ></p-button>
+                  </div>
+                  <small class="text-gray-400">{{ 'EXAMS.ONLINE.ACCESS_CODE_HINT' | translate }}</small>
+                </div>
+              } @else if (!isEditMode()) {
+                <small class="text-gray-500">{{ 'EXAMS.ONLINE.CODE_ON_SAVE' | translate }}</small>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Total marks (out of). An online exam is out of its own question count —
+           one mark per question — so the box would only invite a contradiction. -->
+      @if (isOnline()) {
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            {{ 'EXAMS.FORM.MAX_GRADE' | translate }}
+          </label>
+          <p class="text-gray-700">
+            {{ 'EXAMS.ONLINE.MAX_GRADE_IS_COUNT' | translate: { count: form.get('questionCount')?.value ?? 0 } }}
+          </p>
+        </div>
+      } @else if (useRating()) {
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">
             {{ 'EXAMS.FORM.MAX_GRADE' | translate }}

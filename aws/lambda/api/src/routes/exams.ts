@@ -1,4 +1,4 @@
-import { insert, update, query, queryOne } from '../db/connection';
+import { insert, update, query, queryOne, getClient } from '../db/connection';
 import { ensureQrCardSchema, qrStudentMatch, codeDigits } from './qr-cards';
 import {
   extractTenantContext,
@@ -11,7 +11,10 @@ import { apiError, mapThrownError } from '../utils/api-error';
 import { studentIsPresent } from '../db/active-students';
 import { sendExamResultsSms } from '../services/sms/triggers';
 import { sendExamResultNotifications } from './telegram';
-import { ensureHomeworkGradingColumn } from './companies';
+import { ensureHomeworkGradingColumn, assertOnlineExams, isOnlineExamsEnabled } from './companies';
+import { ensureLessonSchema, lessonPoolSize, lessonsInCourse } from './lessons';
+import { ensureStudentAuthSchema } from './student-auth';
+import { gradeAttempt } from '../db/exam-grading';
 
 type AuthHeaders = { authorization: string };
 
@@ -49,7 +52,7 @@ export async function isRatingCompany(companyId: string): Promise<boolean> {
  * routes/sessions.ts). Cheap once the tables exist.
  */
 let examTablesEnsured = false;
-async function ensureExamTables(): Promise<void> {
+export async function ensureExamTables(): Promise<void> {
   if (examTablesEnsured) return;
   await query(`
     CREATE TABLE IF NOT EXISTS exams (
@@ -99,10 +102,226 @@ async function ensureExamTables(): Promise<void> {
   await query(`CREATE INDEX IF NOT EXISTS idx_exams_class    ON exams(class_id)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_exams_session  ON exams(session_id)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_exams_homework ON exams(company_id, is_homework)`);
+
+  // Online exams (migration 103): same table, behind a flag, same as homework. The
+  // paper is drawn from the question banks of the lessons in exam_lessons and the
+  // auto-computed mark lands in exam_results, so the whole existing grading stack
+  // applies to it unchanged.
+  await query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS is_online BOOLEAN NOT NULL DEFAULT false`);
+  await query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS question_count INTEGER`);
+  await query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS duration_minutes INTEGER`);
+  await query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS opens_at TIMESTAMP WITH TIME ZONE`);
+  await query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS closes_at TIMESTAMP WITH TIME ZONE`);
+  await query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS access_code VARCHAR(12)`);
+  await query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS shuffle_options BOOLEAN NOT NULL DEFAULT true`);
+  await query(`ALTER TABLE exams ADD COLUMN IF NOT EXISTS show_answers BOOLEAN NOT NULL DEFAULT true`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_exams_online ON exams(company_id, is_online)`);
+  // The FK targets `lessons`, so that table has to exist first on a database that
+  // predates the online-exams feature.
+  await ensureLessonSchema();
+  await query(`
+    CREATE TABLE IF NOT EXISTS exam_lessons (
+      id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      exam_id    UUID NOT NULL REFERENCES exams(id)   ON DELETE CASCADE,
+      lesson_id  UUID NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (exam_id, lesson_id)
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_exam_lessons_exam ON exam_lessons(exam_id)`);
+
+  // The sitting (migration 105): one attempt per student, and the paper drawn
+  // for them — snapshotted at start so a later bank edit never rewrites it.
+  await query(`
+    CREATE TABLE IF NOT EXISTS exam_attempts (
+      id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      exam_id      UUID NOT NULL REFERENCES exams(id)     ON DELETE CASCADE,
+      company_id   UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      student_id   UUID NOT NULL REFERENCES students(id)  ON DELETE CASCADE,
+      status       VARCHAR(16) NOT NULL DEFAULT 'IN_PROGRESS'
+                     CHECK (status IN ('IN_PROGRESS', 'SUBMITTED', 'EXPIRED')),
+      started_at   TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      expires_at   TIMESTAMP WITH TIME ZONE,
+      submitted_at TIMESTAMP WITH TIME ZONE,
+      score        INTEGER,
+      total        INTEGER,
+      created_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (exam_id, student_id)
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_exam_attempts_exam    ON exam_attempts(exam_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_exam_attempts_student ON exam_attempts(student_id)`);
+  await query(`
+    CREATE TABLE IF NOT EXISTS exam_attempt_questions (
+      id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      attempt_id  UUID NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
+      question_id UUID REFERENCES lesson_questions(id) ON DELETE SET NULL,
+      lesson_id   UUID REFERENCES lessons(id)          ON DELETE SET NULL,
+      order_index INTEGER NOT NULL,
+      question_text TEXT NOT NULL,
+      options     JSONB NOT NULL,
+      selected_option_id UUID,
+      is_correct  BOOLEAN,
+      answered_at TIMESTAMP WITH TIME ZONE,
+      created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (attempt_id, order_index)
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_eaq_attempt  ON exam_attempt_questions(attempt_id, order_index)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_eaq_question ON exam_attempt_questions(question_id)`);
+
   examTablesEnsured = true;
 }
 
-function mapExamFromDB(row: any) {
+/**
+ * A short code the teacher reads out so nobody starts before the class does.
+ *
+ * No 0/O/1/I/5/S: it gets read off a screen, said out loud, and typed on a phone.
+ * Stored and compared upper-case.
+ */
+function generateAccessCode(length = 6): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRTUVWXYZ2346789';
+  let code = '';
+  for (let i = 0; i < length; i++) {
+    code += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return code;
+}
+
+/** The lessons an online exam draws from, in curriculum order. */
+async function loadExamLessonIds(examId: string): Promise<string[]> {
+  const rows = await query<any>(
+    `SELECT el.lesson_id
+       FROM exam_lessons el
+       JOIN lessons l ON l.id = el.lesson_id
+      WHERE el.exam_id = $1
+      ORDER BY l.order_index, l.name`,
+    [examId],
+  );
+  return rows.map((r) => r.lesson_id);
+}
+
+/** Replaces an exam's lesson scope with exactly this list. */
+async function writeExamLessons(examId: string, lessonIds: string[]): Promise<void> {
+  await query('DELETE FROM exam_lessons WHERE exam_id = $1', [examId]);
+  for (const lessonId of lessonIds) {
+    await query(
+      `INSERT INTO exam_lessons (exam_id, lesson_id) VALUES ($1, $2)
+       ON CONFLICT (exam_id, lesson_id) DO NOTHING`,
+      [examId, lessonId],
+    );
+  }
+}
+
+/**
+ * Has anybody started this exam yet?
+ *
+ * Once they have, the lesson scope and question count are frozen: papers already
+ * drawn came from that pool, and changing it would leave two students marked out of
+ * different things under one exam. Tolerant of a database with no attempts table
+ * yet — that is "nobody has started" by definition.
+ */
+async function examHasAttempts(examId: string): Promise<boolean> {
+  const row = await queryOne<any>(
+    `SELECT CASE WHEN to_regclass('public.exam_attempts') IS NULL THEN 0
+                 ELSE (SELECT COUNT(*) FROM exam_attempts a WHERE a.exam_id = $1)
+            END AS total`,
+    [examId],
+  );
+  return parseInt(row?.total ?? '0', 10) > 0;
+}
+
+/**
+ * Validates and normalises the online settings of an exam being saved.
+ *
+ * Returns `{ error }` with a translation key, or the columns to write plus the
+ * lesson ids to store alongside them.
+ *
+ * The two checks that matter: the lessons must belong to the exam's own course
+ * (otherwise the paper would examine material this class was never taught), and the
+ * question count must not exceed the pool it draws from (otherwise every student
+ * gets a short paper and nobody finds out until the first sitting).
+ */
+async function resolveOnlineSettings(
+  body: any,
+  courseId: string,
+  companyId: string,
+  existing?: any,
+): Promise<{ error: string; detail?: string } | { columns: Record<string, any>; lessonIds: string[] }> {
+  const requestedLessons: string[] = Array.isArray(body.lessonIds)
+    ? body.lessonIds
+    : existing
+      ? await loadExamLessonIds(existing.id)
+      : [];
+
+  const lessonIds = await lessonsInCourse(requestedLessons, courseId, companyId);
+  if (!lessonIds.length) return { error: 'ERRORS.EXAMS.LESSONS_REQUIRED' };
+  if (Array.isArray(body.lessonIds) && lessonIds.length !== body.lessonIds.length) {
+    return { error: 'ERRORS.EXAMS.LESSON_COURSE_MISMATCH' };
+  }
+
+  const rawCount = body.questionCount ?? existing?.question_count;
+  const questionCount = rawCount === null || rawCount === undefined ? NaN : parseInt(rawCount, 10);
+  if (!Number.isFinite(questionCount) || questionCount < 1) {
+    return { error: 'ERRORS.EXAMS.QUESTION_COUNT_REQUIRED' };
+  }
+
+  const pool = await lessonPoolSize(lessonIds, companyId);
+  if (questionCount > pool) {
+    // The pool size rides on the message so the form can say "only 14 available"
+    // instead of a flat refusal.
+    return { error: 'ERRORS.EXAMS.NOT_ENOUGH_QUESTIONS', detail: `Only ${pool} questions available` };
+  }
+
+  const rawDuration = body.durationMinutes ?? existing?.duration_minutes;
+  const durationMinutes = rawDuration === null || rawDuration === undefined ? NaN : parseInt(rawDuration, 10);
+  if (!Number.isFinite(durationMinutes) || durationMinutes < 1) {
+    return { error: 'ERRORS.EXAMS.DURATION_REQUIRED' };
+  }
+
+  const opensAt = body.opensAt !== undefined ? (body.opensAt || null) : (existing?.opens_at ?? null);
+  const closesAt = body.closesAt !== undefined ? (body.closesAt || null) : (existing?.closes_at ?? null);
+  if (opensAt && closesAt && new Date(closesAt) <= new Date(opensAt)) {
+    return { error: 'ERRORS.EXAMS.WINDOW_INVALID' };
+  }
+
+  // An explicit empty string clears the code (identity comes from the student's
+  // login in any case); omitting it keeps whatever the exam already had, and a new
+  // online exam gets one generated so there is something to read out.
+  let accessCode: string | null;
+  if (body.accessCode !== undefined) {
+    accessCode = (body.accessCode || '').trim().toUpperCase() || null;
+  } else if (existing) {
+    accessCode = existing.access_code ?? null;
+  } else {
+    accessCode = generateAccessCode();
+  }
+
+  return {
+    lessonIds,
+    columns: {
+      is_online: true,
+      question_count: questionCount,
+      // Every question is worth one mark, so the paper is out of its own length.
+      // Mirroring it into max_grade is what makes the existing "17/20" displays,
+      // the results feed and the SMS/Telegram blast correct with no changes.
+      max_grade: questionCount,
+      duration_minutes: durationMinutes,
+      opens_at: opensAt,
+      closes_at: closesAt,
+      access_code: accessCode,
+      shuffle_options: body.shuffleOptions !== undefined
+        ? body.shuffleOptions === true
+        : (existing?.shuffle_options ?? true),
+      show_answers: body.showAnswers !== undefined
+        ? body.showAnswers === true
+        : (existing?.show_answers ?? true),
+    },
+  };
+}
+
+function mapExamFromDB(row: any, lessonIds?: string[]) {
   return {
     id: row.id,
     companyId: row.company_id,
@@ -120,10 +339,60 @@ function mapExamFromDB(row: any) {
     classId: row.class_id ?? null,
     className: row.class_name ?? undefined,
     sessionId: row.session_id ?? null,
+    // Online exam settings. `lessonIds` is only populated where it was loaded (the
+    // single-exam read and the two writes) — the list would need a query per row.
+    isOnline: row.is_online === true,
+    questionCount: row.question_count !== null && row.question_count !== undefined
+      ? parseInt(row.question_count, 10)
+      : null,
+    durationMinutes: row.duration_minutes !== null && row.duration_minutes !== undefined
+      ? parseInt(row.duration_minutes, 10)
+      : null,
+    opensAt: row.opens_at ?? null,
+    closesAt: row.closes_at ?? null,
+    accessCode: row.access_code ?? null,
+    shuffleOptions: row.shuffle_options !== false,
+    showAnswers: row.show_answers !== false,
+    lessonIds,
+    // Only the single-exam read computes these (a count per list row would be a
+    // query per row); undefined elsewhere.
+    attemptCounts: row.attempts_started !== undefined
+      ? {
+          started: parseInt(row.attempts_started, 10),
+          submitted: parseInt(row.attempts_submitted ?? '0', 10),
+        }
+      : undefined,
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+/**
+ * The roster union both `results` and the attempts monitor build on — who is
+ * expected to sit/be marked. Placeholders are fixed by convention: $1 = course,
+ * $2 = company, $4 = class (only when byClass). A class-scoped row also admits
+ * substitutes and trial students who actually sat that class's sessions, so the
+ * roster matches the attendance sheet — see the long note in `results`.
+ */
+function examRosterUnionSql(byClass: boolean): string {
+  return byClass
+    ? `SELECT student_id FROM enrollments
+         WHERE course_id = $1 AND company_id = $2 AND class_id = $4 AND status NOT IN ('DROPPED', 'CANCELLED')
+       UNION
+       SELECT student_id FROM master_class_enrollments
+         WHERE course_id = $1 AND company_id = $2 AND class_id = $4 AND status != 'DROPPED'
+       UNION
+       SELECT sa.student_id
+         FROM session_attendance sa
+         JOIN sessions se ON se.id = sa.session_id
+        WHERE se.class_id = $4 AND se.company_id = $2
+          AND sa.attendance_type IN ('SUBSTITUTION', 'TRIAL')`
+    : `SELECT student_id FROM enrollments
+         WHERE course_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+       UNION
+       SELECT student_id FROM master_class_enrollments
+         WHERE course_id = $1 AND company_id = $2 AND status != 'DROPPED'`;
 }
 
 /**
@@ -194,7 +463,7 @@ async function isEnrolledInCourse(
  */
 export const studentExamFeedSql = `
   SELECT e.name AS exam_name, c.name AS course_name, cl.name AS class_name,
-         e.exam_date, e.max_grade, e.is_homework,
+         e.exam_date, e.max_grade, e.is_homework, e.is_online,
          r.grade, r.is_absent,
          (r.exam_id IS NULL) AS not_marked
     FROM exams e
@@ -241,7 +510,11 @@ export function mapStudentExamRow(row: any, rating: boolean) {
     grade: row.grade ?? '',
     maxGrade,
     isHomework: row.is_homework === true,
-    isRating: rating && maxGrade === HOMEWORK_RATING_MAX,
+    // A rating is a marking style for homework, never a score a machine computed.
+    // An online exam with five questions is out of 5 and would otherwise be
+    // relabelled "Excellent" in a RATING-mode company — inventing a meaning nobody
+    // recorded from a mark that was counted, not judged.
+    isRating: rating && maxGrade === HOMEWORK_RATING_MAX && row.is_online !== true,
     // Recorded as not there, vs never recorded at all. Both read as a miss on
     // the page, but they are different facts and only one of them is a decision
     // someone made.
@@ -318,6 +591,21 @@ export const examsRoutes = {
         maxGrade = HOMEWORK_RATING_MAX;
       }
 
+      // An online exam is the same row with a flag and its settings. Gated: a tenant
+      // without the feature asking for one is refused rather than quietly given a
+      // paper exam they cannot mark.
+      let onlineColumns: Record<string, any> = {};
+      let lessonIds: string[] = [];
+      if (body.isOnline === true) {
+        const denied = await assertOnlineExams(context.companyId);
+        if (denied) return denied;
+        const settings = await resolveOnlineSettings(body, courseId, context.companyId);
+        if ('error' in settings) return apiError(400, settings.error, settings.detail ?? 'Invalid online exam settings');
+        onlineColumns = settings.columns;
+        lessonIds = settings.lessonIds;
+        maxGrade = settings.columns.max_grade;
+      }
+
       const row = await insert('exams', {
         company_id: context.companyId,
         branch_id: course.branch_id,
@@ -330,9 +618,12 @@ export const examsRoutes = {
         class_id: classId,
         session_id: sessionId,
         is_active: true,
+        ...onlineColumns,
       });
 
-      return { status: 201 as const, body: mapExamFromDB(row) };
+      if (lessonIds.length) await writeExamLessons(row.id, lessonIds);
+
+      return { status: 201 as const, body: mapExamFromDB(row, lessonIds) };
     } catch (error: any) {
       console.error('Create exam error:', error);
       return mapThrownError(error, 'ERRORS.EXAMS.CREATE_FAILED', 'Failed to create exam', 400);
@@ -393,7 +684,9 @@ export const examsRoutes = {
       sql += ' ORDER BY e.exam_date DESC, e.created_at DESC';
 
       const rows = await query(sql, params);
-      return { status: 200 as const, body: rows.map(mapExamFromDB) };
+      // Wrapped rather than passed by reference: map's index argument would land in
+      // the mapper's `lessonIds` parameter.
+      return { status: 200 as const, body: rows.map((r) => mapExamFromDB(r)) };
     } catch (error: any) {
       console.error('List exams error:', error);
       return mapThrownError(error, 'ERRORS.EXAMS.LIST_FAILED', 'Failed to list exams');
@@ -410,7 +703,13 @@ export const examsRoutes = {
 
       const row = await queryOne(
         `SELECT e.*, c.name AS course_name, cl.name AS class_name,
-                (SELECT COUNT(*) FROM exam_results r WHERE r.exam_id = e.id) AS result_count
+                (SELECT COUNT(*) FROM exam_results r WHERE r.exam_id = e.id) AS result_count,
+                -- How far the sitting has got. started > 0 is what freezes the
+                -- lesson scope and question count in the edit form (the server's
+                -- 409 stays the backstop).
+                (SELECT COUNT(*) FROM exam_attempts a WHERE a.exam_id = e.id) AS attempts_started,
+                (SELECT COUNT(*) FROM exam_attempts a
+                  WHERE a.exam_id = e.id AND a.status <> 'IN_PROGRESS') AS attempts_submitted
          FROM exams e
          JOIN courses c ON c.id = e.course_id
          LEFT JOIN classes cl ON cl.id = e.class_id
@@ -422,10 +721,283 @@ export const examsRoutes = {
         return apiError(403, 'ERRORS.EXAMS.ACCESS_DENIED', 'Access denied to this exam');
       }
 
-      return { status: 200 as const, body: mapExamFromDB(row) };
+      // The lesson scope, so the edit form can render the selection it saved. Only
+      // an online exam has one, so a paper exam pays nothing for it.
+      const lessonIds = row.is_online === true ? await loadExamLessonIds(params.id) : undefined;
+
+      return { status: 200 as const, body: mapExamFromDB(row, lessonIds) };
     } catch (error: any) {
       console.error('Get exam error:', error);
       return mapThrownError(error, 'ERRORS.EXAMS.NOT_FOUND', 'Exam not found', 404);
+    }
+  },
+
+  /**
+   * POST /api/exams/:id/regenerate-code
+   * A fresh access code for an online exam — for when the old one leaked, or a
+   * second group sits the same exam later.
+   *
+   * In-progress attempts are unaffected: the code gates STARTING, not continuing.
+   */
+  regenerateCode: async ({ params, headers }: { params: { id: string }; headers: AuthHeaders }) => {
+    try {
+      await ensureExamTables();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const denied = await assertOnlineExams(context.companyId);
+      if (denied) return denied;
+
+      const exam = await queryOne<any>(
+        'SELECT id, branch_id, is_online FROM exams WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId],
+      );
+      if (!exam) return apiError(404, 'ERRORS.EXAMS.NOT_FOUND', 'Exam not found');
+      if (exam.branch_id && !canAccessBranch(context, exam.branch_id)) {
+        return apiError(403, 'ERRORS.EXAMS.ACCESS_DENIED_UPDATE', 'Access denied to update this exam');
+      }
+      if (exam.is_online !== true) {
+        return apiError(400, 'ERRORS.EXAMS.NOT_ONLINE', 'This is not an online exam');
+      }
+
+      const accessCode = generateAccessCode();
+      await query('UPDATE exams SET access_code = $2, updated_at = NOW() WHERE id = $1', [params.id, accessCode]);
+      return { status: 200 as const, body: { accessCode } };
+    } catch (error: any) {
+      console.error('Regenerate exam code error:', error);
+      return mapThrownError(error, 'ERRORS.EXAMS.UPDATE_FAILED', 'Failed to regenerate the code', 400);
+    }
+  },
+
+  /**
+   * GET /api/exams/:id/attempts — the teacher's live monitor.
+   *
+   * Every student expected to sit (the same roster union `results` uses), each
+   * with their attempt state joined on: not started / in progress (with the
+   * deadline, for a live countdown) / submitted / expired, plus how many
+   * questions they have answered so far.
+   *
+   * This is also one of the expiry catches from online_exams.md §3.5: any
+   * IN_PROGRESS attempt whose clock has run out is graded on the way through,
+   * so an abandoned paper's mark lands the next time the teacher looks.
+   */
+  attempts: async ({ params, headers }: { params: { id: string }; headers: AuthHeaders }) => {
+    try {
+      await ensureExamTables();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const denied = await assertOnlineExams(context.companyId);
+      if (denied) return denied;
+
+      const exam = await queryOne<any>(
+        'SELECT * FROM exams WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId],
+      );
+      if (!exam) return apiError(404, 'ERRORS.EXAMS.NOT_FOUND', 'Exam not found');
+      if (exam.branch_id && !canAccessBranch(context, exam.branch_id)) {
+        return apiError(403, 'ERRORS.EXAMS.ACCESS_DENIED', 'Access denied to this exam');
+      }
+      if (exam.is_online !== true) {
+        return apiError(400, 'ERRORS.EXAMS.NOT_ONLINE', 'This is not an online exam');
+      }
+
+      // The expiry sweep: grade what ran out before reporting it, so the
+      // monitor never shows a live countdown on a paper that is actually over.
+      const expired = await query<any>(
+        `SELECT id FROM exam_attempts
+          WHERE exam_id = $1 AND status = 'IN_PROGRESS' AND expires_at <= NOW()`,
+        [params.id],
+      );
+      for (const row of expired) await gradeAttempt(row.id, 'EXPIRY');
+
+      const byClass = !!exam.class_id;
+      const rosterParams: any[] = [exam.course_id, context.companyId, params.id];
+      if (byClass) rosterParams.push(exam.class_id);
+      const rows = await query<any>(
+        `SELECT s.id AS student_id, s.name, s.student_code,
+                a.status, a.started_at, a.submitted_at, a.expires_at, a.score, a.total,
+                (SELECT COUNT(*) FROM exam_attempt_questions q
+                  WHERE q.attempt_id = a.id AND q.selected_option_id IS NOT NULL) AS answered_count
+         FROM students s
+         JOIN (${examRosterUnionSql(byClass)}) en ON en.student_id = s.id
+         LEFT JOIN exam_attempts a ON a.exam_id = $3 AND a.student_id = s.id
+         WHERE s.company_id = $2
+           AND (${studentIsPresent('s')} OR a.id IS NOT NULL)
+         ORDER BY s.name`,
+        rosterParams,
+      );
+
+      return {
+        status: 200 as const,
+        body: {
+          serverNow: new Date().toISOString(),
+          attempts: rows.map((row) => ({
+            studentId: row.student_id,
+            name: row.name,
+            code: row.student_code ?? null,
+            status: (row.status ?? 'NOT_STARTED') as string,
+            startedAt: row.started_at ? new Date(row.started_at).toISOString() : null,
+            submittedAt: row.submitted_at ? new Date(row.submitted_at).toISOString() : null,
+            expiresAt: row.expires_at ? new Date(row.expires_at).toISOString() : null,
+            score: row.score !== null && row.score !== undefined ? parseInt(row.score, 10) : null,
+            total: row.total !== null && row.total !== undefined ? parseInt(row.total, 10) : null,
+            answeredCount: row.answered_count !== null && row.answered_count !== undefined
+              ? parseInt(row.answered_count, 10)
+              : 0,
+          })),
+        },
+      };
+    } catch (error: any) {
+      console.error('Exam attempts error:', error);
+      return mapThrownError(error, 'ERRORS.EXAMS.ATTEMPTS_FAILED', 'Failed to load attempts', 500);
+    }
+  },
+
+  /**
+   * DELETE /api/exams/:id/attempts/:studentId — let a student back in.
+   *
+   * The ONE escape hatch from the one-attempt-per-student rule, for the student
+   * whose battery died mid-paper. Deletes the attempt (the frozen paper
+   * cascades with it) AND the exam_results row, in one transaction — a mark
+   * left behind would block markRemainingAbsent from ever re-flagging them, and
+   * a fresh start would look already-graded on every marks page.
+   */
+  resetAttempt: async ({ params, headers }: {
+    params: { id: string; studentId: string };
+    headers: AuthHeaders;
+  }) => {
+    try {
+      await ensureExamTables();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'delete')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const denied = await assertOnlineExams(context.companyId);
+      if (denied) return denied;
+
+      const exam = await queryOne<any>(
+        'SELECT id, branch_id, is_online FROM exams WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId],
+      );
+      if (!exam) return apiError(404, 'ERRORS.EXAMS.NOT_FOUND', 'Exam not found');
+      if (exam.branch_id && !canAccessBranch(context, exam.branch_id)) {
+        return apiError(403, 'ERRORS.EXAMS.ACCESS_DENIED_UPDATE', 'Access denied to update this exam');
+      }
+      if (exam.is_online !== true) {
+        return apiError(400, 'ERRORS.EXAMS.NOT_ONLINE', 'This is not an online exam');
+      }
+
+      const attempt = await queryOne<any>(
+        'SELECT id FROM exam_attempts WHERE exam_id = $1 AND student_id = $2',
+        [params.id, params.studentId],
+      );
+      if (!attempt) return apiError(404, 'ERRORS.EXAMS.NO_ATTEMPT', 'This student has not started');
+
+      const client = await getClient();
+      try {
+        await client.query('BEGIN');
+        await client.query('DELETE FROM exam_attempts WHERE id = $1', [attempt.id]);
+        await client.query(
+          'DELETE FROM exam_results WHERE exam_id = $1 AND student_id = $2',
+          [params.id, params.studentId],
+        );
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+      } finally {
+        client.release();
+      }
+      return { status: 200 as const, body: { success: true } };
+    } catch (error: any) {
+      console.error('Reset exam attempt error:', error);
+      return mapThrownError(error, 'ERRORS.EXAMS.RESET_FAILED', 'Failed to reset the attempt', 400);
+    }
+  },
+
+  /**
+   * GET /api/exams/students/:studentId/credentials — "why can't this student
+   * log in?", answered without touching the database. The username, when they
+   * claimed, when they last signed in, and when the password was last reset by
+   * a card scan — an unexpected reset_at is the visible symptom of a lost or
+   * borrowed card. The password itself is not readable here or anywhere.
+   */
+  studentCredentials: async ({ params, headers }: {
+    params: { studentId: string };
+    headers: AuthHeaders;
+  }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const denied = await assertOnlineExams(context.companyId);
+      if (denied) return denied;
+
+      const student = await queryOne<any>(
+        'SELECT id FROM students WHERE id = $1 AND company_id = $2',
+        [params.studentId, context.companyId],
+      );
+      if (!student) return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Student not found');
+
+      await ensureStudentAuthSchema();
+      const row = await queryOne<any>(
+        `SELECT username, claimed_at, reset_at, last_login_at
+           FROM student_auth WHERE student_id = $1`,
+        [params.studentId],
+      );
+      return {
+        status: 200 as const,
+        body: {
+          hasCredentials: !!row,
+          username: row?.username ?? null,
+          claimedAt: row?.claimed_at ? new Date(row.claimed_at).toISOString() : null,
+          resetAt: row?.reset_at ? new Date(row.reset_at).toISOString() : null,
+          lastLoginAt: row?.last_login_at ? new Date(row.last_login_at).toISOString() : null,
+        },
+      };
+    } catch (error: any) {
+      console.error('Student credentials read error:', error);
+      return mapThrownError(error, 'ERRORS.STUDENT_AUTH.READ_FAILED', 'Failed to load credentials', 500);
+    }
+  },
+
+  /**
+   * DELETE /api/exams/students/:studentId/credentials — revoke.
+   *
+   * Deletes the student_auth row outright: their next portal call 401s and they
+   * claim again from scratch by scanning their card. Also the first half of the
+   * lost-card answer (revoke here, then reissue the card through the QR-card
+   * tooling). Staff can only revoke — a teacher who could SET a student's
+   * password could sit their exam.
+   */
+  revokeStudentCredentials: async ({ params, headers }: {
+    params: { studentId: string };
+    headers: AuthHeaders;
+  }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'delete')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const denied = await assertOnlineExams(context.companyId);
+      if (denied) return denied;
+
+      const student = await queryOne<any>(
+        'SELECT id FROM students WHERE id = $1 AND company_id = $2',
+        [params.studentId, context.companyId],
+      );
+      if (!student) return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Student not found');
+
+      await ensureStudentAuthSchema();
+      await query('DELETE FROM student_auth WHERE student_id = $1', [params.studentId]);
+      return { status: 200 as const, body: { success: true } };
+    } catch (error: any) {
+      console.error('Revoke student credentials error:', error);
+      return mapThrownError(error, 'ERRORS.STUDENT_AUTH.REVOKE_FAILED', 'Failed to revoke credentials', 400);
     }
   },
 
@@ -465,6 +1037,35 @@ export const examsRoutes = {
       if (body.isActive !== undefined) updateData.is_active = body.isActive;
       if (body.isHomework !== undefined) updateData.is_homework = body.isHomework === true;
 
+      // Online settings. The window, the name and the date stay editable for the
+      // life of the exam; the lesson scope and the question count freeze the moment
+      // somebody starts, because papers already drawn came from that pool and
+      // changing it would mark two students out of different things.
+      const staysOnline = body.isOnline !== undefined ? body.isOnline === true : existing.is_online === true;
+      let newLessonIds: string[] | null = null;
+      if (staysOnline) {
+        const denied = await assertOnlineExams(context.companyId);
+        if (denied) return denied;
+
+        const targetCourse = updateData.course_id ?? existing.course_id;
+        const scopeChanged =
+          (Array.isArray(body.lessonIds) && body.lessonIds.length > 0) ||
+          (body.questionCount !== undefined && parseInt(body.questionCount, 10) !== existing.question_count);
+        if (scopeChanged && (await examHasAttempts(params.id))) {
+          return apiError(409, 'ERRORS.EXAMS.ALREADY_STARTED', 'Students have already started this exam');
+        }
+
+        const settings = await resolveOnlineSettings(body, targetCourse, context.companyId, existing);
+        if ('error' in settings) return apiError(400, settings.error, settings.detail ?? 'Invalid online exam settings');
+        Object.assign(updateData, settings.columns);
+        newLessonIds = settings.lessonIds;
+      } else if (body.isOnline === false && existing.is_online === true) {
+        // Turned back into a paper exam: drop the scope with the flag, or a later
+        // re-enable would silently inherit a stale one.
+        updateData.is_online = false;
+        newLessonIds = [];
+      }
+
       // Narrowing a row to a class (or widening it back to the whole course)
       // changes who may be graded on it, so the class has to belong to the course
       // the row ends up on — otherwise the roster would come back empty and every
@@ -493,6 +1094,8 @@ export const examsRoutes = {
 
       const row = await update('exams', params.id, updateData);
       if (!row) return apiError(404, 'ERRORS.EXAMS.NOT_FOUND', 'Exam not found');
+
+      if (newLessonIds !== null) await writeExamLessons(params.id, newLessonIds);
 
       // Results SMS, on the SCHEDULED → DONE transition only.
       //
@@ -591,23 +1194,7 @@ export const examsRoutes = {
       // Stamped SUBSTITUTION or TRIAL only: a NORMAL row is already covered by
       // the enrolment halves above.
       const byClass = !!exam.class_id;
-      const enrolledSql = byClass
-        ? `SELECT student_id FROM enrollments
-             WHERE course_id = $1 AND company_id = $2 AND class_id = $4 AND status NOT IN ('DROPPED', 'CANCELLED')
-           UNION
-           SELECT student_id FROM master_class_enrollments
-             WHERE course_id = $1 AND company_id = $2 AND class_id = $4 AND status != 'DROPPED'
-           UNION
-           SELECT sa.student_id
-             FROM session_attendance sa
-             JOIN sessions se ON se.id = sa.session_id
-            WHERE se.class_id = $4 AND se.company_id = $2
-              AND sa.attendance_type IN ('SUBSTITUTION', 'TRIAL')`
-        : `SELECT student_id FROM enrollments
-             WHERE course_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
-           UNION
-           SELECT student_id FROM master_class_enrollments
-             WHERE course_id = $1 AND company_id = $2 AND status != 'DROPPED'`;
+      const enrolledSql = examRosterUnionSql(byClass);
 
       const rosterParams: any[] = [exam.course_id, context.companyId, params.id];
       if (byClass) rosterParams.push(exam.class_id);

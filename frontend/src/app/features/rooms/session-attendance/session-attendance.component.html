@@ -33,6 +33,58 @@
             </span>
           }
         </p>
+
+        <!-- Which lesson of the curriculum this session covered. Only for tenants
+             with online exams: it exists so an exam can be scoped to "everything
+             this class has actually been taught". -->
+        @if (canTagLesson()) {
+          <div class="text-sm mt-1">
+            @if (!editingLesson()) {
+              @if (s.lessonName) {
+                <span class="inline-flex items-center gap-1 text-gray-600">
+                  <i class="pi pi-list-check text-xs text-gray-400"></i>
+                  {{ s.lessonName }}
+                  <i class="pi pi-pencil text-xs cursor-pointer text-gray-400 hover:text-gray-600"
+                    (click)="startEditLesson()"></i>
+                </span>
+              } @else {
+                <button type="button"
+                  class="inline-flex items-center gap-1 text-gray-400 hover:text-gray-600"
+                  (click)="startEditLesson()">
+                  <i class="pi pi-plus-circle text-xs"></i>
+                  {{ 'SESSIONS_DASHBOARD.TAG_LESSON' | translate }}
+                </button>
+              }
+            } @else {
+              <span class="inline-flex items-center gap-2 flex-wrap">
+                <p-select
+                  [ngModel]="lessonDraft()"
+                  (ngModelChange)="lessonDraft.set($event)"
+                  [options]="lessonOptions()"
+                  optionLabel="name"
+                  optionValue="id"
+                  [loading]="loadingLessons()"
+                  [showClear]="true"
+                  [filter]="true"
+                  filterBy="name"
+                  appendTo="body"
+                  size="small"
+                  styleClass="w-64"
+                  [placeholder]="'SESSIONS_DASHBOARD.LESSON_PLACEHOLDER' | translate"
+                ></p-select>
+                <p-button icon="pi pi-check" size="small" [text]="true"
+                  [loading]="savingLesson()" (onClick)="saveLesson()"></p-button>
+                <p-button icon="pi pi-times" size="small" [text]="true" severity="secondary"
+                  (onClick)="cancelEditLesson()"></p-button>
+              </span>
+              @if (!loadingLessons() && lessonOptions().length === 0) {
+                <small class="block text-gray-400 mt-1">
+                  {{ 'SESSIONS_DASHBOARD.NO_LESSONS_FOR_COURSE' | translate }}
+                </small>
+              }
+            }
+          </div>
+        }
       } @else {
         <h1 class="text-2xl font-bold text-gray-900">{{ 'SESSIONS_DASHBOARD.ATTENDANCE_TITLE' | translate }}</h1>
       }

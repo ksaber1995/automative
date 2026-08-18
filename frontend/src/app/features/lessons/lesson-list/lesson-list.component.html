@@ -1,0 +1,199 @@
+<div class="container-custom py-8">
+  <div class="flex justify-between items-center mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">{{ 'LESSONS.LIST.TITLE' | translate }}</h1>
+      <p class="text-gray-500 mt-1">{{ 'LESSONS.LIST.SUBTITLE' | translate }}</p>
+    </div>
+    @if (authService.canWrite('academy')) {
+      <p-button
+        [label]="'LESSONS.LIST.ADD' | translate"
+        icon="pi pi-plus"
+        [disabled]="!selectedCourseId()"
+        [pTooltip]="!selectedCourseId() ? ('LESSONS.LIST.PICK_COURSE_FIRST' | translate) : ''"
+        (onClick)="openCreate()"
+      ></p-button>
+    }
+  </div>
+
+  <p-card>
+    <!-- A course first: lessons belong to one course, so there is nothing to show
+         until we know which. -->
+    <div class="mb-6 max-w-md">
+      <label for="course" class="block text-sm font-medium text-gray-700 mb-2">
+        {{ 'LESSONS.LIST.COURSE_LABEL' | translate }}
+      </label>
+      <p-select
+        inputId="course"
+        [ngModel]="selectedCourseId()"
+        (ngModelChange)="onCourseChange($event)"
+        [options]="courses()"
+        optionLabel="name"
+        optionValue="id"
+        [filter]="true"
+        filterBy="name"
+        [showClear]="true"
+        [loading]="loadingCourses()"
+        [placeholder]="'LESSONS.LIST.COURSE_PLACEHOLDER' | translate"
+        styleClass="w-full"
+      ></p-select>
+    </div>
+
+    @if (!selectedCourseId()) {
+      <div class="text-center py-10 text-gray-500">
+        <i class="pi pi-book text-4xl mb-3"></i>
+        <p>{{ 'LESSONS.LIST.NO_COURSE_SELECTED' | translate }}</p>
+      </div>
+    } @else {
+      <p-table [value]="lessons()" [loading]="loading()" responsiveLayout="scroll">
+        <ng-template pTemplate="header">
+          <tr>
+            <th style="width: 5rem">#</th>
+            <th>{{ 'LESSONS.LIST.COL_NAME' | translate }}</th>
+            <th>{{ 'LESSONS.LIST.COL_QUESTIONS' | translate }}</th>
+            <th style="width: 12rem">{{ 'LESSONS.LIST.COL_ACTIONS' | translate }}</th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-lesson let-rowIndex="rowIndex">
+          <tr>
+            <td class="text-gray-500">{{ rowIndex + 1 }}</td>
+            <td>
+              <div class="font-medium text-gray-900">{{ lesson.name }}</div>
+              @if (lesson.description) {
+                <div class="text-sm text-gray-500">{{ lesson.description }}</div>
+              }
+            </td>
+            <td>
+              <!-- The count doubles as the way into the bank: reviewing or filling a
+                   lesson's questions is the next thing a teacher does here. -->
+              <p-button
+                [label]="lesson.questionCount ? ('LESSONS.LIST.QUESTIONS_COUNT' | translate: { count: lesson.questionCount }) : ('LESSONS.LIST.ADD_QUESTIONS' | translate)"
+                [icon]="lesson.questionCount ? 'pi pi-list' : 'pi pi-plus'"
+                [text]="true"
+                size="small"
+                [severity]="lesson.questionCount ? 'primary' : 'secondary'"
+                (onClick)="openQuestions(lesson)"
+              ></p-button>
+            </td>
+            <td>
+              <div class="flex gap-1">
+                @if (authService.canWrite('academy')) {
+                  <p-button
+                    icon="pi pi-arrow-up"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="secondary"
+                    [disabled]="isFirst(lesson) || reordering()"
+                    (onClick)="move(lesson, -1)"
+                    [pTooltip]="'LESSONS.LIST.MOVE_UP' | translate"
+                  ></p-button>
+                  <p-button
+                    icon="pi pi-arrow-down"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="secondary"
+                    [disabled]="isLast(lesson) || reordering()"
+                    (onClick)="move(lesson, 1)"
+                    [pTooltip]="'LESSONS.LIST.MOVE_DOWN' | translate"
+                  ></p-button>
+                  <p-button
+                    icon="pi pi-pencil"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="warn"
+                    (onClick)="openEdit(lesson)"
+                    [pTooltip]="'LESSONS.LIST.EDIT' | translate"
+                  ></p-button>
+                }
+                @if (authService.canDelete('academy')) {
+                  <p-button
+                    icon="pi pi-trash"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="danger"
+                    (onClick)="deleteLesson(lesson)"
+                    [pTooltip]="'LESSONS.LIST.DELETE' | translate"
+                  ></p-button>
+                }
+              </div>
+            </td>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="emptymessage">
+          <tr>
+            <td colspan="4" class="text-center py-8">
+              <div class="text-gray-500">
+                <i class="pi pi-list text-4xl mb-3"></i>
+                <p>{{ 'LESSONS.LIST.NO_LESSONS' | translate }}</p>
+              </div>
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+    }
+  </p-card>
+
+  <p-dialog
+    [visible]="showDialog()"
+    (visibleChange)="showDialog.set($event)"
+    [modal]="true"
+    [style]="{ width: '520px' }"
+    [header]="(isEditMode() ? 'LESSONS.FORM.EDIT_TITLE' : 'LESSONS.FORM.CREATE_TITLE') | translate"
+  >
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="flex flex-col gap-4">
+        <div>
+          <label for="name" class="block text-sm font-medium text-gray-700 mb-2">
+            {{ 'LESSONS.FORM.NAME_LABEL' | translate }} <span class="text-red-500">*</span>
+          </label>
+          <input
+            pInputText
+            id="name"
+            formControlName="name"
+            [placeholder]="'LESSONS.FORM.NAME_PLACEHOLDER' | translate"
+            class="w-full"
+            [class.border-red-500]="name?.invalid && name?.touched"
+          />
+          @if (name?.invalid && name?.touched) {
+            <small class="text-red-500">{{ 'LESSONS.FORM.NAME_REQUIRED' | translate }}</small>
+          }
+        </div>
+
+        <div>
+          <label for="description" class="block text-sm font-medium text-gray-700 mb-2">
+            {{ 'LESSONS.FORM.DESCRIPTION_LABEL' | translate }}
+          </label>
+          <textarea
+            pTextarea
+            id="description"
+            formControlName="description"
+            rows="3"
+            class="w-full"
+            [placeholder]="'LESSONS.FORM.DESCRIPTION_PLACEHOLDER' | translate"
+          ></textarea>
+        </div>
+
+        @if (!isEditMode()) {
+          <small class="text-gray-500">{{ 'LESSONS.FORM.APPEND_HINT' | translate }}</small>
+        }
+      </div>
+
+      <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
+        <p-button
+          [label]="'LESSONS.FORM.CANCEL' | translate"
+          severity="secondary"
+          [outlined]="true"
+          (onClick)="closeDialog()"
+          type="button"
+        ></p-button>
+        <p-button
+          [label]="(isEditMode() ? 'LESSONS.FORM.UPDATE' : 'LESSONS.FORM.CREATE') | translate"
+          type="submit"
+          [loading]="saving()"
+          [disabled]="form.invalid"
+        ></p-button>
+      </div>
+    </form>
+  </p-dialog>
+
+  <p-confirmDialog></p-confirmDialog>
+</div>

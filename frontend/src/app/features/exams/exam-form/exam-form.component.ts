@@ -7,12 +7,19 @@ import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { SelectModule } from 'primeng/select';
+import { MultiSelectModule } from 'primeng/multiselect';
+import { CheckboxModule } from 'primeng/checkbox';
+import { TooltipModule } from 'primeng/tooltip';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ExamService } from '../services/exam.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { CompanyService } from '../../../core/services/company.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { LessonService } from '../../lessons/services/lesson.service';
+import { SessionService } from '../../rooms/services/session.service';
+import { LessonModel } from '@shared/interfaces/lesson.interface';
 import { HOMEWORK_RATINGS, HOMEWORK_RATING_MAX } from '../homework-rating.util';
 import { toLocalYmd } from '../../../core/utils/date.util';
 
@@ -27,6 +34,9 @@ import { toLocalYmd } from '../../../core/utils/date.util';
     InputTextModule,
     InputNumberModule,
     SelectModule,
+    MultiSelectModule,
+    CheckboxModule,
+    TooltipModule,
     DatePickerModule,
     TranslateModule,
   ],
@@ -41,6 +51,9 @@ export class ExamFormComponent implements OnInit {
   private notifications = inject(NotificationService);
   private translate = inject(TranslateService);
   private companyService = inject(CompanyService);
+  private auth = inject(AuthService);
+  private lessonService = inject(LessonService);
+  private sessionService = inject(SessionService);
 
   form: FormGroup;
   loading = signal(false);
@@ -74,6 +87,50 @@ export class ExamFormComponent implements OnInit {
   /** The scale itself, so the form can show what marking will look like. */
   ratingLabels = computed(() => HOMEWORK_RATINGS.map((r) => this.translate.instant(r.labelKey)));
 
+  // ── Online exam ─────────────────────────────────────────────────────────────
+  /** The whole online section is hidden unless the tenant has the feature. */
+  canUseOnlineExams = computed(() => this.auth.canUseOnlineExams());
+  private isOnlineKind = signal(false);
+  isOnline = computed(() => this.isOnlineKind());
+
+  /** Lessons of the selected course, each carrying its question count. */
+  lessons = signal<LessonModel[]>([]);
+  loadingLessons = signal(false);
+  private selectedLessonIds = signal<string[]>([]);
+  loadingTaught = signal(false);
+  accessCode = signal<string | null>(null);
+  regeneratingCode = signal(false);
+
+  /**
+   * How many questions the chosen lessons hold between them — the ceiling on the
+   * paper length. Summed client-side from the lesson list, which already carries a
+   * count per lesson, so the number moves as lessons are ticked.
+   */
+  poolSize = computed(() => {
+    const chosen = new Set(this.selectedLessonIds());
+    return this.lessons()
+      .filter((l) => chosen.has(l.id))
+      .reduce((sum, l) => sum + (l.questionCount ?? 0), 0);
+  });
+
+  /** Asking for more questions than exist would give everyone a short paper. */
+  questionCountTooHigh = computed(() => {
+    if (!this.isOnline()) return false;
+    const asked = Number(this.form?.get('questionCount')?.value ?? 0);
+    return asked > this.poolSize();
+  });
+
+  /**
+   * The lesson scope and paper length freeze once anybody has started: papers
+   * already drawn came from that pool, so changing it would mark two students out
+   * of different things.
+   *
+   * Set from `attemptCounts.started` on load; the server stays the enforcement
+   * (409 ERRORS.EXAMS.ALREADY_STARTED) for the race where the first student
+   * starts while this form is already open.
+   */
+  scopeLocked = signal(false);
+
   constructor() {
     this.rebuildOptions();
     this.translate.onLangChange.subscribe(() => this.rebuildOptions());
@@ -88,7 +145,19 @@ export class ExamFormComponent implements OnInit {
       examDate: [new Date(), [Validators.required]],
       maxGrade: [100, [Validators.min(0)]],
       status: ['SCHEDULED', [Validators.required]],
+      // ── Online exam ──────────────────────────────────────────────────────
+      isOnline: [false],
+      lessonIds: [[] as string[]],
+      questionCount: [10],
+      durationMinutes: [30],
+      opensAt: [null as Date | null],
+      closesAt: [null as Date | null],
+      shuffleOptions: [true],
+      showAnswers: [true],
     });
+
+    this.form.get('isOnline')!.valueChanges.subscribe((v: boolean) => this.isOnlineKind.set(v === true));
+    this.form.get('lessonIds')!.valueChanges.subscribe((ids: string[]) => this.selectedLessonIds.set(ids ?? []));
 
     this.form.get('isHomework')!.valueChanges.subscribe((v: boolean) => this.isHomeworkKind.set(v === true));
 
@@ -117,6 +186,10 @@ export class ExamFormComponent implements OnInit {
     this.form.get('courseId')!.valueChanges.subscribe((courseId: string) => {
       this.form.get('classId')!.setValue(null);
       this.loadClasses(courseId);
+      // Same reasoning for lessons: they belong to a course, and the server refuses
+      // a lesson from another one.
+      this.form.get('lessonIds')!.setValue([]);
+      this.loadLessons(courseId);
     });
 
     this.id = this.route.snapshot.paramMap.get('id');
@@ -136,6 +209,65 @@ export class ExamFormComponent implements OnInit {
     });
   }
 
+  private loadLessons(courseId: string | null) {
+    if (!courseId || !this.canUseOnlineExams()) {
+      this.lessons.set([]);
+      return;
+    }
+    this.loadingLessons.set(true);
+    this.lessonService.getAll({ courseId }).subscribe({
+      next: (lessons) => {
+        this.lessons.set(lessons);
+        this.loadingLessons.set(false);
+      },
+      error: () => this.loadingLessons.set(false),
+    });
+  }
+
+  /** Tick every lesson of the course. */
+  selectAllLessons() {
+    this.form.get('lessonIds')!.setValue(this.lessons().map((l) => l.id));
+  }
+
+  /**
+   * Tick only the lessons THIS class has actually been taught.
+   *
+   * Classes of one course move through the curriculum at their own pace, so the
+   * course's whole lesson list would examine material a given class has not reached.
+   * The answer comes from the lesson tags on the class's sessions — and it expands
+   * into an ordinary selection the teacher can still edit, because the exam stores
+   * lesson ids, never a rule that could quietly widen later.
+   */
+  selectTaughtLessons() {
+    const classId = this.form.get('classId')!.value;
+    if (!classId) return;
+    this.loadingTaught.set(true);
+    this.sessionService.lessonsTaught(classId).subscribe({
+      next: (taught) => {
+        this.loadingTaught.set(false);
+        if (!taught.length) {
+          this.notifications.error(this.translate.instant('EXAMS.ONLINE.NO_TAUGHT_LESSONS'));
+          return;
+        }
+        this.form.get('lessonIds')!.setValue(taught.map((l) => l.id));
+      },
+      error: () => this.loadingTaught.set(false),
+    });
+  }
+
+  regenerateCode() {
+    if (!this.id) return;
+    this.regeneratingCode.set(true);
+    this.service.regenerateCode(this.id).subscribe({
+      next: (res) => {
+        this.accessCode.set(res.accessCode);
+        this.regeneratingCode.set(false);
+        this.notifications.success(this.translate.instant('EXAMS.ONLINE.CODE_REGENERATED'));
+      },
+      error: () => this.regeneratingCode.set(false),
+    });
+  }
+
   load(id: string) {
     this.loading.set(true);
     this.service.getById(id).subscribe({
@@ -150,11 +282,23 @@ export class ExamFormComponent implements OnInit {
           examDate: row.examDate ? new Date(row.examDate) : new Date(),
           maxGrade: row.maxGrade ?? null,
           status: row.status,
+          isOnline: row.isOnline === true,
+          questionCount: row.questionCount ?? 10,
+          durationMinutes: row.durationMinutes ?? 30,
+          opensAt: row.opensAt ? new Date(row.opensAt) : null,
+          closesAt: row.closesAt ? new Date(row.closesAt) : null,
+          shuffleOptions: row.shuffleOptions !== false,
+          showAnswers: row.showAnswers !== false,
         });
+        this.accessCode.set(row.accessCode ?? null);
+        // Somebody has a paper drawn from this pool — the scope and count are
+        // frozen (the server's 409 ALREADY_STARTED remains the backstop).
+        this.scopeLocked.set((row.attemptCounts?.started ?? 0) > 0);
         // The courseId patch above synchronously fired valueChanges, which cleared
-        // classId and kicked off the class load — so restore the saved class on
-        // top of it. The select shows the name once the options land.
+        // classId and lessonIds and kicked off both loads — so restore the saved
+        // picks on top of them. The selects show names once the options land.
         this.form.get('classId')!.setValue(row.classId ?? null);
+        this.form.get('lessonIds')!.setValue(row.lessonIds ?? []);
         this.loading.set(false);
       },
       error: () => {
@@ -170,6 +314,18 @@ export class ExamFormComponent implements OnInit {
       return;
     }
     const v = this.form.value;
+    // Both are enforced server-side; blocking here means the teacher is told at the
+    // field rather than by a failed save.
+    if (v.isOnline === true) {
+      if (!v.lessonIds?.length) {
+        this.notifications.error(this.translate.instant('ERRORS.EXAMS.LESSONS_REQUIRED'));
+        return;
+      }
+      if (this.questionCountTooHigh()) {
+        this.notifications.error(this.translate.instant('EXAMS.ONLINE.POOL_EXCEEDED', { count: this.poolSize() }));
+        return;
+      }
+    }
     const payload: any = {
       isHomework: v.isHomework === true,
       courseId: v.courseId,
@@ -182,6 +338,25 @@ export class ExamFormComponent implements OnInit {
       maxGrade: this.useRating() ? HOMEWORK_RATING_MAX : (v.maxGrade ?? null),
       status: v.status,
     };
+
+    if (v.isOnline === true) {
+      payload.isOnline = true;
+      payload.lessonIds = v.lessonIds ?? [];
+      payload.questionCount = Number(v.questionCount);
+      payload.durationMinutes = Number(v.durationMinutes);
+      payload.opensAt = v.opensAt ? new Date(v.opensAt).toISOString() : null;
+      payload.closesAt = v.closesAt ? new Date(v.closesAt).toISOString() : null;
+      payload.shuffleOptions = v.shuffleOptions === true;
+      payload.showAnswers = v.showAnswers === true;
+      // The server mirrors questionCount into maxGrade (one mark per question), so
+      // don't send a stale number from the hidden box and start an argument.
+      delete payload.maxGrade;
+    } else if (this.isEditMode()) {
+      // Explicitly off, so turning an online exam back into a paper one clears its
+      // scope rather than leaving a stale one behind.
+      payload.isOnline = false;
+    }
+
     this.loading.set(true);
     if (this.isEditMode() && this.id) {
       this.service.update(this.id, payload).subscribe({

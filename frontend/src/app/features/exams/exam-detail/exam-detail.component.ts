@@ -10,6 +10,9 @@ import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { DialogModule } from 'primeng/dialog';
 import { SelectModule } from 'primeng/select';
+import { ProgressBarModule } from 'primeng/progressbar';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { cameraScanConfig } from '../../../core/utils/scanner-formats.util';
@@ -21,7 +24,7 @@ import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templa
 import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
 import { CompanyService } from '../../../core/services/company.service';
 import { HOMEWORK_RATINGS, HOMEWORK_RATING_MAX, ratingLabelKey } from '../homework-rating.util';
-import { ExamModel, ExamResultRow } from '@shared/interfaces/exam.interface';
+import { ExamAttemptRow, ExamModel, ExamResultRow } from '@shared/interfaces/exam.interface';
 
 @Component({
   selector: 'app-exam-detail',
@@ -38,8 +41,11 @@ import { ExamModel, ExamResultRow } from '@shared/interfaces/exam.interface';
     TooltipModule,
     DialogModule,
     SelectModule,
+    ProgressBarModule,
+    ConfirmDialogModule,
     TranslateModule,
   ],
+  providers: [ConfirmationService],
   templateUrl: './exam-detail.component.html',
 })
 export class ExamDetailComponent implements OnInit, OnDestroy {
@@ -49,6 +55,7 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   private notifications = inject(NotificationService);
   private translate = inject(TranslateService);
   authService = inject(AuthService);
+  private confirmationService = inject(ConfirmationService);
   private templatesSvc = inject(WhatsappTemplatesService);
   private globalScan = inject(GlobalScanService);
   private companyService = inject(CompanyService);
@@ -90,6 +97,31 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   private readonly ROW_DEBOUNCE_MS = 600;
 
   canWrite = computed(() => this.authService.canWrite('academy'));
+  canDelete = computed(() => this.authService.canDelete('academy'));
+
+  // ── Online attempts monitor (phase 7, online_exams.md §4.5) ────────────────
+  isOnline = computed(() => this.exam()?.isOnline === true);
+  attempts = signal<ExamAttemptRow[]>([]);
+  attemptsLoading = signal(false);
+  resettingId = signal<string | null>(null);
+  regeneratingCode = signal(false);
+  codeCopied = signal(false);
+
+  /** serverNow − deviceNow at the last poll; the countdown column adds it back. */
+  private clockSkewMs = 0;
+  /** Re-pulls the attempt list while the sitting can still move. */
+  private attemptsPoll: ReturnType<typeof setInterval> | null = null;
+  private readonly ATTEMPTS_POLL_MS = 20_000;
+  /** One-second tick that keeps the remaining-time column counting down. */
+  private nowTick = signal(Date.now());
+  private tickTimer: ReturnType<typeof setInterval> | null = null;
+
+  submittedCount = computed(() =>
+    this.attempts().filter((a) => a.status === 'SUBMITTED' || a.status === 'EXPIRED').length);
+  attemptsTotal = computed(() => this.attempts().length);
+  submittedPct = computed(() =>
+    this.attemptsTotal() ? Math.round((this.submittedCount() / this.attemptsTotal()) * 100) : 0);
+  anyoneInProgress = computed(() => this.attempts().some((a) => a.status === 'IN_PROGRESS'));
 
   filteredRoster = computed(() => {
     const q = this.search().trim().toLowerCase();
@@ -182,10 +214,114 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     });
     if (!this.examId) { this.loading.set(false); return; }
     this.service.getById(this.examId).subscribe({
-      next: (e) => this.exam.set(e),
+      next: (e) => {
+        this.exam.set(e);
+        if (e.isOnline) this.startMonitor();
+      },
       error: () => { this.notifications.error(this.translate.instant('EXAMS.DETAIL.LOAD_FAILED')); },
     });
     this.loadRoster();
+  }
+
+  // ── Attempts monitor ────────────────────────────────────────────────────────
+  private startMonitor() {
+    this.loadAttempts(true);
+    this.tickTimer = setInterval(() => this.nowTick.set(Date.now()), 1000);
+    this.attemptsPoll = setInterval(() => {
+      // Stop paying for the poll once the window has closed and nobody is
+      // mid-paper — from there the list can only change through this page's own
+      // actions, which refresh it themselves.
+      if (!this.monitorStillMoving()) return;
+      this.loadAttempts(false);
+    }, this.ATTEMPTS_POLL_MS);
+  }
+
+  private monitorStillMoving(): boolean {
+    const e = this.exam();
+    if (!e) return false;
+    const windowClosed = !!e.closesAt && new Date(e.closesAt).getTime() < Date.now();
+    return !windowClosed || this.anyoneInProgress();
+  }
+
+  loadAttempts(showSpinner: boolean) {
+    if (showSpinner) this.attemptsLoading.set(true);
+    this.service.getAttempts(this.examId).subscribe({
+      next: (res) => {
+        this.clockSkewMs = new Date(res.serverNow).getTime() - Date.now();
+        this.attempts.set(res.attempts);
+        this.attemptsLoading.set(false);
+      },
+      // A background poll that fails should not toast every 20 seconds; the
+      // next tick simply tries again.
+      error: () => this.attemptsLoading.set(false),
+    });
+  }
+
+  attemptStatusSeverity(status: ExamAttemptRow['status']): 'secondary' | 'info' | 'success' | 'warn' {
+    switch (status) {
+      case 'IN_PROGRESS': return 'info';
+      case 'SUBMITTED': return 'success';
+      case 'EXPIRED': return 'warn';
+      default: return 'secondary';
+    }
+  }
+
+  /** m:ss left on a running attempt, corrected by the server clock. '' otherwise. */
+  timeLeft(row: ExamAttemptRow): string {
+    if (row.status !== 'IN_PROGRESS' || !row.expiresAt) return '';
+    this.nowTick();   // re-evaluate every second
+    const left = new Date(row.expiresAt).getTime() - (Date.now() + this.clockSkewMs);
+    if (left <= 0) return '0:00';
+    const total = Math.floor(left / 1000);
+    return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+  }
+
+  copyAccessCode() {
+    const code = this.exam()?.accessCode;
+    if (!code) return;
+    navigator.clipboard?.writeText(code).then(() => {
+      this.codeCopied.set(true);
+      setTimeout(() => this.codeCopied.set(false), 1500);
+    }).catch(() => {});
+  }
+
+  regenerateCode() {
+    this.regeneratingCode.set(true);
+    this.service.regenerateCode(this.examId).subscribe({
+      next: (res) => {
+        this.regeneratingCode.set(false);
+        this.exam.update((e) => (e ? { ...e, accessCode: res.accessCode } : e));
+        this.notifications.success(this.translate.instant('EXAMS.ONLINE.CODE_REGENERATED'));
+      },
+      error: () => this.regeneratingCode.set(false),
+    });
+  }
+
+  confirmResetAttempt(row: ExamAttemptRow) {
+    this.confirmationService.confirm({
+      header: this.translate.instant('EXAMS.ONLINE.RESET_TITLE'),
+      message: this.translate.instant('EXAMS.ONLINE.RESET_MSG', { name: row.name }),
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: this.translate.instant('EXAMS.ONLINE.RESET_ATTEMPT'),
+      rejectLabel: this.translate.instant('EXAMS.ONLINE.RESET_CANCEL'),
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => this.resetAttempt(row),
+    });
+  }
+
+  private resetAttempt(row: ExamAttemptRow) {
+    this.resettingId.set(row.studentId);
+    this.service.resetAttempt(this.examId, row.studentId).subscribe({
+      next: () => {
+        this.resettingId.set(null);
+        this.notifications.success(this.translate.instant('EXAMS.ONLINE.RESET_DONE', { name: row.name }));
+        // The reset also deleted their exam_results row, so the marks roster
+        // below is stale too — refresh both.
+        this.loadAttempts(false);
+        this.loadRoster();
+      },
+      error: () => this.resettingId.set(null),
+    });
   }
 
   loadRoster() {
@@ -592,5 +728,7 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     this.audioCtx?.close().catch(() => {});
     this.rowSaveTimers.forEach((t) => clearTimeout(t));
     this.rowSaveTimers.clear();
+    if (this.attemptsPoll) clearInterval(this.attemptsPoll);
+    if (this.tickTimer) clearInterval(this.tickTimer);
   }
 }

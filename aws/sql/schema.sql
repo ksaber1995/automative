@@ -51,6 +51,11 @@ CREATE TABLE companies (
     -- date alone (smsIsActive in routes/companies.ts).
     sms_activated BOOLEAN NOT NULL DEFAULT FALSE,
     sms_expiration DATE,
+    -- Online exams — lessons, question banks and the student exam portal
+    -- (migration 100). Gated per tenant and OFF by default: the feature ships dark
+    -- and is switched on from the admin console, one tenant at a time. Enforced by
+    -- assertOnlineExams in routes/companies.ts, not just hidden in the UI.
+    online_exams_enabled BOOLEAN NOT NULL DEFAULT false,
     is_active BOOLEAN DEFAULT true,
     onboarding_completed BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -405,6 +410,125 @@ CREATE TABLE course_levels (
 
 CREATE INDEX idx_course_levels_course ON course_levels(course_id);
 CREATE INDEX idx_course_levels_level ON course_levels(level_id);
+
+-- =============================================
+-- LESSONS TABLE  (migration 100)
+-- The curriculum of a course, ordered: lesson 1, 2, 3 … A lesson is what a
+-- question bank hangs off, and what an online exam draws its questions from.
+--
+-- Per COURSE, not per class: every class of a course teaches the same lessons.
+-- Which lessons a given class has actually reached is a separate question,
+-- answered by sessions.lesson_id.
+--
+-- Part of the online-exams feature, so it is only reachable by tenants with
+-- companies.online_exams_enabled. See online_exams.md.
+-- =============================================
+CREATE TABLE lessons (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id  UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    branch_id   UUID REFERENCES branches(id) ON DELETE SET NULL,   -- denormalised from the course
+    course_id   UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    name        VARCHAR(255) NOT NULL,
+    description TEXT,
+    -- Position in the course. Not unique on purpose: reordering would fight a
+    -- unique index, and two lessons sharing a position is a display quirk.
+    order_index INTEGER NOT NULL DEFAULT 0,
+    -- Soft-delete: retiring a lesson must not take its question bank with it.
+    is_active   BOOLEAN NOT NULL DEFAULT true,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_lessons_company ON lessons(company_id);
+CREATE INDEX idx_lessons_course  ON lessons(course_id, order_index);
+
+CREATE TRIGGER update_lessons_updated_at
+    BEFORE UPDATE ON lessons
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================
+-- LESSON QUESTION BANK  (migration 101)
+-- The MCQ bank of a lesson. An online exam draws its paper at random from the
+-- pooled questions of every lesson it covers, so each student gets a different
+-- set — see online_exams.md.
+-- =============================================
+CREATE TABLE lesson_questions (
+    id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id    UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    lesson_id     UUID NOT NULL REFERENCES lessons(id)   ON DELETE CASCADE,
+    -- Denormalised from the lesson, so an exam's pool query stays one indexed scan.
+    course_id     UUID NOT NULL REFERENCES courses(id)   ON DELETE CASCADE,
+    question_text TEXT NOT NULL,
+    -- MCQ is the only type for now; the column exists so more types are a CHECK
+    -- change rather than a table change.
+    question_type VARCHAR(16) NOT NULL DEFAULT 'MCQ' CHECK (question_type IN ('MCQ')),
+    explanation   TEXT,                            -- optional, shown in the answer review
+    -- Soft-delete: retires the question from future draws, leaves sat papers alone.
+    is_active     BOOLEAN NOT NULL DEFAULT true,
+    created_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_lesson_questions_lesson  ON lesson_questions(lesson_id, is_active);
+CREATE INDEX idx_lesson_questions_company ON lesson_questions(company_id);
+CREATE INDEX idx_lesson_questions_course  ON lesson_questions(course_id, is_active);
+
+-- Rows, not JSONB on the question: a shuffled paper records WHICH option a student
+-- picked, which needs a stable id per option. "Exactly one is_correct" is enforced
+-- in the API (a question is always written whole), not by a constraint.
+CREATE TABLE lesson_question_options (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    question_id UUID NOT NULL REFERENCES lesson_questions(id) ON DELETE CASCADE,
+    option_text TEXT NOT NULL,
+    is_correct  BOOLEAN NOT NULL DEFAULT false,
+    order_index INTEGER NOT NULL DEFAULT 0,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_lesson_question_options_q ON lesson_question_options(question_id, order_index);
+
+CREATE TRIGGER update_lesson_questions_updated_at
+    BEFORE UPDATE ON lesson_questions
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================
+-- STUDENT PORTAL CREDENTIALS  (migration 104)
+-- Sign-in for the student exam portal (exams.netrofit.com). A separate table,
+-- never columns on `students`: routes/students.ts serialises whole student rows
+-- into staff responses, and a password hash must not ride along. First claim and
+-- password reset both happen by scanning the student's own card — see
+-- online_exams.md §0.5.
+-- =============================================
+CREATE TABLE student_auth (
+    id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    student_id    UUID NOT NULL UNIQUE REFERENCES students(id)  ON DELETE CASCADE,
+    company_id    UUID NOT NULL        REFERENCES companies(id) ON DELETE CASCADE,
+    -- What the student types to sign in. A phone number IS a valid username —
+    -- one field, one unique index, one lookup. Stored lower-cased; anything
+    -- phone-shaped is canonicalised first so 01001234567 and +201001234567
+    -- can't become two accounts.
+    username      VARCHAR(60)  NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,       -- bcryptjs, cost 10, as everywhere else
+    -- Lockout, so a guessable student username isn't a free brute-force target.
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until  TIMESTAMP WITH TIME ZONE,
+    last_login_at TIMESTAMP WITH TIME ZONE,
+    -- Audit of the card scans that created and last reset this credential. An
+    -- unexpected reset is the only visible symptom of a lost or borrowed card.
+    claimed_at    TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    reset_at      TIMESTAMP WITH TIME ZONE,
+    created_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- GLOBALLY unique, not per company: the portal is one hostname with one login
+-- form, so "ahmed" has to resolve to exactly one student.
+CREATE UNIQUE INDEX idx_student_auth_username ON student_auth(LOWER(username));
+CREATE INDEX idx_student_auth_company ON student_auth(company_id);
+
+CREATE TRIGGER update_student_auth_updated_at
+    BEFORE UPDATE ON student_auth
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TABLE master_course_courses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -1184,6 +1308,11 @@ CREATE TABLE sessions (
     -- Per-Course sequence number (1, 2, 3 …). Session number N is conceptually
     -- "the same session" across every class of a course (migration 030).
     session_number INTEGER,
+    -- Which lesson of the course this session covered (migration 102). Optional:
+    -- a session nobody tagged has none. It is what makes "everything taught so far
+    -- in THIS class" answerable — classes share a curriculum but move through it at
+    -- their own pace. SET NULL, so retiring a lesson never deletes a taught session.
+    lesson_id UUID REFERENCES lessons(id) ON DELETE SET NULL,
     start_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     end_date TIMESTAMP WITH TIME ZONE,
     notes TEXT,
@@ -1198,6 +1327,7 @@ CREATE INDEX idx_sessions_class_id ON sessions(class_id);
 CREATE INDEX idx_sessions_start_date ON sessions(start_date);
 CREATE INDEX idx_sessions_end_date ON sessions(end_date);
 CREATE INDEX idx_sessions_session_number ON sessions(session_number);
+CREATE INDEX idx_sessions_lesson ON sessions(lesson_id);
 
 -- =============================================
 -- SESSION ATTENDANCE TABLE  (migration 024; substitution: migration 030)
@@ -1739,6 +1869,18 @@ CREATE TABLE exams (
     is_homework BOOLEAN NOT NULL DEFAULT false,
     class_id    UUID REFERENCES classes(id)  ON DELETE SET NULL,
     session_id  UUID REFERENCES sessions(id) ON DELETE SET NULL,
+    -- ONLINE exams (migration 103) ride on this table too: the student sits them on
+    -- a screen, each gets a random paper drawn from the question banks of the
+    -- lessons in exam_lessons, and the auto-computed mark lands in exam_results like
+    -- any other. max_grade mirrors question_count so every "out of N" display works.
+    is_online        BOOLEAN NOT NULL DEFAULT false,
+    question_count   INTEGER,                          -- how many to draw
+    duration_minutes INTEGER,                          -- per-student clock, from their start
+    opens_at         TIMESTAMP WITH TIME ZONE,         -- the window it may be started in
+    closes_at        TIMESTAMP WITH TIME ZONE,
+    access_code      VARCHAR(12),                      -- optional; stops an early start
+    shuffle_options  BOOLEAN NOT NULL DEFAULT true,
+    show_answers     BOOLEAN NOT NULL DEFAULT true,    -- off = score only, no review
     is_active   BOOLEAN NOT NULL DEFAULT true,
     created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -1751,6 +1893,20 @@ CREATE INDEX idx_exams_exam_date ON exams(exam_date);
 CREATE INDEX idx_exams_class     ON exams(class_id);
 CREATE INDEX idx_exams_session   ON exams(session_id);
 CREATE INDEX idx_exams_homework  ON exams(company_id, is_homework);
+CREATE INDEX idx_exams_online    ON exams(company_id, is_online);
+
+-- Which lessons an online exam draws its questions from. Resolved at SAVE time,
+-- never stored as a rule ("all lessons taught so far" expands to rows here), so an
+-- exam's scope cannot grow because another lesson was taught afterwards.
+CREATE TABLE exam_lessons (
+    id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    exam_id    UUID NOT NULL REFERENCES exams(id)   ON DELETE CASCADE,
+    lesson_id  UUID NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (exam_id, lesson_id)
+);
+
+CREATE INDEX idx_exam_lessons_exam ON exam_lessons(exam_id);
 
 CREATE TABLE exam_results (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -1770,6 +1926,61 @@ CREATE TABLE exam_results (
 CREATE INDEX idx_exam_results_exam    ON exam_results(exam_id);
 CREATE INDEX idx_exam_results_student ON exam_results(student_id);
 CREATE INDEX idx_exam_results_company ON exam_results(company_id);
+
+-- =============================================
+-- ONLINE EXAM ATTEMPTS  (migration 105)
+-- One sitting per student, and the paper they drew — frozen at start (question
+-- text + option list snapshotted per student, in their shuffled order), so
+-- editing or retiring a bank question never rewrites a sat paper. The
+-- auto-computed mark is published into exam_results, so everything downstream
+-- of marks works unchanged. See online_exams.md §1.6/§1.7.
+-- =============================================
+CREATE TABLE exam_attempts (
+    id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    exam_id      UUID NOT NULL REFERENCES exams(id)     ON DELETE CASCADE,
+    company_id   UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    student_id   UUID NOT NULL REFERENCES students(id)  ON DELETE CASCADE,
+    status       VARCHAR(16) NOT NULL DEFAULT 'IN_PROGRESS'
+                   CHECK (status IN ('IN_PROGRESS', 'SUBMITTED', 'EXPIRED')),
+    started_at   TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Server-owned deadline = LEAST(started_at + duration, exams.closes_at).
+    -- The client countdown is decoration; this is what grading trusts.
+    expires_at   TIMESTAMP WITH TIME ZONE,
+    submitted_at TIMESTAMP WITH TIME ZONE,
+    score        INTEGER,     -- correct answers, filled on submit/expiry
+    total        INTEGER,     -- questions on THIS paper
+    created_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (exam_id, student_id)          -- one attempt; signing back in resumes it
+);
+
+CREATE INDEX idx_exam_attempts_exam    ON exam_attempts(exam_id);
+CREATE INDEX idx_exam_attempts_student ON exam_attempts(student_id);
+
+CREATE TABLE exam_attempt_questions (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    attempt_id  UUID NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
+    -- Provenance only; SET NULL so deleting a bank question keeps the sat paper.
+    question_id UUID REFERENCES lesson_questions(id) ON DELETE SET NULL,
+    lesson_id   UUID REFERENCES lessons(id)          ON DELETE SET NULL,
+    order_index INTEGER NOT NULL,                    -- this student's question order
+    question_text TEXT NOT NULL,
+    -- [{ id, text, isCorrect }] in presentation order. The correct flag is NEVER
+    -- serialised to the student API before submit.
+    options     JSONB NOT NULL,
+    selected_option_id UUID,      -- null = unanswered
+    is_correct  BOOLEAN,          -- null until graded
+    answered_at TIMESTAMP WITH TIME ZONE,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (attempt_id, order_index)
+);
+
+CREATE INDEX idx_eaq_attempt  ON exam_attempt_questions(attempt_id, order_index);
+CREATE INDEX idx_eaq_question ON exam_attempt_questions(question_id);
+
+CREATE TRIGGER update_exam_attempts_updated_at
+    BEFORE UPDATE ON exam_attempts
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_exams_updated_at
     BEFORE UPDATE ON exams

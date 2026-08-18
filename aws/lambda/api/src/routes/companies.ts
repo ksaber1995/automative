@@ -216,6 +216,69 @@ export function smsIsActive(alias = 'c'): string {
            AND (${alias}.sms_expiration IS NULL OR ${alias}.sms_expiration >= CURRENT_DATE))`;
 }
 
+// Online exams — lessons, question banks and (later) the student exam portal.
+// Gated per tenant and OFF by default: the feature ships dark and is switched on
+// from the admin console one tenant at a time, like the QR card pool.
+//
+// Same idempotent runtime-migration approach as the columns above, so the flag
+// works before migration 100 has been applied anywhere.
+let onlineExamsColumnInitPromise: Promise<void> | null = null;
+export async function ensureOnlineExamsColumn(): Promise<void> {
+  if (!onlineExamsColumnInitPromise) {
+    onlineExamsColumnInitPromise = (async () => {
+      try {
+        await query(
+          `ALTER TABLE companies ADD COLUMN IF NOT EXISTS online_exams_enabled BOOLEAN NOT NULL DEFAULT false`
+        );
+      } catch (e) {
+        onlineExamsColumnInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return onlineExamsColumnInitPromise;
+}
+
+/**
+ * "May this tenant use online exams at all?" — the single source of the answer for
+ * the whole feature (lessons, question banks, online exams, the student portal).
+ *
+ * Use this form where the right response to a gated tenant is to leave a field
+ * alone rather than fail the request: `sessions.update` accepts a `lessonId` it
+ * silently ignores, so the sessions API keeps the same shape for every tenant.
+ * Where the endpoint IS the feature, use assertOnlineExams below.
+ */
+export async function isOnlineExamsEnabled(companyId: string): Promise<boolean> {
+  await ensureOnlineExamsColumn();
+  const row = await queryOne<any>(
+    'SELECT online_exams_enabled FROM companies WHERE id = $1',
+    [companyId]
+  );
+  return row?.online_exams_enabled === true;
+}
+
+/**
+ * The gate as a guard clause. Returns an apiError response when denied and null
+ * when allowed, so callers read:
+ *
+ *     const denied = await assertOnlineExams(context.companyId);
+ *     if (denied) return denied;
+ *
+ * Mirrors assertCrmAvailable in routes/crm.ts. Every entry point goes through
+ * this one function so the rule cannot drift between them — and so shipping the
+ * feature to customers later is one edit here, not a hunt through call sites.
+ */
+export async function assertOnlineExams(companyId: string) {
+  if (!(await isOnlineExamsEnabled(companyId))) {
+    return apiError(
+      403,
+      'ERRORS.ONLINE_EXAMS.NOT_AVAILABLE',
+      'Online exams are not enabled for this account'
+    );
+  }
+  return null;
+}
+
 // Student ID card back face — one shared design per company. Same idempotent
 // runtime-migration approach as above.
 let cardDesignColumnInitPromise: Promise<void> | null = null;

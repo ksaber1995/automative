@@ -1,0 +1,7 @@
+{
+  "/api": {
+    "target": "https://xnbgr057y1.execute-api.eu-west-1.amazonaws.com/prod",
+    "secure": true,
+    "changeOrigin": true
+  }
+}

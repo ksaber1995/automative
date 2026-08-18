@@ -2,7 +2,12 @@ import bcrypt from 'bcryptjs';
 import { ensureQrCardSchema, nextCardSerial, firstTakenCardNumber, CARD_SERIAL_BASE_V2 } from './qr-cards';
 import { query, queryOne, getClient } from '../db/connection';
 import { DEBUG_ACCOUNT_EMAIL, isDebugAccount } from '../utils/debug-account';
-import { ensureCompanyTypeConstraint, ensureCompanySmsColumns, smsIsActive } from './companies';
+import {
+  ensureCompanyTypeConstraint,
+  ensureCompanySmsColumns,
+  ensureOnlineExamsColumn,
+  smsIsActive,
+} from './companies';
 import { withPortalGuard, PortalPermission } from './admin-portal';
 import { createPrintJob, ensurePrintJobSchema, mapPrintJob } from './print-jobs';
 
@@ -51,6 +56,9 @@ const SUBSCRIPTIONS_SQL = `
     c.sms_activated                                            AS sms_activated,
     c.sms_expiration                                           AS sms_expiration,
     ${smsIsActive('c')}                                        AS sms_active,
+    -- Online exams (lessons, question banks, student portal): one flag, sold/
+    -- trialled per tenant and off by default, toggled from this console.
+    c.online_exams_enabled                                     AS online_exams_enabled,
     NULLIF(CONCAT('+', u.country_code, u.phone), '+')          AS mobile,
     u.email                                                    AS owner_email,
     s.status                                                   AS subscription_type,
@@ -82,8 +90,10 @@ function toIso(value: any): string | null {
 const unguardedAdminSecretRoutes = {
   getSubscriptions: async () => {
     try {
-      // The SELECT reads the SMS columns, so they have to exist before it runs.
+      // The SELECT reads the SMS and online-exam columns, so they have to exist
+      // before it runs.
       await ensureCompanySmsColumns();
+      await ensureOnlineExamsColumn();
       const rows = await query<any>(SUBSCRIPTIONS_SQL);
       const body = rows.map((r) => ({
         company_id: r.company_id,
@@ -99,6 +109,7 @@ const unguardedAdminSecretRoutes = {
         // the end of a day.
         sms_expiration: r.sms_expiration ? toIso(r.sms_expiration)?.slice(0, 10) ?? null : null,
         sms_active: r.sms_active === true,
+        online_exams_enabled: r.online_exams_enabled === true,
         mobile: r.mobile ?? null,
         owner_email: r.owner_email ?? null,
         subscription_type: r.subscription_type ?? null,
@@ -535,6 +546,33 @@ const unguardedAdminSecretRoutes = {
     } catch (error: any) {
       console.error('karim-admin-secret set qr cards failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Set QR cards failed' } };
+    }
+  },
+
+  /**
+   * POST /api/karim-admin-secret/companies/:companyId/online-exams  { enabled }
+   * Turn online exams — lessons, question banks and the student exam portal — on
+   * or off for one client. Off by default: the feature ships dark and is switched
+   * on one tenant at a time, starting with our own test tenant.
+   *
+   * Switching a tenant OFF is immediate and blunt: their Lessons screen disappears
+   * and every endpoint behind the flag starts refusing. Don't do it to a tenant
+   * mid-exam.
+   */
+  setOnlineExamsEnabled: async ({ params, body }: { params: { companyId: string }; body: { enabled: boolean } }) => {
+    try {
+      await ensureOnlineExamsColumn();
+      const company = await queryOne<any>('SELECT id FROM companies WHERE id = $1', [params.companyId]);
+      if (!company) return { status: 404 as const, body: { message: 'Company not found' } };
+
+      const enabled = body?.enabled === true;
+      await query('UPDATE companies SET online_exams_enabled = $2, updated_at = NOW() WHERE id = $1',
+        [params.companyId, enabled]);
+
+      return { status: 200 as const, body: { success: true, online_exams_enabled: enabled } };
+    } catch (error: any) {
+      console.error('karim-admin-secret set online exams failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Set online exams failed' } };
     }
   },
 
@@ -1094,6 +1132,7 @@ const ADMIN_SECRET_PERMISSIONS: { [K in keyof typeof unguardedAdminSecretRoutes]
   // Selling a tenant a feature is the same kind of act as extending their
   // subscription, so it rides on the same grant.
   setSmsAccess: 'companies.write',
+  setOnlineExamsEnabled: 'companies.write',
 
   // Handing a batch of cards to an outside printer is part of running the pool.
   createPrintLink: 'cards.write',

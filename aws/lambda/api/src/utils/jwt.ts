@@ -46,6 +46,13 @@ export async function verifyToken(token: string): Promise<JWTPayload> {
 
   try {
     const decoded = jwt.verify(token, secret) as JWTPayload;
+    // This is the STAFF token verifier. Every other audience signed with the
+    // same secret marks itself with a `typ` claim (admin portal, student
+    // portal, claim tickets); staff tokens never carry one. Rejecting it HERE
+    // covers every caller — subscriptions.getMySubscription, for one, checks
+    // nothing but companyId, which a student token also carries. See
+    // online_exams.md §0.5.5.
+    if ((decoded as any).typ !== undefined) throw new Error('typ');
     return decoded;
   } catch (error) {
     throw new Error('Invalid token');

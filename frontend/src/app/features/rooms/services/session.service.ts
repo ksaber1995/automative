@@ -15,12 +15,20 @@ export interface Session {
   /** A free (trial) session: nobody is billed, and any student may scan in. */
   isFree: boolean;
   notes: string | null;
+  /**
+   * Which lesson of the course this session covered, when someone tagged it.
+   * Part of the online-exams feature; undefined for tenants without it.
+   */
+  lessonId?: string | null;
   createdAt: string;
   updatedAt: string;
   roomCode?: string | null;
   roomDescription?: string | null;
   className?: string;
+  courseId?: string;
   courseName?: string;
+  /** Display name of `lessonId`, on the single-session read only. */
+  lessonName?: string | null;
   branchName?: string;
   durationMinutes?: number | null;
   /** When filtering history by a student: was that student present this session? (null otherwise) */
@@ -167,8 +175,16 @@ export class SessionService {
     return this.api.get<FreeSessionSummary>('sessions/free-summary', { classId });
   }
 
-  /** Edit a session's number (and/or notes) after it was started. */
-  update(id: string, body: { sessionNumber?: number; notes?: string }): Observable<Session> {
+  /** Edit a session's number, notes, or the lesson it covered, after it started. */
+  update(id: string, body: { sessionNumber?: number; notes?: string; lessonId?: string | null }): Observable<Session> {
     return this.api.patch<Session>(`sessions/${id}`, body);
+  }
+
+  /**
+   * The lessons a class has actually been taught, in curriculum order. Feeds the
+   * exam form's "everything taught so far" shortcut; online-exams tenants only.
+   */
+  lessonsTaught(classId: string): Observable<{ id: string; name: string; orderIndex: number }[]> {
+    return this.api.get<{ id: string; name: string; orderIndex: number }[]>('sessions/lessons-taught', { classId });
   }
 }

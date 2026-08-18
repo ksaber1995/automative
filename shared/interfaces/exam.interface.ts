@@ -23,9 +23,68 @@ export interface ExamModel {
   classId: string | null;
   className?: string;
   sessionId: string | null;
+  /**
+   * An ONLINE exam: the student sits it on a screen, each one gets a different
+   * random paper drawn from the question banks of `lessonIds`, and the mark is
+   * computed on submit. Same table, same results feed — see online_exams.md.
+   */
+  isOnline: boolean;
+  /** How many questions to draw. Equals `maxGrade`: one mark per question. */
+  questionCount: number | null;
+  /** The clock each student gets, counted from when THEY start. */
+  durationMinutes: number | null;
+  opensAt: string | null;
+  closesAt: string | null;
+  /** Short code the teacher reads out so nobody starts early. Optional. */
+  accessCode: string | null;
+  shuffleOptions: boolean;
+  /** Show the per-question review after submitting; off = score only. */
+  showAnswers: boolean;
+  /** Lessons the paper is drawn from. Present on the single-exam read only. */
+  lessonIds?: string[];
+  /**
+   * How far the sitting has got — single-exam read only. `started > 0` is what
+   * freezes the lesson scope and question count in the edit form (the server's
+   * 409 ALREADY_STARTED stays the backstop).
+   */
+  attemptCounts?: { started: number; submitted: number };
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+/** One row of the online-exam attempts monitor. NOT_STARTED = no attempt yet. */
+export interface ExamAttemptRow {
+  studentId: string;
+  name: string;
+  code?: number | string | null;
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'SUBMITTED' | 'EXPIRED';
+  startedAt: string | null;
+  submittedAt: string | null;
+  /** The attempt's server-owned deadline — what the live countdown reads. */
+  expiresAt: string | null;
+  score: number | null;
+  total: number | null;
+  answeredCount: number;
+}
+
+export interface ExamAttemptsResponse {
+  /** What the monitor corrects the device clock by. */
+  serverNow: string;
+  attempts: ExamAttemptRow[];
+}
+
+/**
+ * A student's exam-portal credential as the TEACHER sees it: existence and the
+ * audit stamps only. An unexpected `resetAt` is the visible symptom of a lost
+ * or borrowed card. No password is readable by anyone, anywhere.
+ */
+export interface StudentCredentialInfo {
+  hasCredentials: boolean;
+  username: string | null;
+  claimedAt: string | null;
+  resetAt: string | null;
+  lastLoginAt: string | null;
 }
 
 export interface ExamCreateDto {
@@ -38,6 +97,19 @@ export interface ExamCreateDto {
   isHomework?: boolean;
   classId?: string | null;
   sessionId?: string | null;
+  // ── Online exam ───────────────────────────────────────────────────────────
+  isOnline?: boolean;
+  /** Required when `isOnline`. Must all belong to the exam's course. */
+  lessonIds?: string[];
+  /** Required when `isOnline`, and never more than the selected lessons hold. */
+  questionCount?: number;
+  durationMinutes?: number;
+  opensAt?: string | null;
+  closesAt?: string | null;
+  /** Empty string clears it; omit to keep (generated for a new online exam). */
+  accessCode?: string | null;
+  shuffleOptions?: boolean;
+  showAnswers?: boolean;
 }
 
 export interface ExamUpdateDto extends Partial<ExamCreateDto> {

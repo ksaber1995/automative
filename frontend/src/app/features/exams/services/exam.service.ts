@@ -7,7 +7,9 @@ import {
   ExamCreateDto,
   ExamUpdateDto,
   ExamResultRow,
+  ExamAttemptsResponse,
   QrExamResult,
+  StudentCredentialInfo,
   StudentExamResult,
 } from '@shared/interfaces/exam.interface';
 
@@ -42,6 +44,14 @@ export class ExamService {
 
   update(id: string, dto: ExamUpdateDto): Observable<ExamModel> {
     return this.api.patch<ExamModel>(`exams/${id}`, dto);
+  }
+
+  /**
+   * A fresh access code for an online exam — for a leaked code, or a second group
+   * sitting the same exam later. Attempts already running are unaffected.
+   */
+  regenerateCode(id: string): Observable<{ accessCode: string }> {
+    return this.api.post<{ accessCode: string }>(`exams/${id}/regenerate-code`, {});
   }
 
   delete(id: string): Observable<{ message: string }> {
@@ -91,5 +101,32 @@ export class ExamService {
   /** All of a student's recorded grades (student-detail page). */
   getByStudent(studentId: string): Observable<StudentExamResult[]> {
     return this.api.get<StudentExamResult[]>(`exams/student/${studentId}`);
+  }
+
+  /**
+   * The online-exam monitor: everyone expected to sit, with their attempt state.
+   * The server grades any expired attempt on the way through, so polling this is
+   * also what lands abandoned papers' marks.
+   */
+  getAttempts(id: string): Observable<ExamAttemptsResponse> {
+    return this.api.get<ExamAttemptsResponse>(`exams/${id}/attempts`);
+  }
+
+  /**
+   * Let a student back in: deletes their attempt (the drawn paper with it) AND
+   * their exam_results row. The one escape hatch from one-attempt-per-student.
+   */
+  resetAttempt(id: string, studentId: string): Observable<{ success: boolean }> {
+    return this.api.delete<{ success: boolean }>(`exams/${id}/attempts/${studentId}`);
+  }
+
+  /** The student's exam-portal credential — existence + audit stamps only. */
+  getStudentCredentials(studentId: string): Observable<StudentCredentialInfo> {
+    return this.api.get<StudentCredentialInfo>(`exams/students/${studentId}/credentials`);
+  }
+
+  /** Revoke: the student is signed out on their next call and claims afresh. */
+  revokeStudentCredentials(studentId: string): Observable<{ success: boolean }> {
+    return this.api.delete<{ success: boolean }>(`exams/students/${studentId}/credentials`);
   }
 }

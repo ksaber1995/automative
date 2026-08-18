@@ -288,6 +288,10 @@ const SafeUserSchema = z.object({
   companyType: z.enum(['ACADEMY', 'TEACHER', 'SCHOOL']).optional(),
   plan: z.enum(['SIMPLE', 'ADVANCED']).optional(), // Feature plan; ADVANCED unlocks CRM
   vertical: z.enum(['GENERAL', 'SPORTS']).optional(), // Vocabulary only; drives the i18n overlay
+  qrCardsEnabled: z.boolean().optional(), // Pre-printed QR card pool; sold per academy
+  // Online exams (lessons, question banks, student portal); switched on per tenant
+  // from the admin console. Off for everyone else.
+  onlineExamsEnabled: z.boolean().optional(),
   qrFree: z.boolean().optional(), // Teacher tenant is in the free QR-activation launch tier
   branchId: UUIDSchema.nullable().optional(),
   branchIds: z.array(UUIDSchema).optional(),
@@ -846,9 +850,234 @@ const ReceiptSchema = z.object({
 });
 
 // =============================================
+// Lesson Schemas
+// A lesson is one entry in a course's curriculum, in order. Part of the
+// online-exams feature — see online_exams.md.
+// =============================================
+const LessonSchema = z.object({
+  id: UUIDSchema,
+  companyId: UUIDSchema,
+  branchId: UUIDSchema.nullable(),
+  courseId: UUIDSchema,
+  courseName: z.string().optional(),
+  name: z.string(),
+  description: z.string().nullable(),
+  orderIndex: z.number(),
+  /** Active questions in this lesson's bank; 0 until the bank ships. */
+  questionCount: z.number().optional(),
+  isActive: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const CreateLessonSchema = z.object({
+  courseId: UUIDSchema,
+  name: z.string().min(1),
+  description: z.string().nullable().optional(),
+  // Omit to append to the end of the course's list.
+  orderIndex: z.number().int().optional(),
+});
+
+const UpdateLessonSchema = z.object({
+  courseId: OptionalUUIDSchema,
+  name: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  orderIndex: z.number().int().optional(),
+  isActive: z.boolean().optional(),
+});
+
+const ReorderLessonsSchema = z.object({
+  courseId: UUIDSchema,
+  lessonIds: z.array(UUIDSchema),
+});
+
+// The lesson's MCQ bank. This is the TEACHER view, so `isCorrect` is included —
+// the student-facing paper (phase 5) uses a different serialiser that must never
+// emit it before a submit.
+const LessonQuestionOptionSchema = z.object({
+  id: UUIDSchema,
+  optionText: z.string(),
+  isCorrect: z.boolean(),
+  orderIndex: z.number(),
+});
+
+const LessonQuestionSchema = z.object({
+  id: UUIDSchema,
+  companyId: UUIDSchema,
+  lessonId: UUIDSchema,
+  courseId: UUIDSchema,
+  questionText: z.string(),
+  questionType: z.string(),
+  explanation: z.string().nullable(),
+  isActive: z.boolean(),
+  options: z.array(LessonQuestionOptionSchema),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+// A question is always written whole: the stem plus its complete option list, of
+// which exactly one is correct (enforced server-side — see validateOptions).
+const CreateLessonQuestionSchema = z.object({
+  questionText: z.string().min(1),
+  explanation: z.string().nullable().optional(),
+  options: z.array(z.object({
+    optionText: z.string().min(1),
+    isCorrect: z.boolean(),
+  })).min(2).max(6),
+});
+
+const UpdateLessonQuestionSchema = z.object({
+  questionText: z.string().min(1).optional(),
+  explanation: z.string().nullable().optional(),
+  // Omit to leave the answers alone — fixing a typo in the stem shouldn't require
+  // re-posting the options.
+  options: z.array(z.object({
+    optionText: z.string().min(1),
+    isCorrect: z.boolean(),
+  })).min(2).max(6).optional(),
+  isActive: z.boolean().optional(),
+});
+
+// =============================================
+// Student portal auth (phase 5 of online exams — see online_exams.md §0.5)
+// The student's session for exams.netrofit.com. Deliberately tiny: name and
+// username only — nothing here should ever look like a staff user payload.
+// =============================================
+const StudentClaimStartSchema = z.object({
+  /** The token scanned off the student's own card. */
+  qrToken: z.string().min(16).max(64),
+});
+
+const StudentClaimStartResponseSchema = z.object({
+  /** Shown as "Is this you?" before a password can be set. */
+  studentName: z.string(),
+  /** True → the next screen is a password RESET, not a first claim. */
+  hasCredentials: z.boolean(),
+  /** Proof of the scan, valid 10 minutes; spent by claim-finish. */
+  claimTicket: z.string(),
+});
+
+const StudentClaimFinishSchema = z.object({
+  claimTicket: z.string(),
+  /** The student's pick on a first claim; ignored on a reset (the name is kept). */
+  username: z.string(),
+  password: z.string().min(8),
+});
+
+const StudentLoginSchema = z.object({
+  /** Username or phone — one field, canonicalised server-side. */
+  identifier: z.string().min(1),
+  password: z.string().min(1),
+});
+
+const StudentSessionSchema = z.object({
+  token: z.string(),
+  student: z.object({ name: z.string(), username: z.string() }),
+});
+
+const StudentMeSchema = z.object({
+  name: z.string(),
+  username: z.string(),
+  companyName: z.string(),
+  branchName: z.string().nullable(),
+  lastLoginAt: z.string().nullable(),
+});
+
+// =============================================
+// Student exam sitting (phase 6 — see online_exams.md §3)
+// The paper mid-sitting NEVER carries a correct flag; the review after submit
+// is the only schema here that does, and only when the exam allows it.
+// =============================================
+const StudentExamListItemSchema = z.object({
+  examId: UUIDSchema,
+  name: z.string(),
+  courseName: z.string(),
+  questionCount: z.number().nullable(),
+  durationMinutes: z.number().nullable(),
+  closesAt: z.string().nullable(),
+  /** Whether a code must be typed to start — never the code itself. */
+  requiresCode: z.boolean(),
+  state: z.enum(['AVAILABLE', 'IN_PROGRESS', 'DONE']),
+  score: z.number().nullable(),
+  total: z.number().nullable(),
+});
+
+const StudentPaperQuestionSchema = z.object({
+  /** The attempt-question id — minted for this one paper, not the bank's id. */
+  id: UUIDSchema,
+  orderIndex: z.number(),
+  questionText: z.string(),
+  /** Option ids are local to this paper too. No isCorrect, by construction. */
+  options: z.array(z.object({ id: UUIDSchema, text: z.string() })),
+  selectedOptionId: UUIDSchema.nullable(),
+});
+
+const StudentAttemptSchema = z.object({
+  /** The server-owned deadline. The client countdown is decoration. */
+  expiresAt: z.string().nullable(),
+  /** What the client corrects its clock by — the device clock is not trusted. */
+  serverNow: z.string(),
+  exam: z.object({
+    name: z.string(),
+    questionCount: z.number(),
+    durationMinutes: z.number().nullable(),
+  }),
+  questions: z.array(StudentPaperQuestionSchema),
+});
+
+const StudentReviewQuestionSchema = z.object({
+  questionText: z.string(),
+  explanation: z.string().nullable(),
+  options: z.array(z.object({ id: UUIDSchema, text: z.string(), isCorrect: z.boolean() })),
+  selectedOptionId: UUIDSchema.nullable(),
+  isCorrect: z.boolean(),
+});
+
+const StudentSubmitResultSchema = z.object({
+  score: z.number(),
+  total: z.number(),
+  attemptStatus: z.string(),
+  showAnswers: z.boolean(),
+  /** The per-question review — present only when the exam shows answers. */
+  questions: z.array(StudentReviewQuestionSchema).optional(),
+});
+
+/** Same row shape as the staff student page's feed (mapStudentExamRow). */
+const StudentResultRowSchema = z.object({
+  examName: z.string(),
+  courseName: z.string(),
+  className: z.string().nullable(),
+  examDate: z.string().nullable(),
+  grade: z.string(),
+  maxGrade: z.number().nullable(),
+  isHomework: z.boolean(),
+  isRating: z.boolean(),
+  isAbsent: z.boolean(),
+  notMarked: z.boolean(),
+});
+
+// =============================================
 // Exam Schemas
 // =============================================
 const ExamStatusSchema = z.enum(['SCHEDULED', 'DONE']);
+
+// The online-exam settings, shared by create and update. An online exam is the
+// same `exams` row behind a flag — see online_exams.md.
+const OnlineExamFieldsSchema = z.object({
+  isOnline: z.boolean().optional(),
+  /** Lessons whose question banks the paper is drawn from. Required when online. */
+  lessonIds: z.array(UUIDSchema).optional(),
+  /** How many questions to draw. Also becomes maxGrade — one mark per question. */
+  questionCount: z.number().int().positive().optional(),
+  /** Per-student clock, counted from when they start. */
+  durationMinutes: z.number().int().positive().optional(),
+  opensAt: z.string().nullable().optional(),
+  closesAt: z.string().nullable().optional(),
+  /** Empty string clears it; omitted keeps the current one (generated on create). */
+  accessCode: z.string().max(12).nullable().optional(),
+  shuffleOptions: z.boolean().optional(),
+  showAnswers: z.boolean().optional(),
+});
 
 const CreateExamSchema = z.object({
   // Homework is created from a session, where the class is known but the course
@@ -861,7 +1090,7 @@ const CreateExamSchema = z.object({
   isHomework: z.boolean().optional(),
   classId: OptionalUUIDSchema,
   sessionId: OptionalUUIDSchema,
-});
+}).merge(OnlineExamFieldsSchema);
 
 const UpdateExamSchema = CreateExamSchema.partial().extend({
   isActive: z.boolean().optional(),
@@ -886,9 +1115,49 @@ const ExamSchema = z.object({
   classId: UUIDSchema.nullable(),
   className: z.string().optional(),
   sessionId: UUIDSchema.nullable(),
+  // Online exam settings. `lessonIds` comes back on the single-exam read and the
+  // two writes; the list omits it (it would be a query per row).
+  isOnline: z.boolean(),
+  questionCount: z.number().nullable(),
+  durationMinutes: z.number().nullable(),
+  opensAt: z.any(),
+  closesAt: z.any(),
+  accessCode: z.string().nullable(),
+  shuffleOptions: z.boolean(),
+  showAnswers: z.boolean(),
+  lessonIds: z.array(UUIDSchema).optional(),
+  /** Only on the single-exam read. started > 0 freezes scope/count in the form. */
+  attemptCounts: z.object({ started: z.number(), submitted: z.number() }).optional(),
   isActive: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
+});
+
+// One row of the online-exam attempts monitor: a student expected to sit, with
+// their attempt state joined on. NOT_STARTED means no attempt row exists.
+const ExamAttemptRowSchema = z.object({
+  studentId: UUIDSchema,
+  name: z.string(),
+  code: z.union([z.string(), z.number()]).nullable(),
+  status: z.enum(['NOT_STARTED', 'IN_PROGRESS', 'SUBMITTED', 'EXPIRED']),
+  startedAt: z.string().nullable(),
+  submittedAt: z.string().nullable(),
+  /** The attempt's server-owned deadline — what the live countdown reads. */
+  expiresAt: z.string().nullable(),
+  score: z.number().nullable(),
+  total: z.number().nullable(),
+  answeredCount: z.number(),
+});
+
+// The student's exam-portal credential as the teacher may see it: existence and
+// audit stamps only — the password is not readable by anyone, anywhere.
+const StudentCredentialInfoSchema = z.object({
+  hasCredentials: z.boolean(),
+  username: z.string().nullable(),
+  claimedAt: z.string().nullable(),
+  /** Stamped by every scan-the-card reset — the lost/borrowed-card symptom. */
+  resetAt: z.string().nullable(),
+  lastLoginAt: z.string().nullable(),
 });
 
 const ExamResultRowSchema = z.object({
@@ -3036,6 +3305,194 @@ export const contract = c.router({
     },
   },
 
+  // Lessons — a course's curriculum, and the base of the online-exams feature.
+  // Every endpoint is gated on companies.online_exams_enabled (assertOnlineExams),
+  // so a tenant without the flag gets 403 everywhere here.
+  // Order matters — `/reorder` before `/:id`, or it would match as an id.
+  lessons: {
+    list: {
+      method: 'GET',
+      path: '/api/lessons',
+      query: z.object({
+        courseId: OptionalUUIDSchema,
+        branchId: OptionalUUIDSchema,
+        // 'true' to include retired lessons — query params arrive as strings.
+        includeInactive: z.string().optional(),
+      }),
+      responses: { 200: z.array(LessonSchema), 403: ApiErrorSchema },
+    },
+    reorder: {
+      method: 'POST',
+      path: '/api/lessons/reorder',
+      body: ReorderLessonsSchema,
+      responses: {
+        200: z.object({ success: z.boolean(), count: z.number() }),
+        400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema,
+      },
+    },
+    create: {
+      method: 'POST',
+      path: '/api/lessons',
+      body: CreateLessonSchema,
+      responses: { 201: LessonSchema, 400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+    // The question bank. Listed before `/:id` so the longer paths win.
+    listQuestions: {
+      method: 'GET',
+      path: '/api/lessons/:id/questions',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: { 200: z.array(LessonQuestionSchema), 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+    createQuestion: {
+      method: 'POST',
+      path: '/api/lessons/:id/questions',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: CreateLessonQuestionSchema,
+      responses: { 201: LessonQuestionSchema, 400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+    updateQuestion: {
+      method: 'PATCH',
+      path: '/api/lessons/:lessonId/questions/:questionId',
+      pathParams: z.object({ lessonId: UUIDSchema, questionId: UUIDSchema }),
+      body: UpdateLessonQuestionSchema,
+      responses: { 200: LessonQuestionSchema, 400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+    deleteQuestion: {
+      method: 'DELETE',
+      path: '/api/lessons/:lessonId/questions/:questionId',
+      pathParams: z.object({ lessonId: UUIDSchema, questionId: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: { 200: z.any(), 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+    getById: {
+      method: 'GET',
+      path: '/api/lessons/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: { 200: LessonSchema, 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+    update: {
+      method: 'PATCH',
+      path: '/api/lessons/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: UpdateLessonSchema,
+      responses: { 200: LessonSchema, 400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+    delete: {
+      method: 'DELETE',
+      path: '/api/lessons/:id',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: { 200: z.any(), 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+  },
+
+  // Student exam portal sign-in (exams.netrofit.com) — claim a card, reset by
+  // scanning it again, log in. Unauthenticated except `me`/`changePassword`,
+  // which take a STUDENT token (typ 'student'); staff and student tokens reject
+  // each other's endpoints (see middleware/student-context.ts). All paths are
+  // static, so registration order is free here.
+  studentAuth: {
+    claimStart: {
+      method: 'POST',
+      path: '/api/student-auth/claim-start',
+      body: StudentClaimStartSchema,
+      responses: { 200: StudentClaimStartResponseSchema, 404: ApiErrorSchema, 429: ApiErrorSchema },
+    },
+    claimFinish: {
+      method: 'POST',
+      path: '/api/student-auth/claim-finish',
+      body: StudentClaimFinishSchema,
+      responses: {
+        200: StudentSessionSchema,
+        400: ApiErrorSchema, 401: ApiErrorSchema, 404: ApiErrorSchema,
+        409: ApiErrorSchema, 429: ApiErrorSchema, 500: ApiErrorSchema,
+      },
+    },
+    login: {
+      method: 'POST',
+      path: '/api/student-auth/login',
+      body: StudentLoginSchema,
+      responses: {
+        200: StudentSessionSchema,
+        401: ApiErrorSchema, 403: ApiErrorSchema, 429: ApiErrorSchema, 500: ApiErrorSchema,
+      },
+    },
+    me: {
+      method: 'GET',
+      path: '/api/student-auth/me',
+      responses: { 200: StudentMeSchema, 401: ApiErrorSchema, 403: ApiErrorSchema, 500: ApiErrorSchema },
+    },
+    changePassword: {
+      method: 'POST',
+      path: '/api/student-auth/change-password',
+      body: z.object({ currentPassword: z.string(), newPassword: z.string() }),
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        400: ApiErrorSchema, 401: ApiErrorSchema, 403: ApiErrorSchema, 500: ApiErrorSchema,
+      },
+    },
+  },
+
+  // Student exam sitting (exams.netrofit.com, phase 6) — list, start/resume,
+  // answer, submit, results. Every route takes a STUDENT token and is scoped to
+  // that one student; the exam id is always resolved within the student's own
+  // company. A finished attempt answers 409 ALREADY_SUBMITTED with the score in
+  // `params`, so the portal routes straight to the result screen.
+  studentExams: {
+    list: {
+      method: 'GET',
+      path: '/api/student/exams',
+      responses: { 200: z.array(StudentExamListItemSchema), 401: ApiErrorSchema, 403: ApiErrorSchema, 500: ApiErrorSchema },
+    },
+    results: {
+      method: 'GET',
+      path: '/api/student/results',
+      responses: { 200: z.array(StudentResultRowSchema), 401: ApiErrorSchema, 403: ApiErrorSchema, 500: ApiErrorSchema },
+    },
+    start: {
+      method: 'POST',
+      path: '/api/student/exams/:examId/start',
+      pathParams: z.object({ examId: UUIDSchema }),
+      body: z.object({ accessCode: z.string().optional() }),
+      responses: {
+        200: StudentAttemptSchema,
+        401: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema,
+        409: ApiErrorSchema, 500: ApiErrorSchema,
+      },
+    },
+    attempt: {
+      method: 'GET',
+      path: '/api/student/exams/:examId/attempt',
+      pathParams: z.object({ examId: UUIDSchema }),
+      responses: {
+        200: StudentAttemptSchema,
+        401: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema,
+        409: ApiErrorSchema, 500: ApiErrorSchema,
+      },
+    },
+    answer: {
+      method: 'POST',
+      path: '/api/student/exams/:examId/answer',
+      pathParams: z.object({ examId: UUIDSchema }),
+      body: z.object({ questionId: UUIDSchema, optionId: UUIDSchema }),
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        400: ApiErrorSchema, 401: ApiErrorSchema, 403: ApiErrorSchema,
+        404: ApiErrorSchema, 409: ApiErrorSchema, 500: ApiErrorSchema,
+      },
+    },
+    submit: {
+      method: 'POST',
+      path: '/api/student/exams/:examId/submit',
+      pathParams: z.object({ examId: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: StudentSubmitResultSchema,
+        401: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema, 500: ApiErrorSchema,
+      },
+    },
+  },
+
   // Exams routes. Order matters — static/specific paths before `/:id`
   // (itty-router matches in registration order; see sessions note in index.ts).
   exams: {
@@ -3127,6 +3584,18 @@ export const contract = c.router({
         400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema, 500: ApiErrorSchema,
       },
     },
+    // A fresh access code for an online exam. Does not disturb attempts already in
+    // progress — the code gates starting, not continuing.
+    regenerateCode: {
+      method: 'POST',
+      path: '/api/exams/:id/regenerate-code',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ accessCode: z.string() }),
+        400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema,
+      },
+    },
     markRemainingAbsent: {
       method: 'POST',
       path: '/api/exams/:id/mark-remaining-absent',
@@ -3135,6 +3604,52 @@ export const contract = c.router({
       responses: {
         200: z.object({ success: z.boolean(), count: z.number() }),
         403: ApiErrorSchema, 404: ApiErrorSchema, 500: ApiErrorSchema,
+      },
+    },
+    // The live monitor for an online exam: everyone expected to sit, with their
+    // attempt state. Grades any expired attempt it touches (the expiry sweep).
+    attempts: {
+      method: 'GET',
+      path: '/api/exams/:id/attempts',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: {
+        200: z.object({ serverNow: z.string(), attempts: z.array(ExamAttemptRowSchema) }),
+        400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema, 500: ApiErrorSchema,
+      },
+    },
+    // The one escape hatch from one-attempt-per-student: deletes the attempt
+    // (the paper cascades) and the exam_results row, so the student starts over.
+    resetAttempt: {
+      method: 'DELETE',
+      path: '/api/exams/:id/attempts/:studentId',
+      pathParams: z.object({ id: UUIDSchema, studentId: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema,
+      },
+    },
+    // The student's exam-portal credential, as the teacher may see it. Static
+    // 'students' segment — registered before /api/exams/:id, like /student/.
+    studentCredentials: {
+      method: 'GET',
+      path: '/api/exams/students/:studentId/credentials',
+      pathParams: z.object({ studentId: UUIDSchema }),
+      responses: {
+        200: StudentCredentialInfoSchema,
+        403: ApiErrorSchema, 404: ApiErrorSchema, 500: ApiErrorSchema,
+      },
+    },
+    // Revoke = delete the credential; the student claims afresh by scanning
+    // their card. Staff can only revoke, never read or set a password.
+    revokeStudentCredentials: {
+      method: 'DELETE',
+      path: '/api/exams/students/:studentId/credentials',
+      pathParams: z.object({ studentId: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema,
       },
     },
     getById: {
@@ -6111,6 +6626,8 @@ export const contract = c.router({
             /** YYYY-MM-DD, or null for no end date — which is NOT the same as expired. */
             sms_expiration: z.string().nullable(),
             sms_active: z.boolean(),
+            /** Online exams (lessons, banks, student portal) — off by default. */
+            online_exams_enabled: z.boolean(),
             mobile: z.string().nullable(),
             subscription_type: z.string().nullable(),
             price: z.number().nullable(),
@@ -6229,6 +6746,19 @@ export const contract = c.router({
       },
     },
     // Switch a company's registration type between ACADEMY and TEACHER.
+    // Online exams (lessons, question banks, student portal) per tenant. Off by
+    // default — the feature ships dark and is switched on one tenant at a time.
+    setOnlineExamsEnabled: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/companies/:companyId/online-exams',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      body: z.object({ enabled: z.boolean() }),
+      responses: {
+        200: z.object({ success: z.boolean(), online_exams_enabled: z.boolean() }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
     setQrCardsEnabled: {
       method: 'POST',
       path: '/api/karim-admin-secret/companies/:companyId/qr-cards/enabled',
@@ -7696,6 +8226,9 @@ export const contract = c.router({
         sessionNumber: z.number().int().positive().optional(),
         // Free (trial) session: bills nobody, and any active student may scan in.
         isFree: z.boolean().optional(),
+        // Which lesson of the course is being taught. Silently ignored for tenants
+        // without the online-exams feature.
+        lessonId: OptionalUUIDSchema,
         teachers: z.array(z.object({
           employeeId: UUIDSchema,
           role: z.enum(['PRIMARY', 'SUBSTITUTE', 'ASSISTANT']).optional(),
@@ -7753,6 +8286,24 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    // The lessons a class has actually been taught, in curriculum order — the exam
+    // form's "everything taught so far" shortcut. Static path, so it sits above
+    // `/:id` like next-number.
+    lessonsTaught: {
+      method: 'GET' as const,
+      path: '/api/sessions/lessons-taught',
+      query: z.object({ classId: z.string() }),
+      responses: {
+        200: z.array(z.object({
+          id: UUIDSchema,
+          name: z.string(),
+          orderIndex: z.number(),
+        })),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
     freeSummary: {
       method: 'GET' as const,
       path: '/api/sessions/free-summary',
@@ -7785,6 +8336,9 @@ export const contract = c.router({
       body: z.object({
         sessionNumber: z.number().int().positive().optional(),
         notes: z.string().optional(),
+        // Which lesson of the course this session covered. null clears the tag.
+        // Silently ignored for tenants without the online-exams feature.
+        lessonId: UUIDSchema.nullable().optional(),
       }),
       responses: {
         200: z.any(),

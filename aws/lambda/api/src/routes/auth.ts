@@ -12,6 +12,7 @@ import {
   ensureCardDesignColumn,
   ensureAutoManageSessionsColumn,
   ensureVerticalColumn,
+  ensureOnlineExamsColumn,
   toVertical,
 } from './companies';
 import { ensureQrCardSchema } from './qr-cards';
@@ -36,10 +37,12 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
   const trimmed = (identifier || '').trim();
   if (!trimmed) return null;
 
-  // The queries below read c.qr_cards_enabled and c.vertical, so both columns
-  // have to exist — a login must never 500 on a database that predates them.
+  // The queries below read c.qr_cards_enabled, c.vertical and
+  // c.online_exams_enabled, so all three columns have to exist — a login must
+  // never 500 on a database that predates them.
   await ensureQrCardSchema();
   await ensureVerticalColumn();
+  await ensureOnlineExamsColumn();
 
   if (trimmed.includes('@')) {
     return queryOne<any>(
@@ -50,7 +53,8 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
               c.type as company_type,
               c.plan as company_plan,
               c.vertical as company_vertical,
-              c.qr_cards_enabled as company_qr_cards
+              c.qr_cards_enabled as company_qr_cards,
+              c.online_exams_enabled as company_online_exams
        FROM users u
        JOIN companies c ON u.company_id = c.id
        WHERE LOWER(u.email) = LOWER($1)`,
@@ -69,7 +73,8 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
             c.type as company_type,
             c.plan as company_plan,
             c.vertical as company_vertical,
-            c.qr_cards_enabled as company_qr_cards
+            c.qr_cards_enabled as company_qr_cards,
+            c.online_exams_enabled as company_online_exams
      FROM users u
      JOIN companies c ON u.company_id = c.id
      WHERE u.phone = $1
@@ -86,7 +91,8 @@ async function findUserByIdentifier(identifier: string): Promise<any | null> {
             c.type as company_type,
             c.plan as company_plan,
             c.vertical as company_vertical,
-            c.qr_cards_enabled as company_qr_cards
+            c.qr_cards_enabled as company_qr_cards,
+            c.online_exams_enabled as company_online_exams
      FROM users u
      JOIN companies c ON u.company_id = c.id
      WHERE u.phone IS NOT NULL AND $1 LIKE '%' || u.phone
@@ -121,6 +127,16 @@ async function buildSafeUser(user: any, branchIds: string[]) {
     vertical: toVertical(user.company_vertical),
     /** The pre-printed QR card pool is sold per academy; off unless we switch it on. */
     qrCardsEnabled: user.company_qr_cards === true,
+    /**
+     * Online exams (lessons, question banks, the student exam portal) — switched
+     * on per tenant from the admin console, off for everyone else. Rides on the
+     * user payload like the flag above so the sidebar is right on first paint;
+     * the API enforces it independently, so this only decides what is shown.
+     *
+     * Read at login: flipping the flag needs a re-login (or refreshCurrentUser)
+     * before the client notices.
+     */
+    onlineExamsEnabled: user.company_online_exams === true,
     qrFree,
     branchId: user.branch_id,
     branchIds,
@@ -459,13 +475,15 @@ export const authRoutes = {
       const email = (body.email || '').trim().toLowerCase();
       enforce(RATE_LIMITS.AUTH_EMAIL, email || null);
 
-      // Reads c.qr_cards_enabled and c.vertical below, so both must exist first.
+      // Reads three company feature columns below, so all must exist first.
       await ensureQrCardSchema();
       await ensureVerticalColumn();
+      await ensureOnlineExamsColumn();
       const user = await queryOne<any>(
         `SELECT u.*, c.is_active as company_is_active, c.name as company_name, c.type as company_type, c.plan as company_plan,
                 c.vertical as company_vertical,
-                c.qr_cards_enabled as company_qr_cards
+                c.qr_cards_enabled as company_qr_cards,
+                c.online_exams_enabled as company_online_exams
          FROM users u
          JOIN companies c ON u.company_id = c.id
          WHERE LOWER(u.email) = LOWER($1)`,
@@ -706,16 +724,18 @@ export const authRoutes = {
 
       await ensureQrCardSchema();
       await ensureVerticalColumn();
+      await ensureOnlineExamsColumn();
       const user = await queryOne<any>(
         `SELECT u.*, c.type as company_type, c.plan as company_plan,
                 c.vertical as company_vertical,
                 c.qr_cards_enabled as company_qr_cards,
+                c.online_exams_enabled as company_online_exams,
                 array_agg(ub.branch_id) FILTER (WHERE ub.branch_id IS NOT NULL) as branch_ids
          FROM users u
          JOIN companies c ON u.company_id = c.id
          LEFT JOIN user_branches ub ON ub.user_id = u.id
          WHERE u.id = $1
-         GROUP BY u.id, c.type, c.plan, c.vertical`,
+         GROUP BY u.id, c.type, c.plan, c.vertical, c.qr_cards_enabled, c.online_exams_enabled`,
         [decoded.id]
       );
 

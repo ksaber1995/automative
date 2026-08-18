@@ -1,0 +1,140 @@
+/*
+ * Student portal — one small stylesheet, mobile-first.
+ *
+ * Everything uses LOGICAL properties (margin-inline, text-align: start) so the
+ * same rules read correctly in Arabic (rtl, the default) and English (ltr) —
+ * the i18n service flips document.dir, nothing here should care.
+ */
+:root {
+  --bg: #f1f5f9;
+  --panel: #ffffff;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --accent: #2563eb;
+  --accent-ink: #ffffff;
+  --danger: #dc2626;
+  --ok: #16a34a;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Segoe UI', Tahoma, system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  min-height: 100%;
+}
+
+/* One centered column; phones get edge padding, desktops a card-width page. */
+.page {
+  max-width: 430px;
+  margin-inline: auto;
+  padding: 16px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-block-end: 12px;
+}
+
+h1 { font-size: 1.35rem; margin: 0 0 6px; }
+h2 { font-size: 1.1rem; margin: 0 0 6px; }
+p.muted, span.muted { color: var(--muted); font-size: .9rem; margin: 0 0 8px; }
+
+label { display: block; font-size: .85rem; color: var(--muted); margin-block: 10px 4px; }
+
+input {
+  width: 100%;
+  padding: 12px;
+  font-size: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+}
+input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
+
+/* Big tap targets — this app is used standing in a corridor on a phone. */
+.btn {
+  display: block;
+  width: 100%;
+  padding: 13px;
+  margin-block-start: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.btn:disabled { opacity: .55; cursor: default; }
+.btn.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+.btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+
+.error {
+  background: #fef2f2;
+  color: var(--danger);
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: .9rem;
+  margin-block-start: 12px;
+}
+
+.notice {
+  background: #f0fdf4;
+  color: var(--ok);
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: .9rem;
+  margin-block-start: 12px;
+}
+
+a.link { color: var(--accent); text-decoration: none; font-size: .9rem; }
+
+/* The header strip: brand on one side, language toggle on the other. */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 6px 14px;
+}
+.topbar .brand { font-weight: 700; font-size: 1.05rem; }
+.topbar button {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: .85rem;
+}
+
+/* The camera preview box on the scan screen. */
+.scan-region {
+  width: 100%;
+  min-height: 260px;
+  background: #0b1220;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.empty {
+  text-align: center;
+  padding: 36px 12px;
+  color: var(--muted);
+}
+.empty .glyph { font-size: 2.4rem; margin-block-end: 8px; }

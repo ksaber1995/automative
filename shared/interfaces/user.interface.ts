@@ -42,6 +42,13 @@ export interface SafeUser {
   vertical?: CompanyVertical;
   /** The pre-printed QR card pool — sold per academy, off unless we switch it on. */
   qrCardsEnabled?: boolean;
+  /**
+   * Online exams — lessons, question banks and the student exam portal. Switched
+   * on per tenant from the admin console; off for everyone else. Read at login, so
+   * a change needs a re-login (or AuthService.refreshUser) to be noticed.
+   * Deliberately absent from RegisterDto: this is not a signup choice.
+   */
+  onlineExamsEnabled?: boolean;
   qrFree?: boolean;                  // Teacher tenant in the free QR-activation launch tier
   branchId?: string | null;
   branchIds?: string[];              // All branch IDs (for BRANCH_ADMIN multi-branch)

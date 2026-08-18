@@ -146,4 +146,38 @@ new LandingStack(app, `NetrofitAdminStack-prod`, {
   },
 });
 
+// The student exam portal at exams.netrofit.com (online_exams.md §0.5).
+//
+// Students never sign into the staff app; this serves the small student-portal/
+// SPA where they claim their card, sign in and (phase 6) sit online exams. The
+// API enforces the per-tenant online_exams_enabled flag on every endpoint the
+// portal calls, so serving the shell publicly exposes nothing.
+//
+// No wwwDomain: a portal students reach by typing the name needs no www alias,
+// and every extra SAN is a certificate replacement if it changes later.
+//
+// apiProxy keeps the API same-origin (relative /api/*), which is why the API's
+// CORS allowlist needs no entry for this hostname.
+new LandingStack(app, `NetrofitExamsStack-prod`, {
+  domainName: 'exams.netrofit.com',
+  wwwDomain: null,
+  sourcePath: path.resolve(__dirname, '../../student-portal/dist/student-portal/browser'),
+  apiProxy: {
+    originDomain: 'xnbgr057y1.execute-api.eu-west-1.amazonaws.com',
+    pathPattern: '/api/*',
+    originPath: '/prod',
+  },
+  hostedZoneId: netrofitZoneId,
+  // Brand-new stack, so it may issue and validate its own cert. Never add this
+  // to the older stacks — it would replace certs that are already issued.
+  certValidationInZone: true,
+  env: { account, region: 'us-east-1' },
+  description: `Netrofit Student Exam Portal (prod)`,
+  tags: {
+    Environment: 'prod',
+    Application: 'NetrofitStudentPortal',
+    ManagedBy: 'CDK',
+  },
+});
+
 app.synth();

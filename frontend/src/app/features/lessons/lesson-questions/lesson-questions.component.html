@@ -1,0 +1,232 @@
+<div class="container-custom py-8">
+  <div class="flex justify-between items-start mb-6 gap-4">
+    <div>
+      <p-button
+        [label]="'LESSONS.QUESTIONS.BACK' | translate"
+        icon="pi pi-arrow-left"
+        [text]="true"
+        severity="secondary"
+        styleClass="mb-2 -ml-3"
+        (onClick)="back()"
+      ></p-button>
+      <h1 class="text-3xl font-bold text-gray-900">
+        {{ 'LESSONS.QUESTIONS.TITLE' | translate }}
+      </h1>
+      <p class="text-gray-500 mt-1">
+        @if (lesson()) {
+          {{ lesson()!.name }}
+          @if (lesson()!.courseName) {
+            <span class="text-gray-400"> · {{ lesson()!.courseName }}</span>
+          }
+        }
+      </p>
+    </div>
+    @if (authService.canWrite('academy')) {
+      <p-button
+        [label]="'LESSONS.QUESTIONS.ADD' | translate"
+        icon="pi pi-plus"
+        (onClick)="openCreate()"
+      ></p-button>
+    }
+  </div>
+
+  <p-card>
+    @if (loading()) {
+      <div class="text-center py-10 text-gray-400">
+        <i class="pi pi-spin pi-spinner text-3xl"></i>
+      </div>
+    } @else if (questions().length === 0) {
+      <div class="text-center py-10 text-gray-500">
+        <i class="pi pi-question-circle text-4xl mb-3"></i>
+        <p>{{ 'LESSONS.QUESTIONS.NONE' | translate }}</p>
+      </div>
+    } @else {
+      <div class="mb-4 text-sm text-gray-500">
+        {{ 'LESSONS.QUESTIONS.COUNT' | translate: { count: questions().length } }}
+      </div>
+
+      <!-- Cards, not a table: a question is a stem plus its options, and the whole
+           point of reviewing a bank is seeing which answer is marked right. -->
+      <div class="flex flex-col gap-4">
+        @for (question of questions(); track question.id; let i = $index) {
+          <div class="border border-gray-200 rounded-lg p-4">
+            <div class="flex justify-between items-start gap-4">
+              <div class="flex-1">
+                <div class="flex gap-2">
+                  <span class="text-gray-400 font-medium">{{ i + 1 }}.</span>
+                  <span class="font-medium text-gray-900 whitespace-pre-line">{{ question.questionText }}</span>
+                </div>
+
+                <ul class="mt-3 ml-6 flex flex-col gap-1">
+                  @for (option of question.options; track option.id) {
+                    <li class="flex items-center gap-2">
+                      @if (option.isCorrect) {
+                        <i class="pi pi-check-circle text-green-600"></i>
+                        <span class="text-green-700 font-medium">{{ option.optionText }}</span>
+                      } @else {
+                        <i class="pi pi-circle text-gray-300"></i>
+                        <span class="text-gray-700">{{ option.optionText }}</span>
+                      }
+                    </li>
+                  }
+                </ul>
+
+                @if (question.explanation) {
+                  <p class="mt-3 ml-6 text-sm text-gray-500 italic">{{ question.explanation }}</p>
+                }
+              </div>
+
+              <div class="flex gap-1 shrink-0">
+                @if (authService.canWrite('academy')) {
+                  <p-button
+                    icon="pi pi-pencil"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="warn"
+                    (onClick)="openEdit(question)"
+                    [pTooltip]="'LESSONS.QUESTIONS.EDIT' | translate"
+                  ></p-button>
+                }
+                @if (authService.canDelete('academy')) {
+                  <p-button
+                    icon="pi pi-trash"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="danger"
+                    (onClick)="deleteQuestion(question)"
+                    [pTooltip]="'LESSONS.QUESTIONS.DELETE' | translate"
+                  ></p-button>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </p-card>
+
+  <p-dialog
+    [visible]="showDialog()"
+    (visibleChange)="showDialog.set($event)"
+    [modal]="true"
+    [style]="{ width: '640px' }"
+    [header]="(isEditMode() ? 'LESSONS.QUESTIONS.EDIT_TITLE' : 'LESSONS.QUESTIONS.CREATE_TITLE') | translate"
+  >
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="flex flex-col gap-4">
+        <div>
+          <label for="questionText" class="block text-sm font-medium text-gray-700 mb-2">
+            {{ 'LESSONS.QUESTIONS.QUESTION_LABEL' | translate }} <span class="text-red-500">*</span>
+          </label>
+          <textarea
+            pTextarea
+            id="questionText"
+            formControlName="questionText"
+            rows="2"
+            class="w-full"
+            [placeholder]="'LESSONS.QUESTIONS.QUESTION_PLACEHOLDER' | translate"
+            [class.border-red-500]="questionText?.invalid && questionText?.touched"
+          ></textarea>
+          @if (questionText?.invalid && questionText?.touched) {
+            <small class="text-red-500">{{ 'LESSONS.QUESTIONS.QUESTION_REQUIRED' | translate }}</small>
+          }
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            {{ 'LESSONS.QUESTIONS.OPTIONS_LABEL' | translate }} <span class="text-red-500">*</span>
+          </label>
+          <p class="text-sm text-gray-500 mb-3">{{ 'LESSONS.QUESTIONS.OPTIONS_HINT' | translate }}</p>
+
+          <div class="flex flex-col gap-2" formArrayName="options">
+            @for (control of options.controls; track $index; let i = $index) {
+              <div class="flex items-center gap-2">
+                <!-- One radio bound to a single parent control, so "exactly one
+                     correct" is not something the teacher can get wrong. It sits
+                     outside the option's own group on purpose: the answer is a
+                     property of the question, not of the option. -->
+                <p-radiobutton
+                  [inputId]="'correct-' + i"
+                  [value]="i"
+                  [formControl]="$any(form.get('correctIndex'))"
+                  [pTooltip]="'LESSONS.QUESTIONS.MARK_CORRECT' | translate"
+                ></p-radiobutton>
+                <ng-container [formGroupName]="i">
+                  <input
+                    pInputText
+                    formControlName="optionText"
+                    class="flex-1"
+                    [placeholder]="('LESSONS.QUESTIONS.OPTION_PLACEHOLDER' | translate) + ' ' + (i + 1)"
+                    [class.border-red-500]="control.get('optionText')?.invalid && control.get('optionText')?.touched"
+                  />
+                </ng-container>
+                <p-button
+                  icon="pi pi-times"
+                  [rounded]="true"
+                  [text]="true"
+                  severity="secondary"
+                  type="button"
+                  [disabled]="!canRemoveOption"
+                  (onClick)="removeOption(i)"
+                  [pTooltip]="'LESSONS.QUESTIONS.REMOVE_OPTION' | translate"
+                ></p-button>
+              </div>
+            }
+          </div>
+
+          @if (canAddOption) {
+            <p-button
+              [label]="'LESSONS.QUESTIONS.ADD_OPTION' | translate"
+              icon="pi pi-plus"
+              [text]="true"
+              size="small"
+              type="button"
+              styleClass="mt-2 -ml-3"
+              (onClick)="addOption()"
+            ></p-button>
+          }
+
+          @if (noCorrect && form.touched) {
+            <small class="block text-red-500 mt-2">{{ 'LESSONS.QUESTIONS.ONE_CORRECT_REQUIRED' | translate }}</small>
+          }
+          @if (options.invalid && options.touched) {
+            <small class="block text-red-500 mt-1">{{ 'LESSONS.QUESTIONS.OPTION_TEXT_REQUIRED' | translate }}</small>
+          }
+        </div>
+
+        <div>
+          <label for="explanation" class="block text-sm font-medium text-gray-700 mb-2">
+            {{ 'LESSONS.QUESTIONS.EXPLANATION_LABEL' | translate }}
+          </label>
+          <textarea
+            pTextarea
+            id="explanation"
+            formControlName="explanation"
+            rows="2"
+            class="w-full"
+            [placeholder]="'LESSONS.QUESTIONS.EXPLANATION_PLACEHOLDER' | translate"
+          ></textarea>
+          <small class="text-gray-500">{{ 'LESSONS.QUESTIONS.EXPLANATION_HINT' | translate }}</small>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
+        <p-button
+          [label]="'LESSONS.QUESTIONS.CANCEL' | translate"
+          severity="secondary"
+          [outlined]="true"
+          (onClick)="closeDialog()"
+          type="button"
+        ></p-button>
+        <p-button
+          [label]="(isEditMode() ? 'LESSONS.QUESTIONS.UPDATE' : 'LESSONS.QUESTIONS.CREATE') | translate"
+          type="submit"
+          [loading]="saving()"
+          [disabled]="form.invalid"
+        ></p-button>
+      </div>
+    </form>
+  </p-dialog>
+
+  <p-confirmDialog></p-confirmDialog>
+</div>

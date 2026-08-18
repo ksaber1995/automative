@@ -316,6 +316,53 @@
           <p class="text-gray-600 whitespace-pre-wrap">{{ s.notes }}</p>
         </div>
       }
+
+      <!-- Exam portal credentials — answers "why can't this student log in?"
+           without touching the database. Only for tenants with online exams on. -->
+      @if (canSeePortalCredentials() && portalCredentials(); as cred) {
+        <div class="mt-6 pt-6 border-t">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="text-lg font-semibold mb-1 text-gray-700">
+                <i class="pi pi-desktop me-1"></i>{{ 'STUDENTS.DETAIL.PORTAL_TITLE' | translate }}
+              </h3>
+              @if (cred.hasCredentials) {
+                <div class="text-sm text-gray-600 space-y-1">
+                  <div>
+                    <span class="font-medium">{{ 'STUDENTS.DETAIL.PORTAL_USERNAME' | translate }}:</span>
+                    <span class="font-mono ms-1">{{ cred.username }}</span>
+                  </div>
+                  <div>
+                    <span class="font-medium">{{ 'STUDENTS.DETAIL.PORTAL_LAST_LOGIN' | translate }}:</span>
+                    {{ cred.lastLoginAt ? (cred.lastLoginAt | date: 'short') : ('STUDENTS.DETAIL.PORTAL_NEVER' | translate) }}
+                  </div>
+                  <!-- A reset the student didn't do themselves is the one visible
+                       symptom of a lost or borrowed card — so it is shown, dated. -->
+                  @if (cred.resetAt) {
+                    <div>
+                      <span class="font-medium">{{ 'STUDENTS.DETAIL.PORTAL_RESET' | translate }}:</span>
+                      {{ cred.resetAt | date: 'short' }}
+                    </div>
+                  }
+                </div>
+              } @else {
+                <p class="text-sm text-gray-500">{{ 'STUDENTS.DETAIL.PORTAL_NONE' | translate }}</p>
+              }
+            </div>
+            @if (cred.hasCredentials && canRevokePortal()) {
+              <p-button
+                [label]="'STUDENTS.DETAIL.PORTAL_REVOKE' | translate"
+                icon="pi pi-ban"
+                severity="danger"
+                [outlined]="true"
+                size="small"
+                [loading]="revokingPortal()"
+                (onClick)="confirmRevokePortal()"
+              ></p-button>
+            }
+          </div>
+        </div>
+      }
     </p-card>
 
     <!-- Master Course (Bundle) Enrollments — hidden for TEACHER companies -->

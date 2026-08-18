@@ -52,7 +52,7 @@ import { ProductSaleService } from '../../products/services/product-sale.service
 import { ExamService } from '../../exams/services/exam.service';
 import { ratingLabelKey } from '../../exams/homework-rating.util';
 import { Student } from '@shared/interfaces/student.interface';
-import { StudentExamResult } from '@shared/interfaces/exam.interface';
+import { StudentCredentialInfo, StudentExamResult } from '@shared/interfaces/exam.interface';
 import { Enrollment, EnrollmentPayment, Refund } from '@shared/interfaces/enrollment.interface';
 import { Course } from '@shared/interfaces/course.interface';
 import { Class, ClassWithDetails } from '@shared/interfaces/class.interface';
@@ -520,6 +520,53 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
    */
   canRefund = (): boolean => this.authService.canWrite('refunds');
 
+  // ── Exam portal credentials (online exams, phase 7) ────────────────────────
+  /**
+   * The whole block hides when the tenant lacks the online-exams flag — showing
+   * it to a gated tenant would only render a row the API 403s.
+   */
+  canSeePortalCredentials = (): boolean => this.authService.canUseOnlineExams();
+  /** Revoke is destructive: same permission as deleting academic records. */
+  canRevokePortal = (): boolean => this.authService.canDelete('academy');
+  portalCredentials = signal<StudentCredentialInfo | null>(null);
+  revokingPortal = signal(false);
+
+  loadPortalCredentials(studentId: string) {
+    if (!this.canSeePortalCredentials()) return;
+    this.examService.getStudentCredentials(studentId).subscribe({
+      next: (info) => this.portalCredentials.set(info),
+      // A 403 (flag flipped off since login) or any failure just hides the row.
+      error: () => this.portalCredentials.set(null),
+    });
+  }
+
+  confirmRevokePortal() {
+    const s = this.student();
+    if (!s || !this.studentId) return;
+    this.confirmationService.confirm({
+      header: this.translate.instant('STUDENTS.DETAIL.PORTAL_REVOKE_TITLE'),
+      message: this.translate.instant('STUDENTS.DETAIL.PORTAL_REVOKE_MSG', { name: s.name }),
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: this.translate.instant('STUDENTS.DETAIL.PORTAL_REVOKE'),
+      rejectLabel: this.translate.instant('STUDENTS.DETAIL.CANCEL'),
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => this.revokePortal(),
+    });
+  }
+
+  private revokePortal() {
+    if (!this.studentId) return;
+    this.revokingPortal.set(true);
+    this.examService.revokeStudentCredentials(this.studentId).subscribe({
+      next: () => {
+        this.revokingPortal.set(false);
+        this.notificationService.success(this.translate.instant('STUDENTS.DETAIL.PORTAL_REVOKED'));
+        this.loadPortalCredentials(this.studentId!);
+      },
+      error: () => this.revokingPortal.set(false),
+    });
+  }
+
   ngOnInit() {
     // Subscribe to the route param (not snapshot) so that scanning another
     // student while already on a detail page — which navigates to the same
@@ -564,6 +611,7 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
     this.loadBookPurchases(id);
     this.loadExamResults(id);
     this.loadLinkedCards(id);
+    this.loadPortalCredentials(id);
   }
 
   /** Clear per-student state so data from a previously-viewed student
@@ -582,6 +630,7 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
     this.attendanceRecords.set([]);
     this.bookPurchases.set([]);
     this.examResults.set([]);
+    this.portalCredentials.set(null);
     this.expandedRows = {};
     this.expandedMasterRows = {};
   }

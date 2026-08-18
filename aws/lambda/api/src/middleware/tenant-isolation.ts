@@ -145,6 +145,16 @@ export async function extractTenantContext(authHeader?: string): Promise<TenantC
   if (!token) throw new Error('No authentication token provided');
 
   const decoded = await verifyToken(token);
+
+  // Every token signed with the shared secret that is NOT a staff token carries
+  // a `typ` claim (admin portal: 'admin-portal', student portal: 'student',
+  // claim tickets: 'STUDENT_CLAIM'). Staff tokens never do. Reject the claim
+  // outright: a student token MUST carry companyId for its own tenant scoping,
+  // so without this line it would sail straight through into staff endpoints,
+  // where role and permissions are read off the token. See online_exams.md
+  // §0.5.5 — this is the line that keeps the two audiences apart.
+  if ((decoded as any).typ !== undefined) throw new Error('Invalid token');
+
   if (!decoded.companyId) throw new Error('Invalid token: missing company context');
 
   // Rate limit every authenticated request — per-user catches a runaway

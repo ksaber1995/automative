@@ -28,6 +28,9 @@ import { masterClassEnrollmentsRoutes } from './routes/master-class-enrollments'
 import { eventsRoutes } from './routes/events';
 import { eventSubscriptionsRoutes } from './routes/event-subscriptions';
 import { examsRoutes } from './routes/exams';
+import { lessonsRoutes } from './routes/lessons';
+import { studentAuthRoutes } from './routes/student-auth';
+import { studentExamsRoutes } from './routes/student-exams';
 import { classesRoutes } from './routes/classes';
 import { revenuesRoutes } from './routes/revenues';
 import { expensesRoutes } from './routes/expenses';
@@ -118,6 +121,39 @@ const router = {
     listRefunds: eventSubscriptionsRoutes.listRefunds,
     createRefund: eventSubscriptionsRoutes.createRefund,
   },
+  // Order matters — `/reorder` is listed before `/:id` or it would match as an id.
+  lessons: {
+    list: lessonsRoutes.list,
+    reorder: lessonsRoutes.reorder,
+    create: lessonsRoutes.create,
+    // `/:id/questions*` before `/:id`, same reason.
+    listQuestions: lessonsRoutes.listQuestions,
+    createQuestion: lessonsRoutes.createQuestion,
+    updateQuestion: lessonsRoutes.updateQuestion,
+    deleteQuestion: lessonsRoutes.deleteQuestion,
+    getById: lessonsRoutes.getById,
+    update: lessonsRoutes.update,
+    delete: lessonsRoutes.delete,
+  },
+  // The student exam portal's sign-in (claim / reset / login / me). Static
+  // paths only — no ordering trap here.
+  studentAuth: {
+    claimStart: studentAuthRoutes.claimStart,
+    claimFinish: studentAuthRoutes.claimFinish,
+    login: studentAuthRoutes.login,
+    me: studentAuthRoutes.me,
+    changePassword: studentAuthRoutes.changePassword,
+  },
+  // The sitting itself (student-token authenticated). The bare list paths are
+  // registered before the `/:examId/...` ones, matching the contract order.
+  studentExams: {
+    list: studentExamsRoutes.list,
+    results: studentExamsRoutes.results,
+    start: studentExamsRoutes.start,
+    attempt: studentExamsRoutes.attempt,
+    answer: studentExamsRoutes.answer,
+    submit: studentExamsRoutes.submit,
+  },
   // Order matters — itty-router matches in registration order, so the static
   // `/student/:studentId` and `/:id/results*` paths are listed before `/:id`.
   exams: {
@@ -131,7 +167,14 @@ const router = {
     deleteResult: examsRoutes.deleteResult,
     markAbsent: examsRoutes.markAbsent,
     markRemainingAbsent: examsRoutes.markRemainingAbsent,
+    regenerateCode: examsRoutes.regenerateCode,
     sendTelegramResults: examsRoutes.sendTelegramResults,
+    // Online-exam monitor + portal credentials — all more specific than `/:id`,
+    // so they must be registered before it.
+    attempts: examsRoutes.attempts,
+    resetAttempt: examsRoutes.resetAttempt,
+    studentCredentials: examsRoutes.studentCredentials,
+    revokeStudentCredentials: examsRoutes.revokeStudentCredentials,
     getById: examsRoutes.getById,
     update: examsRoutes.update,
     delete: examsRoutes.delete,
@@ -203,6 +246,7 @@ const router = {
     // route MUST be registered before the `/:id` route, or `next-number` is
     // captured as `:id` and fails "id: Invalid uuid".
     nextNumber: sessionsRoutes.nextNumber,
+    lessonsTaught: sessionsRoutes.lessonsTaught,
     freeSummary: sessionsRoutes.freeSummary,
     activeForStudent: sessionsRoutes.activeForStudent,
     checkinTarget: sessionsRoutes.checkinTarget,

@@ -2,7 +2,8 @@ import { insert, update, query, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 import { notifySessionAttendance } from './telegram';
-import { ensureAutoManageSessionsColumn } from './companies';
+import { ensureAutoManageSessionsColumn, assertOnlineExams, isOnlineExamsEnabled } from './companies';
+import { ensureLessonSchema } from './lessons';
 import { chargeAbsencesAtSessionEnd } from './session-payments';
 import { ensureClassDayTimesSchema } from './classes';
 import { claimPendingSubstitutions, ensureSubstitutionLinkSchema, substitutionCoversExists } from '../db/substitutions';
@@ -135,6 +136,81 @@ export async function ensureFreeSessionSchema(): Promise<void> {
 }
 
 /**
+ * Which lesson of the course a session covered (migration 102) — the online-exams
+ * feature's one hook into sessions. Idempotent at runtime like the columns above.
+ *
+ * The FK targets `lessons`, which only exists once that feature's migration has
+ * run, so this creates the table first via ensureLessonSchema.
+ */
+let lessonSessionInitPromise: Promise<void> | null = null;
+export async function ensureLessonSessionColumn(): Promise<void> {
+  if (!lessonSessionInitPromise) {
+    lessonSessionInitPromise = (async () => {
+      try {
+        await ensureLessonSchema();
+        await query(
+          `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS lesson_id UUID REFERENCES lessons(id) ON DELETE SET NULL`
+        );
+        await query(`CREATE INDEX IF NOT EXISTS idx_sessions_lesson ON sessions(lesson_id)`);
+      } catch (e) {
+        lessonSessionInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return lessonSessionInitPromise;
+}
+
+/**
+ * Resolves a `lessonId` from a request body against the class it is being tagged
+ * onto, for tenants that have the online-exams feature.
+ *
+ * Returns `{ value }` with the id to store (null clears the tag), or `{ error }`
+ * with an error key. A lesson from a different course is refused rather than
+ * quietly stored: it would put a lesson nobody teaches in this class into the
+ * "taught so far" list an exam is later scoped by.
+ */
+async function resolveLessonTag(
+  lessonId: unknown,
+  classId: string,
+  companyId: string
+): Promise<{ value: string | null } | { error: string }> {
+  if (lessonId === null || lessonId === '') return { value: null };
+
+  const lesson = await queryOne<any>(
+    `SELECT l.id
+       FROM lessons l
+       JOIN classes c ON c.course_id = l.course_id
+      WHERE l.id = $1 AND l.company_id = $2 AND c.id = $3`,
+    [lessonId, companyId, classId]
+  );
+  if (!lesson) return { error: 'ERRORS.SESSIONS.LESSON_COURSE_MISMATCH' };
+  return { value: lesson.id };
+}
+
+/**
+ * The lessons a given class has actually been taught, in curriculum order.
+ *
+ * This is what "all lessons taught so far in this class" means on the exam form:
+ * two classes of the same course are usually at different points, so scoping an
+ * exam by the course's whole curriculum would examine lessons one of them has not
+ * reached. Only started sessions count — a prepared session is a lesson that has
+ * not happened yet.
+ */
+export async function lessonsTaughtIn(classId: string, companyId: string) {
+  await ensureLessonSessionColumn();
+  return query<any>(
+    `SELECT DISTINCT l.id, l.name, l.order_index
+       FROM sessions s
+       JOIN lessons l ON l.id = s.lesson_id
+      WHERE s.class_id = $1 AND s.company_id = $2
+        AND s.started = true AND l.is_active = true
+      ORDER BY l.order_index, l.name`,
+    [classId, companyId]
+  );
+}
+
+/**
  * How many times its own scheduled length a running session may overrun before
  * the automation treats it as forgotten and closes it — a 2-hour class still
  * open after 6 hours is clearly not a lesson someone is still sitting through.
@@ -257,6 +333,10 @@ function mapSessionFromDB(row: any) {
     sessionNumber: row.session_number === null || row.session_number === undefined
       ? null
       : parseInt(row.session_number, 10),
+    // Which lesson of the course was covered, when someone tagged it. Undefined
+    // rather than null on a row read before migration 102 — "not asked" is not the
+    // same as "not tagged".
+    lessonId: row.lesson_id === undefined ? undefined : (row.lesson_id ?? null),
     startDate: row.start_date,
     endDate: row.end_date,
     started: row.started !== false,
@@ -278,6 +358,10 @@ function mapSessionWithDetailsFromDB(row: any) {
     roomDescription: row.room_description,
     className: row.class_name,
     courseName: row.course_name,
+    // The course, not just its name: the lesson picker needs it to list the
+    // curriculum this session's class is working through.
+    courseId: row.course_id ?? undefined,
+    lessonName: row.lesson_name ?? null,
     branchName: row.branch_name,
     durationMinutes,
     studentPresent: row.student_present === null || row.student_present === undefined ? null : !!row.student_present,
@@ -426,12 +510,24 @@ export const sessionsRoutes = {
         sessionNumber = parseInt(nextRow?.next ?? '1', 10);
       }
 
+      // Which lesson is being taught, for tenants that have the online-exams
+      // feature. Ignored (not rejected) for everyone else, so the Start dialog can
+      // send the same body whoever is signed in.
+      let lessonId: string | null = null;
+      if (body.lessonId !== undefined && await isOnlineExamsEnabled(context.companyId)) {
+        await ensureLessonSessionColumn();
+        const tag = await resolveLessonTag(body.lessonId, body.classId, context.companyId);
+        if ('error' in tag) return apiError(400, tag.error, 'That lesson belongs to a different course');
+        lessonId = tag.value;
+      }
+
       const session = await insert('sessions', {
         company_id: context.companyId,
         branch_id: body.branchId || room?.branch_id || cls.branch_id,
         room_id: body.roomId || null,
         class_id: body.classId,
         session_number: sessionNumber,
+        ...(lessonId ? { lesson_id: lessonId } : {}),
         start_date: new Date().toISOString(),
         end_date: null,
         started: true,
@@ -1517,6 +1613,55 @@ export const sessionsRoutes = {
     }
   },
 
+  /**
+   * GET /api/sessions/lessons-taught?classId=…
+   * The lessons this class has actually been taught, in curriculum order.
+   *
+   * Feeds the exam form's "all lessons taught so far in this class" shortcut. Part
+   * of the online-exams feature, so unlike the lesson tag itself this one refuses a
+   * tenant without the flag rather than answering with an empty list — an empty
+   * list would read as "this class has been taught nothing".
+   */
+  lessonsTaught: async ({ query: queryParams, headers }: {
+    query: { classId?: string };
+    headers: { authorization: string };
+  }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const denied = await assertOnlineExams(context.companyId);
+      if (denied) return denied;
+
+      if (!queryParams.classId) {
+        return apiError(400, 'ERRORS.SESSIONS.CLASS_REQUIRED', 'classId is required');
+      }
+
+      const cls = await queryOne<any>(
+        'SELECT id, branch_id FROM classes WHERE id = $1 AND company_id = $2',
+        [queryParams.classId, context.companyId]
+      );
+      if (!cls) return apiError(404, 'ERRORS.CLASSES.NOT_FOUND', 'Class not found');
+      if (cls.branch_id && !canAccessBranch(context, cls.branch_id)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+
+      const rows = await lessonsTaughtIn(queryParams.classId, context.companyId);
+      return {
+        status: 200 as const,
+        body: rows.map((r) => ({
+          id: r.id,
+          name: r.name,
+          orderIndex: r.order_index ?? 0,
+        })),
+      };
+    } catch (error) {
+      console.error('Lessons taught error:', error);
+      return mapThrownError(error, 'ERRORS.SESSIONS.LESSONS_TAUGHT_FAILED', 'Failed to load taught lessons');
+    }
+  },
+
   getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
@@ -1524,19 +1669,27 @@ export const sessionsRoutes = {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
 
+      // The lesson tag is read here (not in `list`) because this is the screen a
+      // teacher tags from. The column may predate migration 102 on this database,
+      // so ensure it before selecting it.
+      await ensureLessonSessionColumn();
+
       const sql = `
         SELECT
           s.*,
           r.code as room_code,
           r.description as room_description,
           cl.name as class_name,
+          cl.course_id as course_id,
           co.name as course_name,
-          b.name as branch_name
+          b.name as branch_name,
+          l.name as lesson_name
         FROM sessions s
         LEFT JOIN rooms r ON s.room_id = r.id
         LEFT JOIN classes cl ON s.class_id = cl.id
         LEFT JOIN courses co ON cl.course_id = co.id
         LEFT JOIN branches b ON s.branch_id = b.id
+        LEFT JOIN lessons l ON l.id = s.lesson_id
         WHERE s.id = $1 AND s.company_id = $2
       `;
 
@@ -1722,6 +1875,20 @@ export const sessionsRoutes = {
         updateData.session_number = n;
       }
       if (body.notes !== undefined) updateData.notes = body.notes;
+
+      // Tag (or clear) the lesson this session covered. This is the realistic place
+      // it happens: most sessions are opened by the schedule or by a student
+      // scanning in, so nobody was asked at the time — the teacher says which
+      // lesson it was while they are on the session's own screen.
+      //
+      // Silently ignored for a tenant without the online-exams feature, so the
+      // sessions API keeps one shape for everybody.
+      if (body.lessonId !== undefined && await isOnlineExamsEnabled(context.companyId)) {
+        await ensureLessonSessionColumn();
+        const tag = await resolveLessonTag(body.lessonId, existing.class_id, context.companyId);
+        if ('error' in tag) return apiError(400, tag.error, 'That lesson belongs to a different course');
+        updateData.lesson_id = tag.value;
+      }
 
       if (Object.keys(updateData).length === 0) {
         return { status: 200 as const, body: mapSessionFromDB(existing) };

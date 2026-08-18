@@ -285,6 +285,23 @@ export class AuthService {
   }
 
   /**
+   * Online exams — the Lessons screen, question banks, and (later) online exams
+   * and the student exam portal. Switched on per tenant from the admin console and
+   * off for everyone else, so the whole feature stays invisible until we enable it.
+   *
+   * The API enforces the same flag on every endpoint behind it, so this only
+   * decides what is worth showing. Deliberately does NOT admit the debug login the
+   * way canSeeQrCardPool does: showing the screens to an account whose tenant
+   * lacks the flag would just produce pages that 403.
+   *
+   * Read from the login payload, so flipping the flag needs a re-login (or
+   * refreshUser()) before the sidebar notices.
+   */
+  canUseOnlineExams(): boolean {
+    return this.currentUser()?.onlineExamsEnabled === true;
+  }
+
+  /**
    * The vendor's debugging login (master@master.com), parked inside a tenant to
    * reproduce what a customer sees. Some tools are for the vendor only and stay
    * hidden from every real user; this decides who they are worth showing to.
