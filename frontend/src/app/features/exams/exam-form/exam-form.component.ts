@@ -113,11 +113,19 @@ export class ExamFormComponent implements OnInit {
       .reduce((sum, l) => sum + (l.questionCount ?? 0), 0);
   });
 
+  /**
+   * The typed question count, mirrored into a signal like isOnlineKind /
+   * selectedLessonIds above. questionCountTooHigh used to read the form control
+   * directly — but a computed() only re-runs when a SIGNAL it read changes, so
+   * lowering the count re-evaluated nothing and "only N available" stuck on
+   * screen until the next lesson tick.
+   */
+  private askedQuestionCount = signal(0);
+
   /** Asking for more questions than exist would give everyone a short paper. */
   questionCountTooHigh = computed(() => {
     if (!this.isOnline()) return false;
-    const asked = Number(this.form?.get('questionCount')?.value ?? 0);
-    return asked > this.poolSize();
+    return this.askedQuestionCount() > this.poolSize();
   });
 
   /**
@@ -158,6 +166,8 @@ export class ExamFormComponent implements OnInit {
 
     this.form.get('isOnline')!.valueChanges.subscribe((v: boolean) => this.isOnlineKind.set(v === true));
     this.form.get('lessonIds')!.valueChanges.subscribe((ids: string[]) => this.selectedLessonIds.set(ids ?? []));
+    this.form.get('questionCount')!.valueChanges.subscribe((v: unknown) => this.askedQuestionCount.set(Number(v ?? 0)));
+    this.askedQuestionCount.set(Number(this.form.get('questionCount')!.value ?? 0));
 
     this.form.get('isHomework')!.valueChanges.subscribe((v: boolean) => this.isHomeworkKind.set(v === true));
 
