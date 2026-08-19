@@ -151,15 +151,17 @@
                   [formControl]="$any(form.get('correctIndex'))"
                   [pTooltip]="'LESSONS.QUESTIONS.MARK_CORRECT' | translate"
                 ></p-radiobutton>
-                <ng-container [formGroupName]="i">
-                  <input
-                    pInputText
-                    formControlName="optionText"
-                    class="flex-1"
-                    [placeholder]="('LESSONS.QUESTIONS.OPTION_PLACEHOLDER' | translate) + ' ' + (i + 1)"
-                    [class.border-red-500]="control.get('optionText')?.invalid && control.get('optionText')?.touched"
-                  />
-                </ng-container>
+                <!-- Bound by [formControl], not formControlName: the dialog's DOM
+                     outlives the controls (openCreate/openEdit rebuild the array),
+                     and a name-bound directive keeps writing to the discarded
+                     control — typed text then never reaches the live form. -->
+                <input
+                  pInputText
+                  [formControl]="$any(control.get('optionText'))"
+                  class="flex-1"
+                  [placeholder]="('LESSONS.QUESTIONS.OPTION_PLACEHOLDER' | translate) + ' ' + (i + 1)"
+                  [class.border-red-500]="control.get('optionText')?.invalid && control.get('optionText')?.touched"
+                />
                 <p-button
                   icon="pi pi-times"
                   [rounded]="true"
