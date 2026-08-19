@@ -48,6 +48,20 @@ export interface CameraScanFeedback {
         } @else {
           <p class="text-center text-xs text-gray-500">{{ 'SESSION_ATTENDANCE.SCAN_HINT' | translate }}</p>
         }
+        <!-- Phones carry several back lenses and the browser's default is often
+             the wide one, which can't focus on a card — so the choice has to be
+             the user's. Hidden when there is nothing to choose between. -->
+        @if (cameras().length > 1) {
+          <p-button
+            [label]="'SESSION_ATTENDANCE.SWITCH_CAMERA' | translate"
+            icon="pi pi-sync"
+            [text]="true"
+            size="small"
+            styleClass="w-full"
+            [disabled]="starting()"
+            (onClick)="switchCamera()"
+          ></p-button>
+        }
         @if (feedback) {
           <div class="rounded-md px-3 py-2 text-sm text-center"
             [class.bg-green-50]="!feedback.alreadyPresent" [class.text-green-700]="!feedback.alreadyPresent"
@@ -86,6 +100,13 @@ export class CameraScanDialogComponent {
   private lastScanAt = 0;
   private readonly DEDUP_MS = 2500;
 
+  /** The device's cameras, once known. More than one → the switch button shows. */
+  cameras = signal<{ id: string; label: string }[]>([]);
+  private currentCameraId: string | null = null;
+  private scanConfig: any;
+  /** Survives page loads: the lens that worked is the lens wanted next time. */
+  private static readonly CAMERA_KEY = 'scanCameraId';
+
   open(): void {
     this.visible.set(true);
     this.lastScan = '';
@@ -105,14 +126,31 @@ export class CameraScanDialogComponent {
       // Loaded on demand: html5-qrcode is heavy and most scanning is done with a
       // reader, so it must not sit in the host page's chunk.
       const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
+      this.scanConfig = cameraScanConfig(Html5QrcodeSupportedFormats);
       this.html5Qr = new Html5Qrcode(this.regionId);
-      await this.html5Qr.start(
-        { facingMode: 'environment' },
-        cameraScanConfig(Html5QrcodeSupportedFormats),
-        (decodedText: string) => this.handle(decodedText),
-        // Per-frame decode failures are normal (no code in view) — ignore.
-        () => {},
-      );
+
+      // A previously chosen lens beats the browser's guess — but a saved id can
+      // go stale (another phone's id synced in, a browser reshuffle), so fall
+      // back to the default rather than failing the whole dialog over it.
+      const saved = this.savedCameraId();
+      if (saved) {
+        try {
+          await this.startWith({ deviceId: { exact: saved } });
+        } catch {
+          localStorage.removeItem(CameraScanDialogComponent.CAMERA_KEY);
+          await this.startWith({ facingMode: 'environment' });
+        }
+      } else {
+        await this.startWith({ facingMode: 'environment' });
+      }
+
+      this.currentCameraId = this.runningCameraId() ?? saved;
+      // Only after start: enumeration needs the permission the start just won,
+      // and before it the labels come back empty on most phones.
+      Html5Qrcode.getCameras()
+        .then((cams: Array<{ id: string; label: string }>) =>
+          this.cameras.set((cams || []).map((c) => ({ id: c.id, label: c.label || '' }))))
+        .catch(() => {});
     } catch {
       // Close rather than leave a black rectangle with no way forward.
       this.html5Qr = undefined;
@@ -121,6 +159,46 @@ export class CameraScanDialogComponent {
     } finally {
       this.starting.set(false);
     }
+  }
+
+  private startWith(cameraSelector: any): Promise<void> {
+    return this.html5Qr.start(
+      cameraSelector,
+      this.scanConfig,
+      (decodedText: string) => this.handle(decodedText),
+      // Per-frame decode failures are normal (no code in view) — ignore.
+      () => {},
+    );
+  }
+
+  /** Cycle to the next camera and remember it for every later scan. */
+  async switchCamera(): Promise<void> {
+    const cams = this.cameras();
+    if (cams.length < 2 || !this.html5Qr || this.starting()) return;
+    const idx = cams.findIndex((c) => c.id === this.currentCameraId);
+    const next = cams[(idx + 1) % cams.length];
+    this.starting.set(true);
+    try {
+      await this.html5Qr.stop();
+      await this.startWith({ deviceId: { exact: next.id } });
+      this.currentCameraId = next.id;
+      try { localStorage.setItem(CameraScanDialogComponent.CAMERA_KEY, next.id); } catch {}
+    } catch {
+      this.html5Qr = undefined;
+      this.visible.set(false);
+      this.notify.warning(this.translate.instant('NAV.QR_CAMERA_FAILED'));
+    } finally {
+      this.starting.set(false);
+    }
+  }
+
+  private savedCameraId(): string | null {
+    try { return localStorage.getItem(CameraScanDialogComponent.CAMERA_KEY); } catch { return null; }
+  }
+
+  /** The deviceId actually streaming, when the library exposes it. */
+  private runningCameraId(): string | null {
+    try { return this.html5Qr?.getRunningTrackSettings?.()?.deviceId ?? null; } catch { return null; }
   }
 
   private stop(): void {

@@ -5771,6 +5771,7 @@
     "SCAN_TITLE": "مسح كروت الطلاب",
     "SCAN_STARTING": "جارٍ تشغيل الكاميرا…",
     "SCAN_HINT": "وجّه الكاميرا إلى كود الطالب. المسح مستمر — امسح الطلاب واحدًا تلو الآخر.",
+    "SWITCH_CAMERA": "تبديل الكاميرا",
     "SCAN_DONE": "تم",
     "ABSENCE_STREAK": "غاب آخر {{count}} حصص متتالية",
     "ABSENCE_MONTH": "غاب {{count}} من {{total}} في {{month}}"

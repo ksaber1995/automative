@@ -5647,6 +5647,7 @@
     "SCAN_TITLE": "Scan student cards",
     "SCAN_STARTING": "Starting the camera…",
     "SCAN_HINT": "Point the camera at a student's QR or barcode. It keeps scanning — go through them one after another.",
+    "SWITCH_CAMERA": "Switch camera",
     "SCAN_DONE": "Done",
     "ABSENCE_STREAK": "Missed the last {{count}} in a row",
     "ABSENCE_MONTH": "{{count}} of {{total}} missed in {{month}}"
