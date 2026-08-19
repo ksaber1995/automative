@@ -667,21 +667,48 @@ export const classesRoutes = {
         return apiError(404, 'ERRORS.ROOMS.NOT_FOUND', 'Room not found');
       }
 
-      const params: any[] = [roomId, context.companyId, classIds];
-      let sql = `
-        UPDATE classes c
-        SET room_id = $1, updated_at = NOW()
-        FROM courses co
-        WHERE co.id = c.course_id
-          AND co.company_id = $2
-          AND c.id = ANY($3::uuid[])
+      // Which of the requested classes this caller may actually touch — the same
+      // company/branch filter the bulk update used before it was split per class.
+      const selParams: any[] = [context.companyId, classIds];
+      let selSql = `
+        SELECT c.id, c.start_date, c.end_date, c.days_of_week, c.start_time, c.end_time
+        FROM classes c
+        INNER JOIN courses co ON co.id = c.course_id
+        WHERE co.company_id = $1
+          AND c.id = ANY($2::uuid[])
           AND c.deleted_at IS NULL`;
-      const branchClause = appendBranchSqlFilter(context, params, 'co.branch_id');
-      if (branchClause) sql += ` AND ${branchClause}`;
-      sql += ' RETURNING c.id';
+      const branchClause = appendBranchSqlFilter(context, selParams, 'co.branch_id');
+      if (branchClause) selSql += ` AND ${branchClause}`;
+      const targets = await query<any>(selSql, selParams);
 
-      const rows = await query(sql, params);
-      return { status: 200 as const, body: { updated: rows.length } };
+      // Clearing the room can't double-book anything; assigning one can, so each
+      // class is checked THEN moved, one at a time — that way the classes being
+      // assigned also collide with each other, not only with what was already
+      // in the room. A clash stops the batch and names the booking in the way.
+      let updated = 0;
+      for (const cls of targets) {
+        if (roomId) {
+          let dayTimes = await getClassDayTimes(cls.id);
+          if (!dayTimes.length && cls.days_of_week && cls.start_time && cls.end_time) {
+            // Classes predating class_day_times: one envelope for every listed day.
+            dayTimes = String(cls.days_of_week).split(',').map((d: string) => d.trim()).filter(Boolean)
+              .map((day: string) => ({ day, startTime: cls.start_time, endTime: cls.end_time }));
+          }
+          const clashes = await findRoomConflicts(context.companyId, {
+            roomId,
+            startDate: cls.start_date,
+            endDate: cls.end_date,
+            dayTimes,
+            excludeClassId: cls.id,
+          });
+          if (clashes.length) {
+            return apiError(409, 'ERRORS.CLASSES.ROOM_CONFLICT', roomConflictMessage(clashes), roomConflictParams(clashes));
+          }
+        }
+        await query('UPDATE classes SET room_id = $2, updated_at = NOW() WHERE id = $1', [cls.id, roomId]);
+        updated++;
+      }
+      return { status: 200 as const, body: { updated } };
     } catch (error) {
       console.error('Assign class room error:', error);
       return mapThrownError(error, 'ERRORS.CLASSES.ASSIGN_ROOM_FAILED', 'Failed to assign the room', 400);

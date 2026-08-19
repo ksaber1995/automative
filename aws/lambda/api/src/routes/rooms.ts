@@ -2,6 +2,20 @@ import { insert, update, query, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, appendBranchSqlFilter, branchBelongsToCompany } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 
+/**
+ * A room's code IS its identity to the person picking it, so two rooms whose
+ * codes differ only by whitespace or case ("ديسك 1" vs "ديسك 1 ") read as one
+ * room while the double-booking guard sees two — classes land "in the same
+ * room at the same time" with nothing to stop them. Reject the near-duplicate
+ * at the door.
+ */
+async function duplicateRoomCode(companyId: string, code: string, excludeId?: string): Promise<boolean> {
+  const params: any[] = [companyId, code];
+  let sql = `SELECT id FROM rooms WHERE company_id = $1 AND UPPER(TRIM(code)) = UPPER(TRIM($2))`;
+  if (excludeId) { params.push(excludeId); sql += ` AND id <> $${params.length}`; }
+  return !!(await queryOne<any>(sql, params));
+}
+
 function mapRoomFromDB(row: any) {
   return {
     id: row.id,
@@ -48,10 +62,18 @@ export const roomsRoutes = {
         return apiError(400, 'ERRORS.ROOMS.BRANCH_NOT_IN_COMPANY', 'That branch does not belong to this company');
       }
 
+      const code = String(body.code ?? '').trim();
+      if (!code) {
+        return apiError(400, 'ERRORS.ROOMS.CODE_REQUIRED', 'Room code is required');
+      }
+      if (await duplicateRoomCode(context.companyId, code)) {
+        return apiError(409, 'ERRORS.ROOMS.DUPLICATE_CODE', 'A room with this code already exists');
+      }
+
       const room = await insert('rooms', {
         company_id: context.companyId,
         branch_id: body.branchId,
-        code: body.code,
+        code,
         description: body.description || null,
         is_active: true,
       });
@@ -214,7 +236,16 @@ export const roomsRoutes = {
       }
 
       const updateData: any = {};
-      if (body.code !== undefined) updateData.code = body.code;
+      if (body.code !== undefined) {
+        const code = String(body.code ?? '').trim();
+        if (!code) {
+          return apiError(400, 'ERRORS.ROOMS.CODE_REQUIRED', 'Room code is required');
+        }
+        if (await duplicateRoomCode(context.companyId, code, params.id)) {
+          return apiError(409, 'ERRORS.ROOMS.DUPLICATE_CODE', 'A room with this code already exists');
+        }
+        updateData.code = code;
+      }
       if (body.description !== undefined) updateData.description = body.description;
       if (body.isActive !== undefined) updateData.is_active = body.isActive;
 

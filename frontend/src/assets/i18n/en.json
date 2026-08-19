@@ -581,7 +581,9 @@
       "DELETE_FAILED": "Failed to delete room",
       "LIST_FAILED": "Failed to load rooms",
       "HAS_ACTIVE_SESSION": "Room has an active session",
-      "BRANCH_NOT_IN_COMPANY": "That branch does not belong to this company"
+      "BRANCH_NOT_IN_COMPANY": "That branch does not belong to this company",
+      "CODE_REQUIRED": "Room code is required",
+      "DUPLICATE_CODE": "A room with this code already exists"
     },
     "SESSIONS": {
       "NOT_FOUND": "Session not found",
