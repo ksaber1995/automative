@@ -321,14 +321,16 @@ export class ClassFormComponent implements OnInit {
           this.branchName.set(found?.label || '');
         }
 
-        // Auto-select course's branch and instructor if creating new class.
-        // emitEvent:false so the branchId valueChanges hook below doesn't fire
-        // and clear the courseId we just selected (the dropdown is already
-        // filtered to this branch, so the patch is essentially a no-op anyway).
+        // Auto-select course's branch, instructor and default room if creating
+        // new class. emitEvent:false so the branchId valueChanges hook below
+        // doesn't fire and clear the courseId we just selected (the dropdown is
+        // already filtered to this branch, so the patch is essentially a no-op
+        // anyway).
         if (!this.isEditMode()) {
           this.classForm.patchValue({
             branchId: course.branchId,
-            instructorId: course.instructorId
+            instructorId: course.instructorId,
+            roomId: (course as any).defaultRoomId || ''
           }, { emitEvent: false });
         }
       },

@@ -210,6 +210,20 @@ async function cascadeCoursePrice(
   return { studentsRepriced, openRepriced };
 }
 
+/** Sentinel: a default room id was given, but it isn't one of this company's rooms. */
+const INVALID_ROOM = Symbol('invalid-room');
+
+/**
+ * Validate the course's default room against the caller's company. Null when no
+ * room was chosen (or it was cleared), the id when it checks out, and the
+ * sentinel when it belongs to someone else or doesn't exist.
+ */
+async function resolveDefaultRoomId(raw: any, companyId: string): Promise<string | null | typeof INVALID_ROOM> {
+  if (raw === undefined || raw === null || raw === '') return null;
+  const room = await queryOne<any>('SELECT id FROM rooms WHERE id = $1 AND company_id = $2', [raw, companyId]);
+  return room ? String(raw) : INVALID_ROOM;
+}
+
 function mapCourseFromDB(row: any) {
   let levels: { id: string; name: string | null }[] = [];
   const raw = row.levels_json;
@@ -241,6 +255,7 @@ function mapCourseFromDB(row: any) {
     // elsewhere rather than a wrong null, so a caller can tell "no teacher" from
     // "didn't ask".
     instructorName: row.instructor_name ?? null,
+    defaultRoomId: row.default_room_id ?? null,
     levelId: row.level_id ?? (levels[0]?.id ?? null),
     levelName: row.level_name ?? (levels[0]?.name ?? null),
     levelIds: levels.map((l) => l.id),
@@ -345,6 +360,11 @@ export const coursesRoutes = {
       const levelIds = resolveLevelIds(body);
       const subjectIds = resolveSubjectIds(body);
 
+      const defaultRoomId = await resolveDefaultRoomId(body.defaultRoomId, context.companyId);
+      if (defaultRoomId === INVALID_ROOM) {
+        return apiError(404, 'ERRORS.ROOMS.NOT_FOUND', 'Room not found');
+      }
+
       const course = await insert('courses', {
         company_id: context.companyId,
         branch_id: body.branchId,
@@ -352,6 +372,7 @@ export const coursesRoutes = {
         description: body.description || null,
         price: body.price,
         instructor_id: body.instructorId || null,
+        default_room_id: defaultRoomId,
         // Keep the legacy single column pointed at the first level for old readers.
         level_id: levelIds[0] ?? null,
         is_active: true,
@@ -608,6 +629,13 @@ export const coursesRoutes = {
       if (body.description !== undefined) updateData.description = body.description;
       if (body.price !== undefined) updateData.price = body.price;
       if (body.instructorId !== undefined) updateData.instructor_id = body.instructorId || null;
+      if (body.defaultRoomId !== undefined) {
+        const defaultRoomId = await resolveDefaultRoomId(body.defaultRoomId, context.companyId);
+        if (defaultRoomId === INVALID_ROOM) {
+          return apiError(404, 'ERRORS.ROOMS.NOT_FOUND', 'Room not found');
+        }
+        updateData.default_room_id = defaultRoomId;
+      }
       if (body.paymentType !== undefined) updateData.payment_type = body.paymentType;
       if (body.sessionPackageSize !== undefined) updateData.session_package_size = body.sessionPackageSize || null;
       if (body.sessionPackagePrice !== undefined) updateData.session_package_price = body.sessionPackagePrice ?? null;

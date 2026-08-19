@@ -590,8 +590,17 @@ export const classesRoutes = {
         return apiError(404, 'ERRORS.ROOMS.NOT_FOUND', 'Room not found');
       }
 
+      // A legacy-shaped body (day set + one envelope, no dayTimes array) is still
+      // a schedule — synthesize the per-day slots for the clash check the same
+      // way the update path does, or such a create slips past the guard.
+      const guardDayTimes = dayTimes ?? (
+        legacy.days_of_week && legacy.start_time && legacy.end_time
+          ? String(legacy.days_of_week).split(',').map((d: string) => d.trim()).filter(Boolean)
+              .map((day: string) => ({ day, startTime: legacy.start_time, endTime: legacy.end_time }))
+          : []
+      );
       const clashes = await findRoomConflicts(context.companyId, {
-        roomId, startDate: body.startDate, endDate: body.endDate, dayTimes: dayTimes ?? [],
+        roomId, startDate: body.startDate, endDate: body.endDate, dayTimes: guardDayTimes,
       });
       if (clashes.length) {
         return apiError(409, 'ERRORS.CLASSES.ROOM_CONFLICT', roomConflictMessage(clashes), roomConflictParams(clashes));
