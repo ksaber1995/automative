@@ -107,7 +107,18 @@
         </div>
         <p-progressBar [value]="submittedPct()" [showValue]="false" styleClass="!h-2"></p-progressBar>
 
-        <p-table [value]="attempts()" dataKey="studentId" [loading]="attemptsLoading()" responsiveLayout="scroll">
+        <div class="flex justify-end">
+          <input
+            type="text"
+            pInputText
+            [ngModel]="attemptsSearch()"
+            (ngModelChange)="attemptsSearch.set($event)"
+            [placeholder]="'EXAMS.DETAIL.SEARCH' | translate"
+            class="w-full md:w-64"
+          />
+        </div>
+
+        <p-table [value]="filteredAttempts()" dataKey="studentId" [loading]="attemptsLoading()" responsiveLayout="scroll">
           <ng-template pTemplate="header">
             <tr>
               <th>{{ 'EXAMS.DETAIL.COL_STUDENT' | translate }}</th>

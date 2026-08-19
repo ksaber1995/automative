@@ -123,6 +123,16 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     this.attemptsTotal() ? Math.round((this.submittedCount() / this.attemptsTotal()) * 100) : 0);
   anyoneInProgress = computed(() => this.attempts().some((a) => a.status === 'IN_PROGRESS'));
 
+  attemptsSearch = signal('');
+  filteredAttempts = computed(() => {
+    const q = this.attemptsSearch().trim().toLowerCase();
+    const list = this.attempts();
+    if (!q) return list;
+    return list.filter((a) =>
+      a.name.toLowerCase().includes(q) ||
+      (a.code != null && String(a.code).toLowerCase().includes(q)));
+  });
+
   filteredRoster = computed(() => {
     const q = this.search().trim().toLowerCase();
     const list = this.roster();
