@@ -104,8 +104,6 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   attempts = signal<ExamAttemptRow[]>([]);
   attemptsLoading = signal(false);
   resettingId = signal<string | null>(null);
-  regeneratingCode = signal(false);
-  codeCopied = signal(false);
 
   /** serverNow − deviceNow at the last poll; the countdown column adds it back. */
   private clockSkewMs = 0;
@@ -284,27 +282,6 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     if (left <= 0) return '0:00';
     const total = Math.floor(left / 1000);
     return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
-  }
-
-  copyAccessCode() {
-    const code = this.exam()?.accessCode;
-    if (!code) return;
-    navigator.clipboard?.writeText(code).then(() => {
-      this.codeCopied.set(true);
-      setTimeout(() => this.codeCopied.set(false), 1500);
-    }).catch(() => {});
-  }
-
-  regenerateCode() {
-    this.regeneratingCode.set(true);
-    this.service.regenerateCode(this.examId).subscribe({
-      next: (res) => {
-        this.regeneratingCode.set(false);
-        this.exam.update((e) => (e ? { ...e, accessCode: res.accessCode } : e));
-        this.notifications.success(this.translate.instant('EXAMS.ONLINE.CODE_REGENERATED'));
-      },
-      error: () => this.regeneratingCode.set(false),
-    });
   }
 
   confirmResetAttempt(row: ExamAttemptRow) {

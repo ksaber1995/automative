@@ -253,7 +253,7 @@ export const studentExamsRoutes = {
    *
    * Online exams whose window is open, for courses (and, when class-scoped,
    * classes) the student is enrolled in — with their own attempt state joined
-   * on. Never the access code itself, only whether one is needed.
+   * on.
    */
   list: async ({ headers }: { headers: AuthHeaders }) => {
     const guard = await extractStudentContext(headers?.authorization);
@@ -264,7 +264,6 @@ export const studentExamsRoutes = {
       const rows = await query<any>(
         `SELECT e.id, e.name, c.name AS course_name,
                 e.question_count, e.duration_minutes, e.opens_at, e.closes_at,
-                (e.access_code IS NOT NULL) AS requires_code,
                 a.status AS attempt_status, a.score, a.total, a.expires_at
            FROM exams e
            JOIN courses c ON c.id = e.course_id
@@ -297,7 +296,8 @@ export const studentExamsRoutes = {
           questionCount: row.question_count !== null ? parseInt(row.question_count, 10) : null,
           durationMinutes: row.duration_minutes !== null ? parseInt(row.duration_minutes, 10) : null,
           closesAt: iso(row.closes_at),
-          requiresCode: row.requires_code === true,
+          // Kept in the contract for older portal builds; codes are no longer used.
+          requiresCode: false,
           // IN_PROGRESS even when the clock has actually run out — tapping
           // Continue hits start/attempt, which grades it and answers with the
           // finished state. One place resolves expiry, not two.
@@ -367,14 +367,8 @@ export const studentExamsRoutes = {
       if (!(await maySit(s, exam))) {
         return apiError(403, 'ERRORS.EXAMS.NOT_ENROLLED', 'You are not enrolled in this exam');
       }
-      // The code gates STARTING only — identity comes from the login, so its one
-      // remaining job is stopping a start before the teacher says go.
-      if (exam.access_code) {
-        const typed = (body?.accessCode || '').trim().toUpperCase();
-        if (typed !== exam.access_code.toUpperCase()) {
-          return apiError(403, 'ERRORS.EXAMS.BAD_CODE', 'Wrong access code');
-        }
-      }
+      // No access-code gate: the login is the identity and the open/close window
+      // is the schedule — a code on top of both only got in the way (2026-08-19).
 
       let attempt = await findAttempt(exam.id, s.studentId);
       if (attempt) {

@@ -8,9 +8,8 @@ import { StudentExamsService, StudentExamListItem } from './student-exams.servic
 
 /**
  * The signed-in home: every exam the student may sit, with their own state on
- * each card — Start (behind the access-code field only when the exam wants
- * one), Continue, or the score. A start that answers 409 ALREADY_SUBMITTED
- * routes straight to the result screen instead of erroring.
+ * each card — Start, Continue, or the score. A start that answers 409
+ * ALREADY_SUBMITTED routes straight to the result screen instead of erroring.
  */
 @Component({
   selector: 'app-exams',
@@ -62,17 +61,8 @@ import { StudentExamsService, StudentExamListItem } from './student-exams.servic
 
         @switch (item.state) {
           @case ('AVAILABLE') {
-            @if (item.requiresCode) {
-              <input
-                [placeholder]="i18n.t('EXAMS.CODE_PLACEHOLDER')"
-                [(ngModel)]="codes[item.examId]"
-                autocapitalize="characters"
-                autocomplete="off"
-                style="text-transform: uppercase;"
-              />
-            }
             <button type="button" class="btn" (click)="start(item)"
-                    [disabled]="busyId() === item.examId || (item.requiresCode && !(codes[item.examId] || '').trim())">
+                    [disabled]="busyId() === item.examId">
               {{ i18n.t(busyId() === item.examId ? 'EXAMS.STARTING' : 'EXAMS.START') }}
             </button>
           }
@@ -111,7 +101,6 @@ export class ExamsComponent implements OnInit {
   loading = signal(true);
   items = signal<StudentExamListItem[]>([]);
   busyId = signal<string | null>(null);
-  codes: Record<string, string> = {};
   errors: Record<string, string> = {};
 
   ngOnInit(): void {
@@ -130,7 +119,7 @@ export class ExamsComponent implements OnInit {
   start(item: StudentExamListItem): void {
     this.errors[item.examId] = '';
     this.busyId.set(item.examId);
-    this.svc.start(item.examId, (this.codes[item.examId] || '').trim() || undefined).subscribe({
+    this.svc.start(item.examId).subscribe({
       next: (attempt) => {
         this.svc.activeAttempt.set({ examId: item.examId, attempt });
         this.router.navigate(['/exams', item.examId, 'sit']);

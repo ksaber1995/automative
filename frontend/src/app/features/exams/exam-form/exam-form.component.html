@@ -266,31 +266,6 @@
                 </div>
               </div>
 
-              <!-- The access code exists after the first save; it is generated
-                   server-side so it can't be typed into something guessable. -->
-              @if (isEditMode() && accessCode()) {
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">
-                    {{ 'EXAMS.ONLINE.ACCESS_CODE' | translate }}
-                  </label>
-                  <div class="flex items-center gap-3 flex-wrap">
-                    <span class="font-mono text-2xl font-bold tracking-widest text-indigo-700">{{ accessCode() }}</span>
-                    <p-button
-                      type="button"
-                      size="small"
-                      [outlined]="true"
-                      severity="secondary"
-                      icon="pi pi-refresh"
-                      [loading]="regeneratingCode()"
-                      [label]="'EXAMS.ONLINE.REGENERATE_CODE' | translate"
-                      (onClick)="regenerateCode()"
-                    ></p-button>
-                  </div>
-                  <small class="text-gray-400">{{ 'EXAMS.ONLINE.ACCESS_CODE_HINT' | translate }}</small>
-                </div>
-              } @else if (!isEditMode()) {
-                <small class="text-gray-500">{{ 'EXAMS.ONLINE.CODE_ON_SAVE' | translate }}</small>
-              }
             </div>
           }
         </div>

@@ -90,8 +90,8 @@ export class StudentExamsService {
     return this.http.get<ResultRow[]>(`${API}/results`);
   }
 
-  start(examId: string, accessCode?: string): Observable<StudentAttempt> {
-    return this.http.post<StudentAttempt>(`${API}/exams/${examId}/start`, accessCode ? { accessCode } : {});
+  start(examId: string): Observable<StudentAttempt> {
+    return this.http.post<StudentAttempt>(`${API}/exams/${examId}/start`, {});
   }
 
   attempt(examId: string): Observable<StudentAttempt> {

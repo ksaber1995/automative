@@ -98,8 +98,6 @@ export class ExamFormComponent implements OnInit {
   loadingLessons = signal(false);
   private selectedLessonIds = signal<string[]>([]);
   loadingTaught = signal(false);
-  accessCode = signal<string | null>(null);
-  regeneratingCode = signal(false);
 
   /**
    * How many questions the chosen lessons hold between them — the ceiling on the
@@ -265,19 +263,6 @@ export class ExamFormComponent implements OnInit {
     });
   }
 
-  regenerateCode() {
-    if (!this.id) return;
-    this.regeneratingCode.set(true);
-    this.service.regenerateCode(this.id).subscribe({
-      next: (res) => {
-        this.accessCode.set(res.accessCode);
-        this.regeneratingCode.set(false);
-        this.notifications.success(this.translate.instant('EXAMS.ONLINE.CODE_REGENERATED'));
-      },
-      error: () => this.regeneratingCode.set(false),
-    });
-  }
-
   load(id: string) {
     this.loading.set(true);
     this.service.getById(id).subscribe({
@@ -300,7 +285,6 @@ export class ExamFormComponent implements OnInit {
           shuffleOptions: row.shuffleOptions !== false,
           showAnswers: row.showAnswers !== false,
         });
-        this.accessCode.set(row.accessCode ?? null);
         // Somebody has a paper drawn from this pool — the scope and count are
         // frozen (the server's 409 ALREADY_STARTED remains the backstop).
         this.scopeLocked.set((row.attemptCounts?.started ?? 0) > 0);
