@@ -429,6 +429,31 @@
           </div>
         </div>
       }
+      <!-- Room Availability Warning — the room twin of the teacher block above. -->
+      @if (roomConflicts().length > 0) {
+        <div class="mt-6 p-4 border border-red-300 bg-red-50 rounded-md">
+          <div class="flex items-start gap-2">
+            <i class="pi pi-exclamation-triangle text-red-600 text-lg mt-0.5"></i>
+            <div class="flex-1">
+              <p class="font-semibold text-red-700">
+                {{ 'CLASSES.FORM.ROOM_CONFLICT_TITLE' | translate: { name: roomName() } }}
+              </p>
+              <p class="text-sm text-red-700 mt-1">
+                {{ 'CLASSES.FORM.ROOM_CONFLICT_HINT' | translate }}
+              </p>
+              <ul class="mt-2 list-disc ms-6 text-sm text-red-700">
+                @for (c of roomConflicts(); track c.id) {
+                  <li>
+                    <strong>{{ c.name }}</strong> —
+                    {{ formatDaysOfWeek(c.conflictDay) }}
+                    {{ formatTime(c.startTime) }}–{{ formatTime(c.endTime) }}
+                  </li>
+                }
+              </ul>
+            </div>
+          </div>
+        </div>
+      }
       @if (checkingAvailability() && availabilityConflicts().length === 0) {
         <div class="mt-3 text-sm text-gray-500 flex items-center gap-2">
           <i class="pi pi-spin pi-spinner"></i>
@@ -452,7 +477,7 @@
           type="submit"
           [label]="isEditMode() ? ('CLASSES.FORM.UPDATE' | translate) : ('CLASSES.FORM.CREATE' | translate)"
           icon="pi pi-check"
-          [disabled]="classForm.invalid || loading() || availabilityConflicts().length > 0 || invalidTimeSlots().length > 0">
+          [disabled]="classForm.invalid || loading() || availabilityConflicts().length > 0 || roomConflicts().length > 0 || invalidTimeSlots().length > 0">
           @if (loading()) {
             <i class="pi pi-spin pi-spinner"></i>
           }

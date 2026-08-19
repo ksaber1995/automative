@@ -1006,6 +1006,62 @@ export const classesRoutes = {
     }
   },
 
+  /**
+   * The room twin of checkTeacherAvailability: the same live warning while the
+   * form is still open, so a double-booked room is something the user sees as
+   * they pick it rather than a 409 after they press Save. Delegates to
+   * findRoomConflicts — the one place that owns the rule (academies only,
+   * per-day comparison, past-midnight splitting).
+   */
+  checkRoomAvailability: async ({ query: queryParams, headers }: { query: { roomId?: string; startDate: string; endDate: string; startTime?: string; endTime?: string; daysOfWeek?: string; dayTimes?: string; excludeClassId?: string }; headers: { authorization: string } }) => {
+    try {
+      await ensureClassStatusColumns();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const { roomId, startDate, endDate, startTime, endTime, daysOfWeek, dayTimes, excludeClassId } = queryParams;
+      if (!roomId || !startDate || !endDate || !daysOfWeek) {
+        return { status: 200 as const, body: { available: true, conflicts: [] } };
+      }
+      if (!dayTimes && (!startTime || !endTime)) {
+        return { status: 200 as const, body: { available: true, conflicts: [] } };
+      }
+
+      // Per-day slots as DAY|START|END; callers with only the envelope spread it
+      // across every listed day — same convention as the teacher check.
+      const incoming: DayTime[] = (dayTimes || '')
+        .split(',')
+        .map(part => part.split('|').map(s => s.trim()))
+        .filter(bits => bits.length === 3 && bits[0] && bits[1] && bits[2])
+        .map(([day, s, e]) => ({ day, startTime: s, endTime: e }));
+      const wanted: DayTime[] = incoming.length
+        ? incoming
+        : daysOfWeek.split(',').map(d => d.trim()).filter(Boolean)
+            .map(day => ({ day, startTime: startTime || '', endTime: endTime || '' }));
+      if (!wanted.length) {
+        return { status: 200 as const, body: { available: true, conflicts: [] } };
+      }
+
+      const clashes = await findRoomConflicts(context.companyId, {
+        roomId, startDate, endDate, dayTimes: wanted, excludeClassId,
+      });
+      const conflicts = clashes.map(c => ({
+        id: c.id,
+        name: c.name,
+        conflictDay: c.day,
+        startTime: String(c.startTime).slice(0, 5),
+        endTime: String(c.endTime).slice(0, 5),
+        roomCode: c.roomCode,
+      }));
+      return { status: 200 as const, body: { available: conflicts.length === 0, conflicts } };
+    } catch (error) {
+      console.error('Check room availability error:', error);
+      return mapThrownError(error, 'ERRORS.CLASSES.CHECK_AVAILABILITY_FAILED', 'Failed to check availability', 400);
+    }
+  },
+
   getById: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
     try {
       await ensureClassStatusColumns();

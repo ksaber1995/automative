@@ -10,7 +10,7 @@ import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TextareaModule } from 'primeng/textarea';
 import { CheckboxModule } from 'primeng/checkbox';
-import { ClassService, TeacherAvailabilityConflict } from '../services/class.service';
+import { ClassService, TeacherAvailabilityConflict, RoomAvailabilityConflict } from '../services/class.service';
 import { debounceTime, switchMap, catchError } from 'rxjs/operators';
 import { Subject, of } from 'rxjs';
 import { EmployeeService } from '../../employees/services/employee.service';
@@ -76,6 +76,9 @@ export class ClassFormComponent implements OnInit {
   /** Availability checks, funnelled through one switchMap — see ngOnInit. */
   private availabilityQuery$ = new Subject<Parameters<ClassService['checkTeacherAvailability']>[0]>();
   checkingAvailability = signal(false);
+  /** The room's own live clash warning — same machinery as the teacher's. */
+  roomConflicts = signal<RoomAvailabilityConflict[]>([]);
+  private roomQuery$ = new Subject<Parameters<ClassService['checkRoomAvailability']>[0]>();
 
   // Per-day times. When sameTime is true the two single time inputs apply to every
   // selected day; when false each selected day carries its own start/end in perDay.
@@ -210,7 +213,7 @@ export class ClassFormComponent implements OnInit {
 
     this.classForm.valueChanges
       .pipe(debounceTime(400))
-      .subscribe(() => this.checkAvailability());
+      .subscribe(() => { this.checkAvailability(); this.checkRoomClash(); });
 
     /**
      * switchMap, not a subscribe per check: every keystroke past the debounce
@@ -233,6 +236,18 @@ export class ClassFormComponent implements OnInit {
         this.availabilityConflicts.set(result.conflicts || []);
         this.checkingAvailability.set(false);
       });
+
+    // The room check rides the same debounce and the same switchMap discipline:
+    // only the newest request's answer may set the warning.
+    this.roomQuery$
+      .pipe(
+        switchMap(params =>
+          this.classService.checkRoomAvailability(params).pipe(
+            catchError(() => of({ available: true, conflicts: [] as RoomAvailabilityConflict[] })),
+          ),
+        ),
+      )
+      .subscribe(result => this.roomConflicts.set(result.conflicts || []));
   }
 
   private checkAvailability() {
@@ -286,9 +301,53 @@ export class ClassFormComponent implements OnInit {
     });
   }
 
+  /** The room's live clash check — same preconditions as the teacher's, keyed on the room. */
+  private checkRoomClash() {
+    const v = this.classForm.value;
+    const days: string[] = v.daysOfWeek || [];
+    const dayTimes = this.buildDayTimes();
+    if (!v.roomId || days.length === 0 || !v.startDate || dayTimes.length === 0) {
+      this.roomConflicts.set([]);
+      return;
+    }
+
+    const startDate = this.toLocalYmd(v.startDate);
+    let endDate: string;
+    if (v.numberOfSessions && v.numberOfSessions > 0) {
+      const calc = this.calculateEndDate(
+        v.startDate instanceof Date ? v.startDate : new Date(v.startDate),
+        days,
+        v.numberOfSessions
+      );
+      endDate = this.toLocalYmd(calc);
+    } else if (v.endDate) {
+      endDate = this.toLocalYmd(v.endDate);
+    } else {
+      this.roomConflicts.set([]);
+      return;
+    }
+
+    this.roomQuery$.next({
+      roomId: v.roomId,
+      startDate,
+      endDate,
+      startTime: v.startTime,
+      endTime: v.endTime,
+      daysOfWeek: days.join(','),
+      dayTimes: dayTimes.map(d => `${d.day}|${d.startTime}|${d.endTime}`).join(','),
+      excludeClassId: this.classId || undefined,
+    });
+  }
+
   instructorName(): string {
     const id = this.classForm.get('instructorId')?.value;
     const found = this.instructors().find(i => i.value === id);
+    return found?.label || '';
+  }
+
+  roomName(): string {
+    const id = this.classForm.get('roomId')?.value;
+    const found = this.rooms().find(r => r.id === id);
     return found?.label || '';
   }
 

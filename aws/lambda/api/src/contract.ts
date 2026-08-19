@@ -4763,6 +4763,37 @@ export const contract = c.router({
         400: ApiErrorSchema,
       },
     },
+    checkRoomAvailability: {
+      method: 'GET',
+      path: '/api/classes/check-room-availability',
+      query: z.object({
+        roomId: OptionalUUIDSchema,
+        startDate: z.string(),
+        endDate: z.string(),
+        // The envelope: one time applied to every listed day.
+        startTime: z.string().optional(),
+        endTime: z.string().optional(),
+        daysOfWeek: z.string().optional(),
+        /** The real per-day slots, DAY|START|END joined by commas — preferred. */
+        dayTimes: z.string().optional(),
+        excludeClassId: OptionalUUIDSchema,
+      }),
+      responses: {
+        200: z.object({
+          available: z.boolean(),
+          conflicts: z.array(z.object({
+            id: UUIDSchema,
+            name: z.string(),
+            /** The weekday that actually clashes. */
+            conflictDay: z.string(),
+            startTime: z.string(),
+            endTime: z.string(),
+            roomCode: z.string().nullable(),
+          })),
+        }),
+        400: ApiErrorSchema,
+      },
+    },
     getEnrollments: {
       method: 'GET',
       path: '/api/classes/:id/enrollments',

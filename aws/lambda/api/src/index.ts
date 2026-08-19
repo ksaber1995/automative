@@ -185,6 +185,7 @@ const router = {
     list: classesRoutes.list,
     listActive: classesRoutes.listActive,
     checkTeacherAvailability: classesRoutes.checkTeacherAvailability,
+    checkRoomAvailability: classesRoutes.checkRoomAvailability,
     getEnrollments: classesRoutes.getEnrollments,
     finish: classesRoutes.finish,
     getById: classesRoutes.getById,

@@ -85,6 +85,34 @@ export class ClassService {
       params as any
     );
   }
+
+  /** The room twin of the teacher check — same shape, same conventions. */
+  checkRoomAvailability(params: {
+    roomId?: string;
+    startDate: string;
+    endDate: string;
+    startTime?: string;
+    endTime?: string;
+    daysOfWeek?: string;
+    /** Per-day slots as DAY|START|END, comma joined — preferred over the envelope. */
+    dayTimes?: string;
+    excludeClassId?: string;
+  }): Observable<{ available: boolean; conflicts: RoomAvailabilityConflict[] }> {
+    return this.api.get<{ available: boolean; conflicts: RoomAvailabilityConflict[] }>(
+      'classes/check-room-availability',
+      params as any
+    );
+  }
+}
+
+export interface RoomAvailabilityConflict {
+  id: string;
+  name: string;
+  /** The weekday that actually clashes. */
+  conflictDay: string;
+  startTime: string;
+  endTime: string;
+  roomCode: string | null;
 }
 
 export interface TeacherAvailabilityConflict {
