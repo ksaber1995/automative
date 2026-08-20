@@ -5012,6 +5012,7 @@
     "PER_SESSION": "per session",
     "CLASS": "Class / group",
     "PICK_CLASS": "Pick a class…",
+    "NO_CLASSES": "This course has no open groups right now — pick another course.",
     "NOTES": "Notes",
     "NOTES_PH": "Anything we should know",
     "PAYMENT_TITLE": "Payment (optional)",

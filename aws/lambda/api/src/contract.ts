@@ -9122,7 +9122,7 @@ export const contract = c.router({
         phone: z.string().min(8),
         parentPhone: z.string().optional(),
         courseId: UUIDSchema,
-        classId: OptionalUUIDSchema,
+        classId: UUIDSchema,
         notes: z.string().optional(),
         claimedAmount: z.number().optional(),
         /** data:image/... URL of the payment proof, ≤ ~3MB of image. */

@@ -140,15 +140,17 @@ export const bookingsRoutes = {
       );
       if (!course) return apiError(400, 'ERRORS.BOOKINGS.COURSE_REQUIRED', 'Pick a course');
 
-      let classId: string | null = null;
-      if (body?.classId) {
-        const cls = await queryOne<any>(
-          'SELECT id FROM classes WHERE id = $1 AND course_id = $2 AND deleted_at IS NULL',
-          [body.classId, course.id]
-        );
-        if (!cls) return apiError(400, 'ERRORS.BOOKINGS.CLASS_INVALID', 'That class does not belong to the course');
-        classId = cls.id;
+      // The class is a MUST: an enrollment without one has no schedule, no
+      // attendance sheet, and no room — the office would only have to chase it.
+      if (!body?.classId) {
+        return apiError(400, 'ERRORS.BOOKINGS.CLASS_REQUIRED', 'Pick a class');
       }
+      const cls = await queryOne<any>(
+        'SELECT id FROM classes WHERE id = $1 AND course_id = $2 AND deleted_at IS NULL',
+        [body.classId, course.id]
+      );
+      if (!cls) return apiError(400, 'ERRORS.BOOKINGS.CLASS_INVALID', 'That class does not belong to the course');
+      const classId: string = cls.id;
 
       const photo = typeof body?.paymentPhoto === 'string' ? body.paymentPhoto : null;
       if (photo && (photo.length > MAX_PHOTO_CHARS || !photo.startsWith('data:image/'))) {

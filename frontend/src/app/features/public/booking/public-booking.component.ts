@@ -83,15 +83,19 @@ interface BookingCourse {
                 </select>
               </div>
 
-              @if (selectedCourse() && selectedCourse()!.classes.length) {
+              @if (selectedCourse(); as course) {
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'PUBLIC_BOOKING.CLASS' | translate }}</label>
-                  <select [(ngModel)]="form.classId" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
-                    <option value="">{{ 'PUBLIC_BOOKING.PICK_CLASS' | translate }}</option>
-                    @for (cl of selectedCourse()!.classes; track cl.id) {
-                      <option [value]="cl.id">{{ cl.name }}{{ classTime(cl) }}</option>
-                    }
-                  </select>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'PUBLIC_BOOKING.CLASS' | translate }} <span class="text-red-500">*</span></label>
+                  @if (course.classes.length) {
+                    <select [(ngModel)]="form.classId" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
+                      <option value="">{{ 'PUBLIC_BOOKING.PICK_CLASS' | translate }}</option>
+                      @for (cl of course.classes; track cl.id) {
+                        <option [value]="cl.id">{{ cl.name }}{{ classTime(cl) }}</option>
+                      }
+                    </select>
+                  } @else {
+                    <p class="text-sm text-red-600">{{ 'PUBLIC_BOOKING.NO_CLASSES' | translate }}</p>
+                  }
                 </div>
               }
 
@@ -126,7 +130,7 @@ interface BookingCourse {
               }
 
               <button type="button" (click)="submit()"
-                [disabled]="submitting() || !form.studentName.trim() || form.phone.trim().length < 8 || !form.courseId"
+                [disabled]="submitting() || !form.studentName.trim() || form.phone.trim().length < 8 || !form.courseId || !form.classId"
                 class="w-full py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 @if (submitting()) { <i class="pi pi-spin pi-spinner me-2"></i> }
                 {{ 'PUBLIC_BOOKING.SUBMIT' | translate }}
@@ -200,7 +204,7 @@ export class PublicBookingComponent implements OnInit {
       phone: this.form.phone.trim(),
       parentPhone: this.form.parentPhone.trim() || undefined,
       courseId: this.form.courseId,
-      classId: this.form.classId || undefined,
+      classId: this.form.classId,
       notes: this.form.notes.trim() || undefined,
       claimedAmount: this.form.claimedAmount ?? undefined,
       paymentPhoto: this.paymentPhoto ?? undefined,
