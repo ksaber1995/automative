@@ -178,6 +178,16 @@ export const masterEnrollmentsRoutes = {
         return apiError(400, 'ERRORS.MASTER_ENROLLMENTS.ALREADY_ACTIVE', 'Student already has an active enrollment in this master course');
       }
 
+      // Enrolling someone who was marked as left means they are BACK — same
+      // rule as the course enrollment path: forward-looking queries (rosters,
+      // ensureBillsForMonth, dues) skip left students, so without this the new
+      // bundle never bills again.
+      await query(
+        `UPDATE students SET is_active = true, inactive_date = NULL, updated_at = NOW()
+          WHERE id = $1 AND company_id = $2 AND COALESCE(is_active, true) = false`,
+        [body.studentId, context.companyId]
+      );
+
       const masterFull = await queryOne(
         'SELECT default_price, payment_type FROM master_courses WHERE id = $1',
         [body.masterCourseId]

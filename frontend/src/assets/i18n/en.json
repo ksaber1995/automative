@@ -4974,6 +4974,8 @@
       "TOTAL_REMAINING": "Total Remaining",
       "FILTER_BRANCH": "Branch",
       "ALL_BRANCHES": "All Branches",
+      "FILTER_STUDENT": "Student",
+      "FILTER_STUDENT_PLACEHOLDER": "Search by name…",
       "FILTER_TYPE": "Type",
       "TYPE_ALL": "All types",
       "TYPE_ONE_TIME": "One-time",

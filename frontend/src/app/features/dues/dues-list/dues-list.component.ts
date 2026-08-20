@@ -11,6 +11,7 @@ import { SelectModule } from 'primeng/select';
 import { TooltipModule } from 'primeng/tooltip';
 import { DialogModule } from 'primeng/dialog';
 import { InputNumberModule } from 'primeng/inputnumber';
+import { InputTextModule } from 'primeng/inputtext';
 import { DatePickerModule } from 'primeng/datepicker';
 import { TextareaModule } from 'primeng/textarea';
 import { ProgressBarModule } from 'primeng/progressbar';
@@ -35,7 +36,7 @@ import { toLocalYmd } from '../../../core/utils/date.util';
     CommonModule, FormsModule,
     CardModule, TableModule, ButtonModule, TagModule,
     SelectModule, TooltipModule, DialogModule,
-    InputNumberModule, DatePickerModule, TextareaModule, ProgressBarModule,
+    InputNumberModule, InputTextModule, DatePickerModule, TextareaModule, ProgressBarModule,
     TranslateModule, TagModule,
   ],
   templateUrl: './dues-list.component.html',
@@ -68,6 +69,9 @@ export class DuesListComponent implements OnInit {
   dateFrom = signal<Date | null>(null);
   dateTo = signal<Date | null>(null);
 
+  /** Client-side filter by student name. */
+  searchStudent = signal('');
+
   /**
    * The date this row is ABOUT — the same one its date column shows: the month
    * owed for a monthly bill, the enrolment date for everything else.
@@ -88,8 +92,10 @@ export class DuesListComponent implements OnInit {
     const t = this.filterType();
     const from = this.dateFrom() ? toLocalYmd(this.dateFrom()!) : null;
     const to = this.dateTo() ? toLocalYmd(this.dateTo()!) : null;
+    const q = this.searchStudent().trim().toLowerCase();
 
     let list = this.dues();
+    if (q) list = list.filter(d => (d.studentName || '').toLowerCase().includes(q));
     if (t !== 'ALL') list = list.filter(d => d.paymentType === t);
     if (from || to) {
       list = list.filter(d => {
@@ -107,7 +113,8 @@ export class DuesListComponent implements OnInit {
 
   /** Any filter beyond the defaults is on — drives the Clear button's state. */
   hasFilters = computed(() =>
-    !!this.filterBranch || this.filterType() !== 'ALL' || !!this.dateFrom() || !!this.dateTo(),
+    !!this.filterBranch || this.filterType() !== 'ALL' || !!this.dateFrom() || !!this.dateTo()
+      || !!this.searchStudent().trim(),
   );
 
   // Totals follow the active type filter, so the header matches the table.
@@ -180,6 +187,7 @@ export class DuesListComponent implements OnInit {
     this.filterType.set('ALL');
     this.dateFrom.set(null);
     this.dateTo.set(null);
+    this.searchStudent.set('');
     // Only the branch is server-side, so this is the one that needs a refetch.
     this.load();
   }

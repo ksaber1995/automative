@@ -5098,6 +5098,8 @@
       "TOTAL_REMAINING": "إجمالي المتبقي",
       "FILTER_BRANCH": "الفرع",
       "ALL_BRANCHES": "جميع الفروع",
+      "FILTER_STUDENT": "الطالب",
+      "FILTER_STUDENT_PLACEHOLDER": "ابحث بالاسم…",
       "FILTER_TYPE": "النوع",
       "TYPE_ALL": "كل الأنواع",
       "TYPE_ONE_TIME": "دفعة واحدة",

@@ -436,6 +436,16 @@ export const enrollmentsRoutes = {
         }
       }
 
+      // Enrolling someone who was marked as left means they are BACK — without
+      // this, every forward-looking query (rosters, ensureBillsForMonth, dues)
+      // keeps skipping them via studentIsPresent, so the new subscription never
+      // raises another bill and the student silently vanishes from /dues.
+      await query(
+        `UPDATE students SET is_active = true, inactive_date = NULL, updated_at = NOW()
+          WHERE id = $1 AND company_id = $2 AND COALESCE(is_active, true) = false`,
+        [body.studentId, context.companyId]
+      );
+
       // Monthly-subscription courses follow a per-month billing model, not a
       // one-time price/installment plan. Route them to a dedicated path.
       const course = await queryOne(

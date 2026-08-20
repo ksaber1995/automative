@@ -15,7 +15,18 @@
 
   <!-- Filters -->
   <p-card>
-    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'DUES.LIST.FILTER_STUDENT' | translate }}</label>
+        <input
+          type="text"
+          pInputText
+          [ngModel]="searchStudent()"
+          (ngModelChange)="searchStudent.set($event)"
+          [placeholder]="'DUES.LIST.FILTER_STUDENT_PLACEHOLDER' | translate"
+          class="w-full"
+        />
+      </div>
       @if (branchState.showBranchPicker()) {
         <div>
           <label class="block text-sm font-medium text-gray-600 mb-1">{{ 'DUES.LIST.FILTER_BRANCH' | translate }}</label>
