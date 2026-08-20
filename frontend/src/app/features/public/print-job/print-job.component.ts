@@ -7,11 +7,6 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import QRCode from 'qrcode';
 import { environment } from '../../../../environments/environment';
-import { canExportCustom, loadCardImages, renderAgnosticCardPng } from '../../students/card-render.util';
-// The types are not re-exported by card-render.util, so they come from where
-// they are declared rather than widening that module's surface for one page.
-import type { AgnosticCardData, AgnosticTemplate } from '../../students/card-agnostic.util';
-import type { CardImages } from '../../students/student-card.util';
 
 interface PrintJob {
   academyName: string;
@@ -88,13 +83,10 @@ interface PrintJob {
           @if (exporting()) {
             <p class="state">{{ 'PRINT_JOB.PREPARING' | translate: { done: done(), total: total() } }}</p>
           } @else {
-            <button class="download" [disabled]="!j.cards.length" (click)="download()">
-              {{ 'PRINT_JOB.DOWNLOAD' | translate: { count: j.cards.length } }}
-            </button>
-            <!-- The bare QR codes, no artwork — for shops that print the design
-                 themselves and only need the codes. Same files the admin
-                 console's cards download produces. -->
-            <button class="download plain" [disabled]="!j.cards.length" (click)="downloadPlain()">
+            <!-- ONE download: the bare QR codes, no artwork. The shop prints the
+                 design themselves — same files the admin console's cards
+                 download produces, serial as the filename. -->
+            <button class="download" [disabled]="!j.cards.length" (click)="downloadPlain()">
               {{ 'PRINT_JOB.DOWNLOAD_PLAIN' | translate: { count: j.cards.length } }}
             </button>
           }
@@ -181,61 +173,6 @@ export class PrintJobComponent implements OnInit {
     const first = label(cards[0].serial);
     const last = label(cards[cards.length - 1].serial);
     return first === last ? first : `${first} – ${last}`;
-  }
-
-  protected async download(): Promise<void> {
-    const j = this.job();
-    if (!j || !j.cards.length || this.exporting()) return;
-
-    this.failed.set(null);
-    this.exporting.set(true);
-    this.done.set(0);
-    this.total.set(j.cards.length);
-
-    try {
-      const design = j.cardDesign ?? null;
-      const template = design?.agnosticTemplate as AgnosticTemplate | undefined;
-
-      // Refuse rather than ship a thousand blank faces. The tenant's own artwork
-      // is only usable if both sides are actually present; the same guard the
-      // in-app export uses, and for the same reason — this batch gets printed.
-      if (template === 'custom' && !canExportCustom(design)) {
-        this.failed.set('PRINT_JOB.CUSTOM_ART_MISSING');
-        return;
-      }
-
-      const images: CardImages = await loadCardImages(design);
-      const canvas = document.createElement('canvas');
-      await document.fonts.ready;   // Arabic must shape before rasterising
-
-      const zip = new JSZip();
-      const label = (s: number) => (s >= 900000 ? `0${s - 900000}` : s > 100000 ? `A${s - 100000}` : String(s));
-      let n = 0;
-      for (const card of j.cards) {
-        const data: AgnosticCardData = {
-          companyName: j.academyName,
-          code: label(card.serial),
-          qrUrl: `${window.location.origin}/p/s/${card.token}`,
-        };
-        zip.file(`${label(card.serial)}.png`, await renderAgnosticCardPng(data, canvas, template, images, design), { base64: true });
-        this.done.set(++n);
-        // Yield so the counter repaints rather than freezing the tab.
-        if (n % 5 === 0) await new Promise((r) => setTimeout(r));
-      }
-
-      const blob = await zip.generateAsync({ type: 'blob' });
-      saveAs(blob, `${j.academyName.replace(/[^\w؀-ۿ-]+/g, '_')}-cards.zip`);
-
-      // Tell the office it was collected. Best effort — the printer already has
-      // the file, so a failure here must not look like a failed download.
-      this.http.post(`${environment.apiUrl}/public/print-jobs/${this.token}/downloaded`, {}).subscribe({
-        next: () => {}, error: () => {},
-      });
-    } catch {
-      this.failed.set('PRINT_JOB.DOWNLOAD_FAILED');
-    } finally {
-      this.exporting.set(false);
-    }
   }
 
   /**
