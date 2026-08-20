@@ -2291,6 +2291,10 @@
       "CREATE": "إنشاء",
       "UPDATE": "تحديث",
       "CREATE_SUCCESS": "تم إنشاء الدرس",
+      "CREATE_SUCCESS_MULTI": "تم إنشاء الدرس في {{count}} كورسات",
+      "COURSES_LABEL": "الكورسات",
+      "COURSES_PLACEHOLDER": "اختر كورساً أو أكثر…",
+      "COURSES_REQUIRED": "اختر كورساً واحداً على الأقل",
       "UPDATE_SUCCESS": "تم تحديث الدرس"
     },
     "QUESTIONS": {

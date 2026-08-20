@@ -10,7 +10,9 @@ import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
 import { SelectModule } from 'primeng/select';
+import { MultiSelectModule } from 'primeng/multiselect';
 import { TagModule } from 'primeng/tag';
+import { forkJoin } from 'rxjs';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -45,6 +47,7 @@ import { LessonModel } from '@shared/interfaces/lesson.interface';
     InputTextModule,
     TextareaModule,
     SelectModule,
+    MultiSelectModule,
     TagModule,
     ConfirmDialogModule,
     TranslateModule,
@@ -79,9 +82,14 @@ export class LessonListComponent implements OnInit {
   form: FormGroup = this.fb.group({
     name: ['', [Validators.required, Validators.minLength(2)]],
     description: [''],
+    // The course(s) the lesson is created in — picked IN the dialog, so adding
+    // never needs a course selected on the page first. More than one course =
+    // the same lesson created in each, so a shared bank is typed once.
+    courseIds: [[] as string[]],
   });
 
   get name() { return this.form.get('name'); }
+  get courseIds() { return this.form.get('courseIds'); }
 
   ngOnInit() {
     this.loadCourses();
@@ -131,14 +139,16 @@ export class LessonListComponent implements OnInit {
   openCreate() {
     this.isEditMode.set(false);
     this.editingId = null;
-    this.form.reset({ name: '', description: '' });
+    // The page's picked course is a sensible default, not a requirement.
+    const preset = this.selectedCourseId();
+    this.form.reset({ name: '', description: '', courseIds: preset ? [preset] : [] });
     this.showDialog.set(true);
   }
 
   openEdit(lesson: LessonModel) {
     this.isEditMode.set(true);
     this.editingId = lesson.id;
-    this.form.reset({ name: lesson.name, description: lesson.description ?? '' });
+    this.form.reset({ name: lesson.name, description: lesson.description ?? '', courseIds: [] });
     this.showDialog.set(true);
   }
 
@@ -148,8 +158,8 @@ export class LessonListComponent implements OnInit {
   }
 
   save() {
-    const courseId = this.selectedCourseId();
-    if (this.form.invalid || !courseId) {
+    const courseIds: string[] = this.isEditMode() ? [] : (this.form.value.courseIds ?? []);
+    if (this.form.invalid || (!this.isEditMode() && !courseIds.length)) {
       this.form.markAllAsTouched();
       return;
     }
@@ -173,10 +183,18 @@ export class LessonListComponent implements OnInit {
         error: fail,
       });
     } else {
-      // No orderIndex: the server appends to the end of the course's list.
-      this.lessonService.create({ courseId, name, description }).subscribe({
+      // One create per chosen course — the same lesson lands in each. No
+      // orderIndex: the server appends to the end of each course's list.
+      forkJoin(courseIds.map((courseId) => this.lessonService.create({ courseId, name, description }))).subscribe({
         next: () => {
-          this.notificationService.success(this.translate.instant('LESSONS.FORM.CREATE_SUCCESS'));
+          this.notificationService.success(courseIds.length > 1
+            ? this.translate.instant('LESSONS.FORM.CREATE_SUCCESS_MULTI', { count: courseIds.length })
+            : this.translate.instant('LESSONS.FORM.CREATE_SUCCESS'));
+          // Land the page on one of the courses just written, so the new lesson
+          // is visible even when nothing was selected before.
+          if (!this.selectedCourseId() || !courseIds.includes(this.selectedCourseId()!)) {
+            this.selectedCourseId.set(courseIds[0]);
+          }
           done();
         },
         error: fail,

@@ -2291,6 +2291,10 @@
       "CREATE": "Create",
       "UPDATE": "Update",
       "CREATE_SUCCESS": "Lesson created",
+      "CREATE_SUCCESS_MULTI": "Lesson created in {{count}} courses",
+      "COURSES_LABEL": "Courses",
+      "COURSES_PLACEHOLDER": "Pick one or more courses…",
+      "COURSES_REQUIRED": "Pick at least one course",
       "UPDATE_SUCCESS": "Lesson updated"
     },
     "QUESTIONS": {
