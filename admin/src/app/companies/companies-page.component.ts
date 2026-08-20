@@ -27,6 +27,25 @@ import { syncQueryParams } from '../shared/query-sync';
     .sms-until { font-size: 12px; white-space: nowrap; }
     .sms-toggle { display: flex; align-items: center; gap: 8px; margin: 6px 0 4px; font-size: 14px; cursor: pointer; }
     .lbl { display: block; font-size: 12px; font-weight: 700; color: #334155; margin: 14px 0 5px; }
+    .contact { display: flex; flex-direction: column; gap: 1px; margin-top: 2px; font-size: 12px; font-weight: 400; }
+    /* Wide table scrolls INSIDE its card — never squeezes the sidebar/layout. */
+    .card { overflow-x: auto; }
+    .menu-btn { white-space: nowrap; }
+    /* Fixed positioning so the card's own scroll/overflow can't clip the menu. */
+    .menu-backdrop { position: fixed; inset: 0; z-index: 40; }
+    .menu {
+      position: fixed; z-index: 41; min-width: 200px; padding: 6px;
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, .16);
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .menu button {
+      text-align: left; background: none; border: 0; padding: 8px 10px; border-radius: 6px;
+      font-size: 13px; font-weight: 600; color: #0f172a; cursor: pointer; font-family: inherit;
+    }
+    .menu button:hover { background: #f1f5f9; }
+    .menu button.danger { color: #dc2626; }
+    .menu .sep { height: 1px; background: #e2e8f0; margin: 4px 2px; }
   `],
   template: `
     <header>
@@ -79,8 +98,6 @@ import { syncQueryParams } from '../shared/query-sync';
           <thead>
             <tr>
               <th>Company</th>
-              <th>Mobile</th>
-              <th>Email</th>
               <th>Registration</th>
               <th>Type</th>
               <th class="num">Price</th>
@@ -100,20 +117,22 @@ import { syncQueryParams } from '../shared/query-sync';
           <tbody>
             @for (r of filtered(); track r.company_id) {
               <tr>
-                <td class="name">{{ r.company_name }}</td>
-                <td>
-                  @if (r.mobile) {
-                    <a class="mobile" [href]="'tel:' + r.mobile">{{ r.mobile }}</a>
-                  } @else {
-                    —
-                  }
-                </td>
-                <td>
-                  @if (r.owner_email) {
-                    <a class="mobile" [href]="'mailto:' + r.owner_email">{{ r.owner_email }}</a>
-                  } @else {
-                    —
-                  }
+                <!-- Name, mobile and email stacked in ONE cell: they answer the
+                     same question (who is this and how do I reach them), and
+                     three columns of it starved the table of width. -->
+                <td class="name">
+                  <div>{{ r.company_name }}</div>
+                  <div class="contact">
+                    @if (r.mobile) {
+                      <a class="mobile" [href]="'tel:' + r.mobile">{{ r.mobile }}</a>
+                    }
+                    @if (r.owner_email) {
+                      <a class="mobile" [href]="'mailto:' + r.owner_email">{{ r.owner_email }}</a>
+                    }
+                    @if (!r.mobile && !r.owner_email) {
+                      <span class="sub">no contact</span>
+                    }
+                  </div>
                 </td>
                 <td>
                   <span class="reg" [class.teacher]="r.company_type === 'TEACHER'" [class.academy]="r.company_type === 'ACADEMY'">
@@ -153,11 +172,6 @@ import { syncQueryParams } from '../shared/query-sync';
                     } @else if (r.sms_active) {
                       <span class="sub sms-until">no end date</span>
                     }
-                    @if (auth.can('companies.write')) {
-                      <button class="act" [disabled]="busyId() === r.company_id" (click)="openSms(r)">
-                        {{ r.sms_activated ? 'Edit' : 'Activate' }}
-                      </button>
-                    }
                   </div>
                 </td>
                 <td>
@@ -165,21 +179,10 @@ import { syncQueryParams } from '../shared/query-sync';
                     <span class="sub">—</span>
                   } @else if (qrStats()[r.company_id]; as q) {
                     <div class="qr-cell">
-                      @if (auth.can('cards.write')) {
-                        <button class="act" [class.activate]="!q.qr_cards_enabled"
-                          [disabled]="busyId() === r.company_id"
-                          (click)="toggleQrCards(r)">
-                          {{ q.qr_cards_enabled ? 'Disable' : 'Enable' }}
-                        </button>
-                      }
                       @if (q.qr_cards_enabled) {
-                        @if (auth.can('cards.write')) {
-                          <button class="act" [disabled]="busyId() === r.company_id" (click)="openQrCards(r)">
-                            + Cards
-                          </button>
-                        }
+                        <span class="badge">on</span>
                         <span class="qr-count">{{ q.linked }} / {{ q.total }}</span>
-                      } @else if (!auth.can('cards.write')) {
+                      } @else {
                         <span class="sub">off</span>
                       }
                     </div>
@@ -200,51 +203,66 @@ import { syncQueryParams } from '../shared/query-sync';
                     } @else {
                       <span class="sub">off</span>
                     }
-                    @if (auth.can('companies.write')) {
-                      <button class="act" [class.activate]="!r.online_exams_enabled"
-                        [disabled]="busyId() === r.company_id"
-                        (click)="toggleOnlineExams(r)">
-                        {{ r.online_exams_enabled ? 'Disable' : 'Enable' }}
-                      </button>
-                    }
                   </div>
                 </td>
                 <td>
-                  <div class="actions">
-                    @if (auth.can('companies.write')) {
-                      @if (r.subscription_type !== 'ACTIVE') {
-                        <button class="act activate" [disabled]="busyId() === r.company_id" (click)="activate(r)">
-                          Activate
-                        </button>
-                      }
-                      @if (r.subscription_type !== 'EXPIRED') {
-                        <button class="act" [disabled]="busyId() === r.company_id" (click)="openDeactivate(r)">
-                          Deactivate
-                        </button>
-                      }
-                      <button class="act" [disabled]="busyId() === r.company_id" (click)="openExtend(r)">
-                        Extend
-                      </button>
-                      @if (r.company_type === 'ACADEMY' || r.company_type === 'TEACHER') {
-                        <button class="act" [disabled]="busyId() === r.company_id" (click)="openType(r)">
-                          Make {{ r.company_type === 'ACADEMY' ? 'Teacher' : 'Academy' }}
-                        </button>
-                      }
+                  <!-- Every action on the row lives in ONE menu — six buttons per
+                       row made the table unreadable and most of them are rare. -->
+                  @if (auth.can('companies.write') || auth.can('companies.delete') || auth.can('cards.write')) {
+                    <button class="act menu-btn" [disabled]="busyId() === r.company_id" (click)="toggleMenu(r.company_id, $event)">
+                      Actions ▾
+                    </button>
+                    @if (menuOpenId() === r.company_id) {
+                      <div class="menu-backdrop" (click)="menuOpenId.set(null)"></div>
+                      <div class="menu" [style.top.px]="menuPos().top" [style.right.px]="menuPos().right">
+                        @if (auth.can('companies.write')) {
+                          @if (r.subscription_type !== 'ACTIVE') {
+                            <button (click)="menuOpenId.set(null); activate(r)">Activate</button>
+                          }
+                          @if (r.subscription_type !== 'EXPIRED') {
+                            <button (click)="menuOpenId.set(null); openDeactivate(r)">Deactivate</button>
+                          }
+                          <button (click)="menuOpenId.set(null); openExtend(r)">Extend…</button>
+                          @if (r.company_type === 'ACADEMY' || r.company_type === 'TEACHER') {
+                            <button (click)="menuOpenId.set(null); openType(r)">
+                              Make {{ r.company_type === 'ACADEMY' ? 'Teacher' : 'Academy' }}
+                            </button>
+                          }
+                          <div class="sep"></div>
+                          <button (click)="menuOpenId.set(null); openSms(r)">
+                            {{ r.sms_activated ? 'Edit SMS…' : 'Activate SMS…' }}
+                          </button>
+                          <button (click)="menuOpenId.set(null); toggleOnlineExams(r)">
+                            {{ r.online_exams_enabled ? 'Disable online exams' : 'Enable online exams' }}
+                          </button>
+                        }
+                        @if (auth.can('cards.write')) {
+                          @if (qrStats()[r.company_id]; as q) {
+                            <button (click)="menuOpenId.set(null); toggleQrCards(r)">
+                              {{ q.qr_cards_enabled ? 'Disable QR cards' : 'Enable QR cards' }}
+                            </button>
+                            @if (q.qr_cards_enabled) {
+                              <button (click)="menuOpenId.set(null); openQrCards(r)">Add QR cards…</button>
+                            }
+                          } @else {
+                            <!-- Stays open: the QR items appear in place once loaded. -->
+                            <button (click)="loadQrStats(r.company_id)">Check QR cards…</button>
+                          }
+                        }
+                        @if (auth.can('companies.delete')) {
+                          <div class="sep"></div>
+                          <button class="danger" (click)="menuOpenId.set(null); openDelete(r)">Delete…</button>
+                        }
+                      </div>
                     }
-                    @if (auth.can('companies.delete')) {
-                      <button class="act danger" [disabled]="busyId() === r.company_id" (click)="openDelete(r)">
-                        Delete
-                      </button>
-                    }
-                    @if (!auth.can('companies.write') && !auth.can('companies.delete')) {
-                      <span class="sub">read only</span>
-                    }
-                  </div>
+                  } @else {
+                    <span class="sub">read only</span>
+                  }
                 </td>
               </tr>
             }
             @if (filtered().length === 0) {
-              <tr><td colspan="16" class="state">No matches.</td></tr>
+              <tr><td colspan="15" class="state">No matches.</td></tr>
             }
           </tbody>
         </table>
@@ -474,6 +492,9 @@ export class CompaniesPageComponent {
   protected statusFilter = signal('');
 
   protected busyId = signal<string | null>(null);
+  /** Which row's action menu is open, and where (fixed coords escape the card's scroll clipping). */
+  protected menuOpenId = signal<string | null>(null);
+  protected menuPos = signal<{ top: number; right: number }>({ top: 0, right: 0 });
   protected extendRow = signal<CompanySubscription | null>(null);
   protected typeRow = signal<CompanySubscription | null>(null);
   protected deleteRow = signal<CompanySubscription | null>(null);
@@ -514,6 +535,13 @@ export class CompaniesPageComponent {
   protected refresh(): void {
     this.error.set(null);
     this.store.loadCompanies(true);
+  }
+
+  protected toggleMenu(id: string, ev: MouseEvent): void {
+    if (this.menuOpenId() === id) { this.menuOpenId.set(null); return; }
+    const rect = (ev.currentTarget as HTMLElement).getBoundingClientRect();
+    this.menuPos.set({ top: rect.bottom + 4, right: Math.max(8, window.innerWidth - rect.right) });
+    this.menuOpenId.set(id);
   }
 
   protected formatDate(d: string | null): string {
