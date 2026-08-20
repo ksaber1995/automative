@@ -230,6 +230,13 @@
       "NOT_FOUND": "Sport not found",
       "UPDATE_FAILED": "Failed to update sport",
       "DELETE_FAILED": "Failed to delete sport"
+    },
+    "LEVELS": {
+      "NOT_FOUND": "Level not found",
+      "CREATE_FAILED": "Failed to create level",
+      "UPDATE_FAILED": "Failed to update level",
+      "DELETE_FAILED": "Failed to delete level",
+      "LIST_FAILED": "Failed to load levels"
     }
   },
   "BREADCRUMBS": {
@@ -249,7 +256,8 @@
     "ATTENDANCE_TEACHERS": "Coach Attendance",
     "EXAMS": "Evaluations & Drills",
     "EDUCATIONAL_BOOKS": "Equipment",
-    "EDUCATIONAL_BOOKS_DETAIL": "Subscription Equipment"
+    "EDUCATIONAL_BOOKS_DETAIL": "Subscription Equipment",
+    "LEVELS": "Levels"
   },
   "SESSION_PAYMENTS": {
     "TITLE": "Training Payments",
@@ -340,7 +348,8 @@
     "FIND_STUDENT": "Find Trainee",
     "QR_STUDENT_NOT_FOUND": "Trainee not found for this QR code.",
     "QR_LOOKING_UP": "Looking up trainee...",
-    "QR_SCAN_INSTRUCTION": "Point your camera at a trainee's QR code to find them."
+    "QR_SCAN_INSTRUCTION": "Point your camera at a trainee's QR code to find them.",
+    "LEVELS": "Levels"
   },
   "BRANCHES": {
     "LIST": {
@@ -409,7 +418,19 @@
   "LEVELS": {
     "LIST": {
       "NO_LEVELS": "No levels yet. Add one to tag subscriptions by skill or age.",
-      "DELETE_MSG": "Delete \"{{name}}\"? Subscriptions linked to this level will simply be unlinked."
+      "DELETE_MSG": "Delete \"{{name}}\"? Subscriptions linked to this level will simply be unlinked.",
+      "TITLE": "Levels",
+      "ADD": "Add Level",
+      "DELETE_TITLE": "Delete Level",
+      "DELETED": "Level deleted",
+      "LOAD_ERROR": "Failed to load levels"
+    },
+    "FORM": {
+      "CREATE_TITLE": "Add Level",
+      "EDIT_TITLE": "Edit Level",
+      "NAME_PLACEHOLDER": "e.g., Beginner",
+      "CREATE_SUCCESS": "Level created",
+      "UPDATE_SUCCESS": "Level updated"
     }
   },
   "SUBJECTS": {
@@ -443,7 +464,9 @@
       "DEACTIVATED": "Master subscription deactivated",
       "ACTIVATED": "Master subscription activated",
       "BLOCKER_DESC": "\"{{name}}\" still has active linked subscriptions or running groups. Deactivate them first:",
-      "EMPTY": "No packages yet. Create one to manage shared subscription templates across branches."
+      "EMPTY": "No packages yet. Create one to manage shared subscription templates across branches.",
+      "COL_LEVEL": "Level",
+      "ALL_LEVELS": "All Levels"
     },
     "FORM": {
       "CREATE_TITLE": "New Package",
@@ -451,7 +474,9 @@
       "SUBTITLE": "A package is a branch-owned template. Clone it to other branches to reuse the template there.",
       "DEFAULT_MAX_STUDENTS": "Default Max Trainees",
       "CREATE": "Create Package",
-      "UPDATE": "Update Package"
+      "UPDATE": "Update Package",
+      "LEVEL": "Level",
+      "SELECT_LEVEL": "Select a level"
     },
     "DETAIL": {
       "BACK": "Back to packages",
@@ -528,7 +553,9 @@
       "TYPE_PER_SESSION": "Pay by Training",
       "COL_TEACHER": "Coach",
       "ALL_TEACHERS": "All coaches",
-      "NO_TEACHER": "No coach"
+      "NO_TEACHER": "No coach",
+      "COL_LEVEL": "Levels",
+      "ALL_LEVELS": "All Levels"
     },
     "FORM": {
       "EDIT_TITLE": "Edit Subscription",
@@ -564,7 +591,10 @@
       "CHARGE_ABSENT_HINT": "When on, a trainee is billed for a training even if they are marked absent.",
       "PACKAGE_SIZE_LABEL": "Advance package size (trainings)",
       "PACKAGE_HINT": "Optional: let trainees prepay this many trainings at a discounted total. Leave empty to offer per-training only.",
-      "PAYMENT_TYPE_LOCKED": "Payment type cannot be changed after the subscription is created"
+      "PAYMENT_TYPE_LOCKED": "Payment type cannot be changed after the subscription is created",
+      "LEVEL_LABEL": "Levels (Optional)",
+      "LEVEL_PLACEHOLDER": "Select one or more levels",
+      "LEVELS_SELECTED": "{0} levels selected"
     },
     "DELETED": "Subscription deleted successfully",
     "PRICE_OVERRIDES": {
@@ -778,7 +808,10 @@
       "EDIT_TEACHER_TITLE": "Edit Coach",
       "SUBJECTS": "Sports",
       "SUBJECTS_PLACEHOLDER": "Select sports (optional)",
-      "SUBJECTS_SELECTED": "{0} sports selected"
+      "SUBJECTS_SELECTED": "{0} sports selected",
+      "LEVELS": "Levels",
+      "LEVELS_PLACEHOLDER": "Select levels (optional)",
+      "LEVELS_SELECTED": "{0} levels selected"
     },
     "DETAIL": {
       "PCT_TOTAL_PAID": "Paid by trainees",
@@ -793,7 +826,8 @@
       "SESSIONS_COUNT": "{{count}} training(s)",
       "COL_CLASS": "Group",
       "TEACHER": "Coach",
-      "SUBJECTS": "Sports"
+      "SUBJECTS": "Sports",
+      "LEVELS": "Levels"
     }
   },
   "EXPENSES": {
