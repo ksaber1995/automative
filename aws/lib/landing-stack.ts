@@ -55,6 +55,13 @@ export interface LandingStackProps extends cdk.StackProps {
     spf?: string;     // e.g. "v=spf1 -all"
     dmarc?: string;   // e.g. "v=DMARC1; p=reject; sp=reject; adkim=s; aspf=s"
   };
+  /**
+   * 301 any request whose path starts with `prefix` to `target` + the same path
+   * — e.g. netrofit.com/p/s/<token> → app.netrofit.com/p/s/<token>, for QR links
+   * printed or shared against the wrong host. Handled at the edge, before the
+   * SPA ever loads.
+   */
+  pathRedirects?: { prefix: string; target: string }[];
 }
 
 /**
@@ -110,16 +117,25 @@ export class LandingStack extends cdk.Stack {
     //    /api/whatever) and replace the JSON body with the SPA shell. Use a CloudFront Function
     //    on viewer-request instead, scoped to non-/api, non-static-asset paths.
     const useFunctionFallback = !!props.apiProxy;
-    const spaFunction = useFunctionFallback
+    const redirects = props.pathRedirects ?? [];
+    // One viewer-request function per behavior is all CloudFront allows, so the
+    // redirects and the SPA fallback share it. Redirects run first — a request
+    // that belongs on another host must never fall through to index.html.
+    const needsFunction = useFunctionFallback || redirects.length > 0;
+    const spaFunction = needsFunction
       ? new cloudfront.Function(this, 'SpaFallbackFunction', {
-          comment: 'Rewrite SPA deep-links to /index.html, leave /api/* and asset paths alone',
+          comment: 'Path redirects + SPA deep-link rewrite (viewer-request)',
           code: cloudfront.FunctionCode.fromInline(`
 function handler(event) {
   var request = event.request;
   var uri = request.uri;
-  if (uri.indexOf('/api/') === 0) return request;
+${redirects.map((r) => `  if (uri.indexOf(${JSON.stringify(r.prefix)}) === 0) {
+    return { statusCode: 301, statusDescription: 'Moved Permanently',
+             headers: { location: { value: ${JSON.stringify(r.target)} + uri } } };
+  }`).join('\n')}
+${useFunctionFallback ? `  if (uri.indexOf('/api/') === 0) return request;
   if (uri.lastIndexOf('.') > uri.lastIndexOf('/')) return request;
-  request.uri = '/index.html';
+  request.uri = '/index.html';` : ''}
   return request;
 }
           `.trim()),

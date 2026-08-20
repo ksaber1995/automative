@@ -35,6 +35,9 @@ new LandingStack(app, `NetrofitLandingStack-dev`, {
   domainName: 'netrofit.com',
   sourcePath: path.resolve(__dirname, '../../landing/dist/netrofit-landing/browser'),
   hostedZoneId: netrofitZoneId,
+  // Student QR links pasted/printed against the apex by mistake still resolve:
+  // netrofit.com/p/s/<token> → app.netrofit.com/p/s/<token>, 301 at the edge.
+  pathRedirects: [{ prefix: '/p/s/', target: 'https://app.netrofit.com' }],
   // Apex stack owns the zone-wide TXTs so we don't get duplicate-record CFN errors.
   zoneApexTxtRecords: {
     spf: 'v=spf1 include:amazonses.com -all',
