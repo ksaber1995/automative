@@ -34,7 +34,11 @@ import { SECTIONS, firstAllowedPath } from './app.routes';
       <app-login />
     } @else {
     <div class="app">
-      <aside class="sidebar">
+      <aside class="sidebar" [class.collapsed]="sidebarCollapsed()">
+        <button class="collapse-btn" (click)="toggleSidebar()"
+          [title]="sidebarCollapsed() ? 'Expand sidebar' : 'Collapse sidebar'">
+          {{ sidebarCollapsed() ? '»' : '«' }}
+        </button>
         <div class="brand">Netrofit <span>Admin</span></div>
         <nav>
           @for (s of sections; track s.path) {
@@ -110,6 +114,18 @@ import { SECTIONS, firstAllowedPath } from './app.routes';
       padding: 20px 14px; display: flex; flex-direction: column; gap: 6px;
       position: sticky; top: 0; height: 100vh;
     }
+    /* Collapsed: a slim rail with only the expand button — the wide tables get
+       the room. The choice sticks (localStorage). */
+    .sidebar.collapsed { width: 52px; flex-basis: 52px; padding: 20px 8px; }
+    .sidebar.collapsed .brand, .sidebar.collapsed nav,
+    .sidebar.collapsed .who, .sidebar.collapsed .refresh.side { display: none; }
+    .collapse-btn {
+      border: 0; background: rgba(255, 255, 255, .08); color: #e2e8f0;
+      border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 16px;
+      font-family: inherit; align-self: flex-end; line-height: 1;
+    }
+    .sidebar.collapsed .collapse-btn { align-self: center; }
+    .collapse-btn:hover { background: rgba(255, 255, 255, .16); }
     .brand { font-size: 18px; font-weight: 800; color: #fff; padding: 6px 10px 18px; }
     .brand span { color: #818cf8; font-weight: 600; }
     .sidebar nav { display: flex; flex-direction: column; gap: 4px; }
@@ -153,6 +169,12 @@ export class AppComponent {
   private router = inject(Router);
 
   protected readonly sections = SECTIONS;
+
+  protected sidebarCollapsed = signal(localStorage.getItem('adminSidebarCollapsed') === '1');
+  protected toggleSidebar(): void {
+    this.sidebarCollapsed.update((v) => !v);
+    localStorage.setItem('adminSidebarCollapsed', this.sidebarCollapsed() ? '1' : '0');
+  }
 
   constructor() {
     this.auth.restore();

@@ -99,7 +99,6 @@ import { syncQueryParams } from '../shared/query-sync';
             <tr>
               <th>Company</th>
               <th>Registration</th>
-              <th>Type</th>
               <th class="num">Price</th>
               <th class="num">Students</th>
               <th class="num">Courses</th>
@@ -108,7 +107,6 @@ import { syncQueryParams } from '../shared/query-sync';
               <th>Start</th>
               <th>End</th>
               <th>Status</th>
-              <th>SMS</th>
               <th>QR cards</th>
               <th>Online exams</th>
               <th>Actions</th>
@@ -139,11 +137,6 @@ import { syncQueryParams } from '../shared/query-sync';
                     {{ r.company_type || '—' }}
                   </span>
                 </td>
-                <td>
-                  <span class="badge" [class.trial]="r.subscription_type === 'TRIAL'">
-                    {{ r.subscription_type || '—' }}
-                  </span>
-                </td>
                 <td class="num">{{ formatPrice(r) }}</td>
                 <td class="num">{{ r.student_count }}</td>
                 <td class="num">{{ r.course_count }}</td>
@@ -154,25 +147,6 @@ import { syncQueryParams } from '../shared/query-sync';
                 <td>
                   <span class="dot" [class.off]="!r.company_active"></span>
                   {{ r.company_active ? 'Active' : 'Inactive' }}
-                </td>
-                <td>
-                  <!-- The derived state, not the raw flag: a tenant switched on
-                       whose date ran out last week is OFF, and saying "on" here
-                       would be the console disagreeing with the sender. -->
-                  <div class="sms-cell">
-                    @if (r.sms_active) {
-                      <span class="badge">on</span>
-                    } @else if (r.sms_activated) {
-                      <span class="badge expired" title="Activated, but the end date has passed">lapsed</span>
-                    } @else {
-                      <span class="sub">off</span>
-                    }
-                    @if (r.sms_expiration) {
-                      <span class="sub sms-until">to {{ formatDate(r.sms_expiration) }}</span>
-                    } @else if (r.sms_active) {
-                      <span class="sub sms-until">no end date</span>
-                    }
-                  </div>
                 </td>
                 <td>
                   @if (!auth.can('cards.read')) {
@@ -262,7 +236,7 @@ import { syncQueryParams } from '../shared/query-sync';
               </tr>
             }
             @if (filtered().length === 0) {
-              <tr><td colspan="15" class="state">No matches.</td></tr>
+              <tr><td colspan="13" class="state">No matches.</td></tr>
             }
           </tbody>
         </table>
