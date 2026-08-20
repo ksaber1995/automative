@@ -83,6 +83,7 @@ const router = {
     forgotPassword: authRoutes.forgotPassword,
     resetPassword: authRoutes.resetPassword,
     profile: authRoutes.profile,
+    refresh: authRoutes.refresh,
   },
   // `similar` is declared first inside studentsRoutes AND above `getById` in the
   // contract — the static `/students/similar` has to be registered before

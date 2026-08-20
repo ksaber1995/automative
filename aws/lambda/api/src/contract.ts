@@ -2526,6 +2526,20 @@ export const contract = c.router({
         authorization: z.string(),
       }),
     },
+    /**
+     * Re-mint the session from the DB. Role/permissions ride inside the access
+     * token, so this is how a permission change reaches a live session without
+     * a sign-out/sign-in.
+     */
+    refresh: {
+      method: 'POST',
+      path: '/api/auth/refresh',
+      body: z.object({ refreshToken: z.string() }),
+      responses: {
+        200: AuthResponseSchema,
+        401: ApiErrorSchema,
+      },
+    },
   },
 
   // Students routes

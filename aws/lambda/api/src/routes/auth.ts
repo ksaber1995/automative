@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { query, queryOne, getClient } from '../db/connection';
-import { signToken, signRefreshToken, verifyToken, extractTokenFromHeader } from '../utils/jwt';
+import { signToken, signRefreshToken, verifyToken, verifyRefreshToken, extractTokenFromHeader } from '../utils/jwt';
 import { sendWhatsappOtp, sendWhatsappPasswordResetOtp } from '../utils/whatsapp';
 import { verifyRecaptcha } from '../utils/recaptcha';
 import { enforce, enforceByIp, RATE_LIMITS } from '../middleware/rate-limit';
@@ -710,6 +710,74 @@ export const authRoutes = {
     } catch (error) {
       console.error('Reset password error:', error);
       return apiError(400, 'ERRORS.AUTH.PASSWORD_RESET_FAILED', 'Could not reset password. Please try again.');
+    }
+  },
+
+  /**
+   * POST /api/auth/refresh { refreshToken } — re-mint the session from the DB.
+   *
+   * Role and permissions live INSIDE the access token (extractTenantContext
+   * reads them off the claims, not the DB), so an admin's permission change
+   * could not reach a session that kept its login-time token — the user had to
+   * sign out and back in. This re-reads the user row and signs fresh tokens,
+   * so the client can pick up permission changes in place.
+   */
+  refresh: async ({ body }: { body: { refreshToken: string } }) => {
+    try {
+      if (!body?.refreshToken) {
+        return apiError(401, 'ERRORS.AUTH.NO_TOKEN', 'No token provided');
+      }
+      const decoded = await verifyRefreshToken(body.refreshToken);
+
+      await ensureQrCardSchema();
+      await ensureVerticalColumn();
+      await ensureOnlineExamsColumn();
+      const user = await queryOne<any>(
+        `SELECT u.*, c.type as company_type, c.plan as company_plan,
+                c.vertical as company_vertical,
+                c.qr_cards_enabled as company_qr_cards,
+                c.online_exams_enabled as company_online_exams,
+                c.is_active as company_is_active,
+                array_agg(ub.branch_id) FILTER (WHERE ub.branch_id IS NOT NULL) as branch_ids
+         FROM users u
+         JOIN companies c ON u.company_id = c.id
+         LEFT JOIN user_branches ub ON ub.user_id = u.id
+         WHERE u.id = $1
+         GROUP BY u.id, c.type, c.plan, c.vertical, c.qr_cards_enabled, c.online_exams_enabled, c.is_active`,
+        [decoded.id]
+      );
+      if (!user) {
+        return apiError(401, 'ERRORS.AUTH.USER_NOT_FOUND', 'User not found');
+      }
+      // The refresh is also where a deactivation lands on a live session, so the
+      // same gates as login apply — an inactive user must not get a new token.
+      if (!user.company_is_active) {
+        return apiError(401, 'ERRORS.AUTH.COMPANY_INACTIVE', 'Company account is inactive. Please contact support.');
+      }
+      if (!user.is_active) {
+        return apiError(401, 'ERRORS.AUTH.USER_INACTIVE', 'User account is inactive');
+      }
+
+      const branchIds: string[] = user.branch_ids ?? (user.branch_id ? [user.branch_id] : []);
+      const payload = {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        companyId: user.company_id,
+        branchId: user.branch_id,
+        permissions: user.permissions ?? null,
+      };
+      return {
+        status: 200 as const,
+        body: {
+          accessToken: await signToken(payload),
+          refreshToken: await signRefreshToken(payload),
+          user: await buildSafeUser(user, branchIds),
+        },
+      };
+    } catch (error) {
+      console.error('Refresh error:', error);
+      return apiError(401, 'ERRORS.UNAUTHORIZED', 'Unauthorized');
     }
   },
 

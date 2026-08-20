@@ -47,7 +47,16 @@ export class AuthService {
 
   constructor() {
     this.loadUserFromStorage();
+    // Role and permissions live INSIDE the access token, so the API keeps
+    // enforcing whatever was true at login until a new token is minted. This
+    // timer re-mints it in place, so an admin's permission change reaches a
+    // live session within minutes instead of demanding a sign-out/sign-in.
+    setInterval(() => {
+      if (this.getToken() && this.getRefreshToken()) this.refreshSession();
+    }, AuthService.SESSION_REFRESH_MS);
   }
+
+  private static readonly SESSION_REFRESH_MS = 5 * 60 * 1000;
 
   /**
    * The one place the signed-in user is published.
@@ -70,14 +79,18 @@ export class AuthService {
 
     if (token && cachedUser) {
       // Straight from the cache first so the app paints in the right vocabulary
-      // immediately, then corrected by the profile call.
+      // immediately, then corrected by the refresh (fresh token AND fresh user,
+      // so permission changes land on a plain page reload too).
       this.publishUser(cachedUser, false);
-
-      this.getProfile().subscribe({
-        next: (user) => this.publishUser(user),
-        error: (err) => {
-          if (err?.status === 401) this.logout();
-        }
+      this.refreshSession(() => {
+        // No/invalid refresh token (older session) — the profile call is the
+        // old behavior and still validates the access token.
+        this.getProfile().subscribe({
+          next: (user) => this.publishUser(user),
+          error: (err) => {
+            if (err?.status === 401) this.logout();
+          }
+        });
       });
     } else if (token && !cachedUser) {
       this.getProfile().subscribe({
@@ -85,6 +98,30 @@ export class AuthService {
         error: () => this.logout()
       });
     }
+  }
+
+  /**
+   * Re-mint the session: the API re-reads role/permissions from the DB and
+   * signs fresh tokens. This — not getProfile(), which only refreshes the UI's
+   * copy of the user — is what makes a permission change actually ENFORCEABLE
+   * mid-session, because the API reads permissions off the token claims.
+   */
+  refreshSession(onUnavailable?: () => void): void {
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) { onUnavailable?.(); return; }
+    this.http.post<AuthResponse>(`${environment.apiUrl}/auth/refresh`, { refreshToken })
+      .subscribe({
+        next: (response) => {
+          this.setTokens(response.accessToken, response.refreshToken);
+          this.publishUser(response.user);
+        },
+        error: (err) => {
+          // 401 here means the account/company was deactivated or the token is
+          // no longer honoured — the session is over, not merely stale.
+          if (err?.status === 401) this.logout();
+          else onUnavailable?.();
+        }
+      });
   }
 
   login(credentials: LoginDto): Observable<AuthResponse> {
@@ -182,9 +219,13 @@ export class AuthService {
 
   /** Re-fetch the signed-in user so plan/permission-driven UI (e.g. CRM nav) updates in place. */
   refreshUser(): void {
-    this.getProfile().subscribe({
-      next: (user) => this.publishUser(user),
-      error: () => {},
+    // Prefer the full session refresh (fresh token = fresh API-side permissions);
+    // fall back to a profile read for sessions predating refresh tokens.
+    this.refreshSession(() => {
+      this.getProfile().subscribe({
+        next: (user) => this.publishUser(user),
+        error: () => {},
+      });
     });
   }
 
