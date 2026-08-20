@@ -62,11 +62,21 @@ interface BookingCourse {
             <div class="flex flex-col gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'PUBLIC_BOOKING.NAME' | translate }} <span class="text-red-500">*</span></label>
-                <input type="text" [(ngModel)]="form.studentName" class="w-full border border-gray-300 rounded-lg px-3 py-2" [placeholder]="'PUBLIC_BOOKING.NAME_PH' | translate" />
+                <input type="text" [(ngModel)]="form.studentName" class="w-full border rounded-lg px-3 py-2"
+                  [class.border-red-500]="attempted() && !nameValid()" [class.border-gray-300]="!(attempted() && !nameValid())"
+                  [placeholder]="'PUBLIC_BOOKING.NAME_PH' | translate" />
+                @if (attempted() && !nameValid()) {
+                  <p class="text-xs text-red-600 mt-1">{{ 'PUBLIC_BOOKING.ERR_NAME' | translate }}</p>
+                }
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'PUBLIC_BOOKING.PHONE' | translate }} <span class="text-red-500">*</span></label>
-                <input type="tel" [(ngModel)]="form.phone" dir="ltr" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="01XXXXXXXXX" />
+                <input type="tel" [(ngModel)]="form.phone" dir="ltr" class="w-full border rounded-lg px-3 py-2"
+                  [class.border-red-500]="attempted() && !phoneValid()" [class.border-gray-300]="!(attempted() && !phoneValid())"
+                  placeholder="01XXXXXXXXX" />
+                @if (attempted() && !phoneValid()) {
+                  <p class="text-xs text-red-600 mt-1">{{ 'PUBLIC_BOOKING.ERR_PHONE' | translate }}</p>
+                }
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'PUBLIC_BOOKING.PARENT_PHONE' | translate }}</label>
@@ -75,24 +85,42 @@ interface BookingCourse {
 
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'PUBLIC_BOOKING.COURSE' | translate }} <span class="text-red-500">*</span></label>
-                <select [(ngModel)]="form.courseId" (ngModelChange)="form.classId = ''" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
+                <select [(ngModel)]="form.courseId" (ngModelChange)="form.classId = ''" class="w-full border rounded-lg px-3 py-2 bg-white"
+                  [class.border-red-500]="attempted() && !form.courseId" [class.border-gray-300]="!(attempted() && !form.courseId)">
                   <option value="">{{ 'PUBLIC_BOOKING.PICK_COURSE' | translate }}</option>
                   @for (c of courses(); track c.id) {
                     <option [value]="c.id">{{ c.name }} — {{ c.price }} {{ c.paymentType === 'MONTHLY_SUBSCRIPTION' ? ('PUBLIC_BOOKING.PER_MONTH' | translate) : (c.paymentType === 'PER_SESSION' ? ('PUBLIC_BOOKING.PER_SESSION' | translate) : '') }}</option>
                   }
                 </select>
+                @if (attempted() && !form.courseId) {
+                  <p class="text-xs text-red-600 mt-1">{{ 'PUBLIC_BOOKING.ERR_COURSE' | translate }}</p>
+                }
               </div>
+
+              @if (selectedCourse(); as course) {
+                <div class="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <span class="text-sm font-medium text-blue-900">{{ 'PUBLIC_BOOKING.PRICE' | translate }}</span>
+                  <span class="text-lg font-bold text-blue-900" dir="ltr">
+                    {{ course.price }}
+                    <span class="text-sm font-medium">{{ course.paymentType === 'MONTHLY_SUBSCRIPTION' ? ('PUBLIC_BOOKING.PER_MONTH' | translate) : (course.paymentType === 'PER_SESSION' ? ('PUBLIC_BOOKING.PER_SESSION' | translate) : '') }}</span>
+                  </span>
+                </div>
+              }
 
               @if (selectedCourse(); as course) {
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'PUBLIC_BOOKING.CLASS' | translate }} <span class="text-red-500">*</span></label>
                   @if (course.classes.length) {
-                    <select [(ngModel)]="form.classId" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
+                    <select [(ngModel)]="form.classId" class="w-full border rounded-lg px-3 py-2 bg-white"
+                      [class.border-red-500]="attempted() && !form.classId" [class.border-gray-300]="!(attempted() && !form.classId)">
                       <option value="">{{ 'PUBLIC_BOOKING.PICK_CLASS' | translate }}</option>
                       @for (cl of course.classes; track cl.id) {
                         <option [value]="cl.id">{{ cl.name }}{{ classTime(cl) }}</option>
                       }
                     </select>
+                    @if (attempted() && !form.classId) {
+                      <p class="text-xs text-red-600 mt-1">{{ 'PUBLIC_BOOKING.ERR_CLASS' | translate }}</p>
+                    }
                   } @else {
                     <p class="text-sm text-red-600">{{ 'PUBLIC_BOOKING.NO_CLASSES' | translate }}</p>
                   }
@@ -110,7 +138,11 @@ interface BookingCourse {
                 <div class="flex flex-col gap-3">
                   <div>
                     <label class="block text-xs text-gray-600 mb-1">{{ 'PUBLIC_BOOKING.PAID_AMOUNT' | translate }}</label>
-                    <input type="number" [(ngModel)]="form.claimedAmount" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2" />
+                    <input type="number" [(ngModel)]="form.claimedAmount" min="0" [max]="maxPay()" class="w-full border rounded-lg px-3 py-2"
+                      [class.border-red-500]="!payValid()" [class.border-gray-300]="payValid()" />
+                    @if (!payValid()) {
+                      <p class="text-xs text-red-600 mt-1">{{ 'PUBLIC_BOOKING.ERR_PAY_MAX' | translate: { max: maxPay() } }}</p>
+                    }
                   </div>
                   <div>
                     <label class="block text-xs text-gray-600 mb-1">{{ 'PUBLIC_BOOKING.PAYMENT_PHOTO' | translate }}</label>
@@ -129,12 +161,17 @@ interface BookingCourse {
                 <p class="text-sm text-red-600 text-center">{{ error() | translate }}</p>
               }
 
+              <!-- Always clickable: a disabled button explains nothing. Clicking
+                   with missing fields marks each one in red instead. -->
               <button type="button" (click)="submit()"
-                [disabled]="submitting() || !form.studentName.trim() || form.phone.trim().length < 8 || !form.courseId || !form.classId"
+                [disabled]="submitting()"
                 class="w-full py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 @if (submitting()) { <i class="pi pi-spin pi-spinner me-2"></i> }
                 {{ 'PUBLIC_BOOKING.SUBMIT' | translate }}
               </button>
+              @if (attempted() && !formValid()) {
+                <p class="text-sm text-red-600 text-center -mt-1">{{ 'PUBLIC_BOOKING.FIX_FIELDS' | translate }}</p>
+              }
             </div>
           </div>
         }
@@ -161,7 +198,27 @@ export class PublicBookingComponent implements OnInit {
   form = { studentName: '', phone: '', parentPhone: '', courseId: '', classId: '', notes: '', claimedAmount: null as number | null };
   private paymentPhoto: string | null = null;
 
+  /** Set on the first submit click — before it, no red ink on an untouched form. */
+  attempted = signal(false);
+
   selectedCourse = computed(() => this.courses().find(c => c.id === this.form.courseId) || null);
+
+  nameValid(): boolean { return this.form.studentName.trim().length >= 2; }
+  phoneValid(): boolean { return this.form.phone.replace(/[^\d]/g, '').length >= 8; }
+
+  /**
+   * The most a student may claim to have paid up-front: one month's fee for a
+   * subscription, the course price for everything else. Anything above it is a
+   * typo or a misunderstanding the office would have to unwind.
+   */
+  maxPay(): number { return this.selectedCourse()?.price ?? 0; }
+  payValid(): boolean {
+    const a = this.form.claimedAmount;
+    if (a == null) return true;
+    return a >= 0 && (!this.selectedCourse() || a <= this.maxPay());
+  }
+
+  formValid(): boolean { return this.nameValid() && this.phoneValid() && !!this.form.courseId && !!this.form.classId && this.payValid(); }
 
   ngOnInit(): void {
     this.token = this.route.snapshot.paramMap.get('token') || '';
@@ -197,6 +254,8 @@ export class PublicBookingComponent implements OnInit {
   }
 
   submit(): void {
+    this.attempted.set(true);
+    if (!this.formValid()) return;
     this.error.set('');
     this.submitting.set(true);
     this.http.post<any>(`${environment.apiUrl}/public/booking/${this.token}`, {

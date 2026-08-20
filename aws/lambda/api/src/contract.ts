@@ -9122,7 +9122,9 @@ export const contract = c.router({
         phone: z.string().min(8),
         parentPhone: z.string().optional(),
         courseId: UUIDSchema,
-        classId: UUIDSchema,
+        // Required by the HANDLER, not here: a zod failure answers with schema
+        // jargon ("classId: Required"), and this message faces the public.
+        classId: OptionalUUIDSchema,
         notes: z.string().optional(),
         claimedAmount: z.number().optional(),
         /** data:image/... URL of the payment proof, ≤ ~3MB of image. */

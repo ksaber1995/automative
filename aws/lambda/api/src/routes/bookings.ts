@@ -135,15 +135,16 @@ export const bookingsRoutes = {
       if (phone.length < 8) return apiError(400, 'ERRORS.BOOKINGS.PHONE_REQUIRED', 'Phone is required');
 
       const course = await queryOne<any>(
-        'SELECT id FROM courses WHERE id = $1 AND company_id = $2 AND is_active = true',
+        'SELECT id, price FROM courses WHERE id = $1 AND company_id = $2 AND is_active = true',
         [body?.courseId, company.id]
       );
-      if (!course) return apiError(400, 'ERRORS.BOOKINGS.COURSE_REQUIRED', 'Pick a course');
+      if (!course) return apiError(400, 'ERRORS.BOOKINGS.COURSE_REQUIRED', 'Please choose the course you want to join');
 
       // The class is a MUST: an enrollment without one has no schedule, no
       // attendance sheet, and no room — the office would only have to chase it.
+      // Worded for the person filling the form, not for a developer.
       if (!body?.classId) {
-        return apiError(400, 'ERRORS.BOOKINGS.CLASS_REQUIRED', 'Pick a class');
+        return apiError(400, 'ERRORS.BOOKINGS.CLASS_REQUIRED', 'Please choose the class / group you want to join');
       }
       const cls = await queryOne<any>(
         'SELECT id FROM classes WHERE id = $1 AND course_id = $2 AND deleted_at IS NULL',
@@ -157,7 +158,13 @@ export const bookingsRoutes = {
         return apiError(400, 'ERRORS.BOOKINGS.PHOTO_INVALID', 'The payment photo must be an image under 3MB');
       }
 
+      // The claimed payment cannot exceed what one enrollment costs up-front:
+      // one month for a subscription, the price for everything else.
       const claimed = body?.claimedAmount != null ? parseFloat(body.claimedAmount) : null;
+      const priceCap = parseFloat(course.price || 0);
+      if (claimed != null && priceCap > 0 && claimed > priceCap + 0.001) {
+        return apiError(400, 'ERRORS.BOOKINGS.PAY_TOO_MUCH', `The paid amount cannot exceed ${priceCap}`);
+      }
       const row = await insert('booking_requests', {
         company_id: company.id,
         course_id: course.id,
