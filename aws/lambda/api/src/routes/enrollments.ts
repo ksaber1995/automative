@@ -774,12 +774,17 @@ export const enrollmentsRoutes = {
       };
       const curPeriodExpr = '(EXTRACT(YEAR FROM CURRENT_DATE)::int * 12 + EXTRACT(MONTH FROM CURRENT_DATE)::int)';
 
+      // What counts as paid is what was paid MINUS what was refunded: a refund
+      // that kept the enrollment running (refund-without-stop) puts the money
+      // back in the parent's hand, so the balance is owed again and must show
+      // here. A refund that ended the deal still hides via status (DROPPED /
+      // CANCELLED), exactly as before.
       const eParams: any[] = [context.companyId];
-      const eConditions = ['e.company_id = $1', "e.payment_type = 'ONE_TIME'", 'e.amount_paid < e.final_price', 'COALESCE(e.total_refunded, 0) = 0', "e.status <> 'DROPPED'"];
+      const eConditions = ['e.company_id = $1', "e.payment_type = 'ONE_TIME'", '(e.amount_paid - COALESCE(e.total_refunded, 0)) < e.final_price', "e.status <> 'DROPPED'"];
       { const b = buildBranch(eParams, 'e.branch_id'); if (b) eConditions.push(b); }
 
       const meParams: any[] = [context.companyId];
-      const meConditions = ['me.company_id = $1', 'me.amount_paid < me.final_price', 'COALESCE(me.total_refunded, 0) = 0', "me.status <> 'CANCELLED'"];
+      const meConditions = ['me.company_id = $1', '(me.amount_paid - COALESCE(me.total_refunded, 0)) < me.final_price', "me.status <> 'CANCELLED'"];
       { const b = buildBranch(meParams, 'me.branch_id'); if (b) meConditions.push(b); }
 
       const mParams: any[] = [context.companyId];
@@ -793,7 +798,8 @@ export const enrollmentsRoutes = {
       const [enrollmentRows, masterRows, monthlyRows, sessionRows] = await Promise.all([
         query(
           `SELECT e.id, e.student_id, e.course_id AS course_id, e.branch_id, e.enrollment_date,
-                  e.final_price, e.amount_paid, e.payment_status, e.status,
+                  e.final_price, e.amount_paid, COALESCE(e.total_refunded, 0) AS total_refunded,
+                  e.payment_status, e.status,
                   s.name AS student_name, c.name AS course_name, b.name AS branch_name
            FROM enrollments e
            JOIN students s ON e.student_id = s.id
@@ -805,7 +811,8 @@ export const enrollmentsRoutes = {
         ),
         query(
           `SELECT me.id, me.student_id, me.master_course_id AS course_id, me.branch_id, me.enrollment_date,
-                  me.final_price, me.amount_paid, me.payment_status, me.status,
+                  me.final_price, me.amount_paid, COALESCE(me.total_refunded, 0) AS total_refunded,
+                  me.payment_status, me.status,
                   s.name AS student_name, mc.name AS course_name, b.name AS branch_name
            FROM master_enrollments me
            JOIN students s ON me.student_id = s.id
@@ -846,17 +853,21 @@ export const enrollmentsRoutes = {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const mapEnrollment = (r: any, type: 'ENROLLMENT' | 'MASTER_ENROLLMENT') => ({
-        id: r.id, studentId: r.student_id, studentName: r.student_name,
-        courseId: r.course_id, courseName: r.course_name,
-        branchId: r.branch_id, branchName: r.branch_name,
-        enrollmentDate: r.enrollment_date,
-        finalPrice: parseFloat(r.final_price),
-        amountPaid: parseFloat(r.amount_paid || 0),
-        remaining: Math.max(0, parseFloat(r.final_price) - parseFloat(r.amount_paid || 0)),
-        paymentStatus: r.payment_status, status: r.status,
-        type, paymentType: 'ONE_TIME' as const,
-      });
+      const mapEnrollment = (r: any, type: 'ENROLLMENT' | 'MASTER_ENROLLMENT') => {
+        // What the student has effectively paid — refunds hand the money back.
+        const effectivePaid = Math.max(0, parseFloat(r.amount_paid || 0) - parseFloat(r.total_refunded || 0));
+        return {
+          id: r.id, studentId: r.student_id, studentName: r.student_name,
+          courseId: r.course_id, courseName: r.course_name,
+          branchId: r.branch_id, branchName: r.branch_name,
+          enrollmentDate: r.enrollment_date,
+          finalPrice: parseFloat(r.final_price),
+          amountPaid: effectivePaid,
+          remaining: Math.max(0, parseFloat(r.final_price) - effectivePaid),
+          paymentStatus: r.payment_status, status: r.status,
+          type, paymentType: 'ONE_TIME' as const,
+        };
+      };
 
       const mapMonthly = (r: any) => {
         const due = parseFloat(r.amount_due), paid = parseFloat(r.amount_paid || 0);
@@ -1330,8 +1341,12 @@ export const enrollmentsRoutes = {
       }
 
       const currentAmountPaid = parseFloat(enrollment.amount_paid || 0);
+      const totalRefunded = parseFloat(enrollment.total_refunded || 0);
       const finalPrice = parseFloat(enrollment.final_price);
-      const remaining = finalPrice - currentAmountPaid;
+      // Refunded money went back to the parent, so it is owed — and payable —
+      // again. Without subtracting it, a refund-without-stop enrollment reads
+      // as fully paid and every new payment is rejected.
+      const remaining = finalPrice - (currentAmountPaid - totalRefunded);
 
       if (parseFloat(body.amount) > remaining) {
         return apiError(400, 'ERRORS.ENROLLMENTS.PAYMENT_EXCEEDS_BALANCE', `Payment exceeds remaining balance (${remaining.toFixed(2)})`);
@@ -1346,9 +1361,11 @@ export const enrollmentsRoutes = {
         recorded_by_user_id: context.userId,
       });
 
-      // Update enrollment amount_paid and payment_status
+      // Update enrollment amount_paid and payment_status. The status reads the
+      // EFFECTIVE balance (paid minus refunded), or a repaid refund would flip
+      // to PAID the moment any money landed.
       const newAmountPaid = currentAmountPaid + parseFloat(body.amount);
-      const newPaymentStatus = computePaymentStatus(finalPrice, newAmountPaid);
+      const newPaymentStatus = computePaymentStatus(finalPrice, newAmountPaid - totalRefunded);
 
       await query(
         'UPDATE enrollments SET amount_paid = $1, payment_status = $2, updated_at = NOW() WHERE id = $3',

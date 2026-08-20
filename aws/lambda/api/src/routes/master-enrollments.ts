@@ -543,8 +543,11 @@ export const masterEnrollmentsRoutes = {
       }
 
       const currentAmountPaid = parseFloat(me.amount_paid || '0');
+      const totalRefunded = parseFloat(me.total_refunded || '0');
       const finalPrice = parseFloat(me.final_price || '0');
-      const remaining = finalPrice - currentAmountPaid;
+      // Effective balance: refunded money is owed — and payable — again (the
+      // refund-without-stop case). Same rule as the course enrollment path.
+      const remaining = finalPrice - (currentAmountPaid - totalRefunded);
       const amount = parseFloat(body.amount);
       if (amount > remaining + 0.001) {
         return apiError(400, 'ERRORS.MASTER_ENROLLMENTS.PAYMENT_EXCEEDS_BALANCE', `Payment exceeds remaining balance (${remaining.toFixed(2)})`);
@@ -560,7 +563,7 @@ export const masterEnrollmentsRoutes = {
       });
 
       const newAmountPaid = currentAmountPaid + amount;
-      const newPaymentStatus = computePaymentStatus(finalPrice, newAmountPaid);
+      const newPaymentStatus = computePaymentStatus(finalPrice, newAmountPaid - totalRefunded);
       await query(
         'UPDATE master_enrollments SET amount_paid = $1, payment_status = $2, updated_at = NOW() WHERE id = $3',
         [newAmountPaid, newPaymentStatus, params.id]

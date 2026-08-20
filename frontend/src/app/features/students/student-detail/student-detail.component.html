@@ -1088,8 +1088,9 @@
                 </div>
               } @else {
               <div class="flex gap-1">
-                <!-- Pay button (any enrollment with remaining balance and no refund) -->
-                @if ((enrollment.amountPaid || 0) < enrollment.finalPrice && (enrollment.totalRefunded || 0) === 0) {
+                <!-- Pay button: any enrollment whose EFFECTIVE balance (paid minus
+                     refunded) is short — a refund-without-stop is payable again. -->
+                @if (((enrollment.amountPaid || 0) - (enrollment.totalRefunded || 0)) < enrollment.finalPrice) {
                   <p-button
                     icon="pi pi-wallet"
                     [rounded]="true"
@@ -1401,7 +1402,7 @@
                       }
                     </td>
                     <td>
-                      @if (!isMonthly(enrollment) && (enrollment.amountPaid || 0) < enrollment.finalPrice && (enrollment.totalRefunded || 0) === 0) {
+                      @if (!isMonthly(enrollment) && ((enrollment.amountPaid || 0) - (enrollment.totalRefunded || 0)) < enrollment.finalPrice) {
                         <p-button
                           icon="pi pi-wallet"
                           [rounded]="true"

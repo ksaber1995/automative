@@ -330,7 +330,9 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
   remaining = computed(() => {
     const e = this.enrollmentForAction();
     if (!e) return 0;
-    return Math.max(0, e.finalPrice - (e.amountPaid || 0));
+    // Refunded money is owed again — a refund-without-stop enrollment must be
+    // payable for its full balance, not read as settled.
+    return Math.max(0, e.finalPrice - ((e.amountPaid || 0) - (e.totalRefunded || 0)));
   });
 
   // Payment dialog
