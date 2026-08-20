@@ -116,7 +116,49 @@ export async function ensureWaSchema(): Promise<void> {
   )`);
   await query(`CREATE INDEX IF NOT EXISTS idx_wa_msg_conversation ON wa_messages(conversation_id, created_at)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_wa_msg_meta ON wa_messages(meta_message_id)`);
+  // Delivery receipts for EVERY message the app's numbers send — including the
+  // platform (Netrofit) number, which has no wa_accounts row. One row per
+  // message (wamid), holding the furthest status it reached.
+  await query(`CREATE TABLE IF NOT EXISTS wa_delivery_receipts (
+    wamid VARCHAR(160) PRIMARY KEY,
+    phone_number_id VARCHAR(64),
+    recipient VARCHAR(32),
+    status VARCHAR(16),
+    error_code VARCHAR(16),
+    error_detail TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_wa_receipts_recipient ON wa_delivery_receipts(recipient)`);
   waSchemaEnsured = true;
+}
+
+/**
+ * Keep the FURTHEST status a message reached: Meta's sent/delivered/read events
+ * arrive out of order, and a late "delivered" must not overwrite "read".
+ * FAILED always wins — it is terminal and the thing the sender must know.
+ */
+const WA_STATUS_RANK: Record<string, number> = { SENT: 1, DELIVERED: 2, READ: 3, FAILED: 9 };
+
+async function recordDeliveryReceipt(phoneNumberId: string, st: any): Promise<void> {
+  const status = String(st.status || '').toUpperCase();
+  if (!WA_STATUS_RANK[status]) return;
+  const err = Array.isArray(st.errors) && st.errors[0] ? st.errors[0] : null;
+  await query(
+    `INSERT INTO wa_delivery_receipts (wamid, phone_number_id, recipient, status, error_code, error_detail)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (wamid) DO UPDATE SET
+       status = CASE
+         WHEN CASE EXCLUDED.status WHEN 'SENT' THEN 1 WHEN 'DELIVERED' THEN 2 WHEN 'READ' THEN 3 WHEN 'FAILED' THEN 9 ELSE 0 END
+            > CASE wa_delivery_receipts.status WHEN 'SENT' THEN 1 WHEN 'DELIVERED' THEN 2 WHEN 'READ' THEN 3 WHEN 'FAILED' THEN 9 ELSE 0 END
+         THEN EXCLUDED.status ELSE wa_delivery_receipts.status END,
+       error_code = COALESCE(EXCLUDED.error_code, wa_delivery_receipts.error_code),
+       error_detail = COALESCE(EXCLUDED.error_detail, wa_delivery_receipts.error_detail),
+       updated_at = NOW()`,
+    [String(st.id), phoneNumberId, st.recipient_id ? String(st.recipient_id) : null, status,
+     err?.code != null ? String(err.code) : null,
+     err ? (err.title || '') + (err.error_data?.details ? ': ' + err.error_data.details : '') : null],
+  );
 }
 
 // The canonical template keys a tenant can configure.
@@ -646,6 +688,15 @@ export const waCloudRoutes = {
           if (!value) continue;
           const phoneNumberId = value?.metadata?.phone_number_id;
           if (!phoneNumberId) continue;
+
+          // Delivery receipts are recorded for EVERY number of the app — the
+          // platform (Netrofit) number has no wa_accounts row, and skipping its
+          // statuses is how "accepted" got mistaken for "delivered".
+          for (const st of value?.statuses || []) {
+            if (!st?.id || !st?.status) continue;
+            await recordDeliveryReceipt(phoneNumberId, st);
+          }
+
           const acct = await queryOne<any>('SELECT company_id FROM wa_accounts WHERE phone_number_id = $1', [phoneNumberId]);
           if (!acct) continue;
           const companyId = acct.company_id;
