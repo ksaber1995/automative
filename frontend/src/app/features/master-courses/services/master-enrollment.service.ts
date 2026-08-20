@@ -39,6 +39,11 @@ export class MasterEnrollmentService {
     return this.api.post<{ message: string }>(`master-enrollments/${id}/cancel`, {});
   }
 
+  /** Resume a CANCELLED bundle (e.g. one stopped by a full refund). */
+  reactivate(id: string): Observable<{ message: string }> {
+    return this.api.post<{ message: string }>(`master-enrollments/${id}/reactivate`, {});
+  }
+
   listRefunds(id: string): Observable<Refund[]> {
     return this.api.get<Refund[]>(`master-enrollments/${id}/refunds`);
   }

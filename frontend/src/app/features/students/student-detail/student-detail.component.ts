@@ -355,6 +355,8 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
   showMasterRefundDialog = false;
   masterEnrollmentForAction = signal<MasterEnrollmentProgress | null>(null);
   masterRefundType: 'FULL' | 'PARTIAL' = 'FULL';
+  /** Full refund WITHOUT stopping the bundle — the money goes back, the student keeps studying. */
+  masterRefundKeepActive = false;
   masterRefundAmount: number | null = null;
   masterRefundDate: Date = new Date();
   masterRefundReason = '';
@@ -519,6 +521,7 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
    * fees cannot quietly un-collect them. Hides the button the API would 403.
    */
   canRefund = (): boolean => this.authService.canWrite('refunds');
+  canManageEnrollments = (): boolean => this.authService.canWrite('enrollments');
 
   // ── Exam portal credentials (online exams, phase 7) ────────────────────────
   /**
@@ -1334,6 +1337,7 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
     }
     this.masterEnrollmentForAction.set(me);
     this.masterRefundType = 'FULL';
+    this.masterRefundKeepActive = false;
     this.masterRefundAmount = refundable;
     this.masterRefundDate = new Date();
     this.masterRefundReason = '';
@@ -1360,6 +1364,7 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
       amount: this.masterRefundAmount,
       refundDate: dateStr,
       reason: this.masterRefundReason || undefined,
+      keepActive: this.masterRefundType === 'FULL' ? this.masterRefundKeepActive : undefined,
     }).subscribe({
       next: () => {
         this.notificationService.success(this.translate.instant('STUDENTS.BUNDLE_REFUND_ISSUED'));
@@ -1370,6 +1375,26 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
       error: () => {
         this.actionLoading.set(false);
       }
+    });
+  }
+
+  /** Resume a CANCELLED bundle — the undo for a stop, refund-driven or manual. */
+  reactivateMasterEnrollment(me: MasterEnrollmentProgress) {
+    this.confirmationService.confirm({
+      header: this.translate.instant('STUDENTS.DETAIL.RESUME_BUNDLE'),
+      message: this.translate.instant('STUDENTS.DETAIL.RESUME_BUNDLE_CONFIRM', { name: me.masterCourseName }),
+      icon: 'pi pi-refresh',
+      accept: () => {
+        this.actionLoading.set(true);
+        this.masterEnrollmentService.reactivate(me.id).subscribe({
+          next: () => {
+            this.notificationService.success(this.translate.instant('STUDENTS.BUNDLE_RESUMED'));
+            this.actionLoading.set(false);
+            if (this.studentId) this.loadMasterEnrollments(this.studentId);
+          },
+          error: () => this.actionLoading.set(false),
+        });
+      },
     });
   }
 

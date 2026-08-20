@@ -108,6 +108,7 @@ const router = {
     getPayments: masterEnrollmentsRoutes.getPayments,
     addPayment: masterEnrollmentsRoutes.addPayment,
     cancel: masterEnrollmentsRoutes.cancel,
+    reactivate: masterEnrollmentsRoutes.reactivate,
     createRefund: masterEnrollmentsRoutes.createRefund,
     listRefunds: masterEnrollmentsRoutes.listRefunds,
     getById: masterEnrollmentsRoutes.getById,

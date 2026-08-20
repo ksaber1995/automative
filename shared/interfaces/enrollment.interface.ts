@@ -100,6 +100,8 @@ export interface CreateRefundDto {
   amount: number;
   refundDate: string;
   reason?: string;
+  /** Full refund without stopping the subscription (master enrollments). */
+  keepActive?: boolean;
 }
 
 export interface EnrollmentWithDetails extends Enrollment {

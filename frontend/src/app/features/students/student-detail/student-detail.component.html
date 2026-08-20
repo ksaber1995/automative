@@ -811,6 +811,7 @@
                         <th pSortableColumn="completedCourses" class="text-center">{{ 'STUDENTS.DETAIL.COL_PROGRESS' | translate }} <p-sortIcon field="completedCourses"></p-sortIcon></th>
                       }
                       <th pSortableColumn="status">{{ 'STUDENTS.DETAIL.COL_STATUS' | translate }} <p-sortIcon field="status"></p-sortIcon></th>
+                      @if (canManageEnrollments()) { <th style="width: 70px;"></th> }
                     </tr>
                   </ng-template>
                   <ng-template pTemplate="body" let-me>
@@ -849,6 +850,14 @@
                       <td>
                         <p-tag [value]="statusLabel(me.status)" severity="danger"></p-tag>
                       </td>
+                      @if (canManageEnrollments()) {
+                        <td class="text-center">
+                          <p-button [text]="true" size="small" [rounded]="true" icon="pi pi-refresh"
+                            severity="success"
+                            [pTooltip]="'STUDENTS.DETAIL.RESUME_BUNDLE' | translate"
+                            (onClick)="reactivateMasterEnrollment(me)"></p-button>
+                        </td>
+                      }
                     </tr>
                   </ng-template>
                 </p-table>
@@ -2087,6 +2096,16 @@
         <p-inputnumber [(ngModel)]="masterRefundAmount" [min]="0.01" [max]="masterRefundable()"
           [disabled]="masterRefundType === 'FULL'" [style]="{ width: '100%' }" />
       </div>
+      <!-- A full refund stops the bundle by default; this keeps it running. -->
+      @if (masterRefundType === 'FULL') {
+        <div class="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded">
+          <p-checkbox [(ngModel)]="masterRefundKeepActive" [binary]="true" inputId="masterRefundKeepActive"></p-checkbox>
+          <label for="masterRefundKeepActive" class="cursor-pointer">
+            <span class="block text-sm font-medium text-amber-900">{{ 'STUDENTS.DETAIL.REFUND_KEEP_ACTIVE' | translate }}</span>
+            <span class="block text-xs text-amber-700 mt-0.5">{{ 'STUDENTS.DETAIL.REFUND_KEEP_ACTIVE_HINT' | translate }}</span>
+          </label>
+        </div>
+      }
       <div>
         <label class="block text-sm font-medium mb-1">{{ 'STUDENTS.DETAIL.REFUND_DATE' | translate }}</label>
         <p-datepicker [(ngModel)]="masterRefundDate" [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }" appendTo="body"></p-datepicker>

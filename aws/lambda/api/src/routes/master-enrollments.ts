@@ -324,6 +324,36 @@ export const masterEnrollmentsRoutes = {
     }
   },
 
+  /**
+   * Resume a CANCELLED subscription — the undo for a stop, whether it came from
+   * the cancel action or from a full refund. Only CANCELLED rows qualify:
+   * "resuming" a completed or active one would be a no-op wearing a green toast.
+   */
+  reactivate: async ({ params, headers }: { params: { id: string }; headers: AuthHeaders }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const existing = await queryOne(
+        'SELECT id, branch_id, status FROM master_enrollments WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!existing) return apiError(404, 'ERRORS.MASTER_ENROLLMENTS.NOT_FOUND', 'Master enrollment not found');
+      if (!canAccessBranch(context, existing.branch_id)) {
+        return apiError(403, 'ERRORS.MASTER_ENROLLMENTS.ACCESS_DENIED', 'Access denied');
+      }
+      if (existing.status !== 'CANCELLED') {
+        return apiError(400, 'ERRORS.MASTER_ENROLLMENTS.NOT_CANCELLED', 'Only a cancelled enrollment can be resumed');
+      }
+      await update('master_enrollments', params.id, { status: 'ACTIVE' });
+      return { status: 200 as const, body: { message: 'Master enrollment resumed', code: 'MASTER_ENROLLMENTS.REACTIVATED' } };
+    } catch (error: any) {
+      console.error('Reactivate master enrollment error:', error);
+      return mapThrownError(error, 'ERRORS.MASTER_ENROLLMENTS.REACTIVATE_FAILED', 'Failed to resume master enrollment', 400);
+    }
+  },
+
   // Refund history for one master enrollment.
   listRefunds: async ({ params, headers }: { params: { id: string }; headers: AuthHeaders }) => {
     try {
@@ -414,7 +444,10 @@ export const masterEnrollmentsRoutes = {
       const values: any[] = [newTotalRefunded];
       if (fullyRefunded) {
         sets.push(`payment_status = 'PENDING'`);
-        sets.push(`status = 'CANCELLED'`);
+        // A full refund stops the subscription by default — but keepActive lets
+        // the office return the money while the student keeps studying (the
+        // balance simply shows as owed again).
+        if (body.keepActive !== true) sets.push(`status = 'CANCELLED'`);
       }
       values.push(params.id);
       await query(

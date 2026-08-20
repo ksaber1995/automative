@@ -4630,6 +4630,18 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    /** Resume a CANCELLED bundle subscription (e.g. one stopped by a full refund). */
+    reactivate: {
+      method: 'POST',
+      path: '/api/master-enrollments/:id/reactivate',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: ApiErrorSchema,
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
     getPayments: {
       method: 'GET',
       path: '/api/master-enrollments/:id/payments',
@@ -4660,6 +4672,9 @@ export const contract = c.router({
         amount: z.number(),
         refundDate: z.string(),
         reason: z.string().optional(),
+        /** Full refund WITHOUT stopping the subscription — the money goes back
+         *  but the student keeps studying (the balance shows as owed again). */
+        keepActive: z.boolean().optional(),
       }),
       responses: {
         201: z.any(),
