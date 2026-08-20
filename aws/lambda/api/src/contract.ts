@@ -9087,6 +9087,87 @@ export const contract = c.router({
   },
 
   // ============================================================
+  // Online booking — the public per-tenant form plus the staff approval queue.
+  bookings: {
+    publicInfo: {
+      method: 'GET',
+      path: '/api/public/booking/:token',
+      pathParams: z.object({ token: z.string().min(16).max(64) }),
+      responses: {
+        200: z.object({
+          companyName: z.string(),
+          courses: z.array(z.object({
+            id: UUIDSchema,
+            name: z.string(),
+            price: z.number(),
+            paymentType: z.string(),
+            classes: z.array(z.object({
+              id: UUIDSchema,
+              name: z.string(),
+              daysOfWeek: z.string().nullable(),
+              startTime: z.string().nullable(),
+              endTime: z.string().nullable(),
+            })),
+          })),
+        }),
+        404: ApiErrorSchema,
+      },
+    },
+    publicCreate: {
+      method: 'POST',
+      path: '/api/public/booking/:token',
+      pathParams: z.object({ token: z.string().min(16).max(64) }),
+      body: z.object({
+        studentName: z.string().min(2),
+        phone: z.string().min(8),
+        parentPhone: z.string().optional(),
+        courseId: UUIDSchema,
+        classId: OptionalUUIDSchema,
+        notes: z.string().optional(),
+        claimedAmount: z.number().optional(),
+        /** data:image/... URL of the payment proof, ≤ ~3MB of image. */
+        paymentPhoto: z.string().max(4 * 1024 * 1024).optional(),
+      }),
+      responses: { 201: z.object({ id: UUIDSchema, message: z.string(), code: z.string() }), 400: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+    getLink: {
+      method: 'GET',
+      path: '/api/bookings/link',
+      responses: { 200: z.object({ token: z.string(), url: z.string() }) },
+    },
+    list: {
+      method: 'GET',
+      path: '/api/bookings',
+      query: z.object({ status: z.enum(['PENDING', 'ACCEPTED', 'REJECTED']).optional() }),
+      responses: { 200: z.array(z.any()) },
+    },
+    getPhoto: {
+      method: 'GET',
+      path: '/api/bookings/:id/photo',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: { 200: z.object({ photo: z.string().nullable() }), 404: ApiErrorSchema },
+    },
+    accept: {
+      method: 'POST',
+      path: '/api/bookings/:id/accept',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ amountPaid: z.number().optional() }),
+      responses: {
+        200: z.object({ message: z.string(), code: z.string(), studentId: UUIDSchema, enrollmentId: UUIDSchema }),
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    reject: {
+      method: 'POST',
+      path: '/api/bookings/:id/reject',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: { 200: ApiErrorSchema, 400: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+  },
+
+  // ============================================================
   timetable: {
     getDay: {
       method: 'GET' as const,

@@ -32,6 +32,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/public/receipt/receipt.component').then(m => m.ReceiptComponent)
   },
   {
+    // The tenant's public booking form. Public and chrome-free like the pages
+    // above — a prospective student has no login; the token IS the tenant.
+    path: 'book/:token',
+    loadComponent: () => import('./features/public/booking/public-booking.component').then(m => m.PublicBookingComponent)
+  },
+  {
     // The print shop's page: the cards to print and the address to ship them to.
     // Public and chrome-free like the two above — the printer is not a user of
     // this system and the link is the whole credential. Served from the customer
@@ -280,6 +286,12 @@ export const routes: Routes = [
         canActivate: [permissionGuard('enrollments')],
         data: { breadcrumb: 'BREADCRUMBS.DUES' },
         loadChildren: () => import('./features/dues/dues.routes').then(m => m.DUES_ROUTES)
+      },
+      {
+        path: 'bookings',
+        canActivate: [permissionGuard('enrollments')],
+        data: { breadcrumb: 'BREADCRUMBS.BOOKINGS' },
+        loadComponent: () => import('./features/bookings/bookings-list.component').then(m => m.BookingsListComponent)
       },
       {
         path: 'receipts',

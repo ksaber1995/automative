@@ -327,6 +327,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
       { labelKey: 'NAV.SALARIES', icon: 'pi pi-users', routerLink: ['/salaries'], visible: auth.canWrite('expenses') && !auth.isTeacher() },
       { labelKey: 'NAV.REFUNDS', icon: 'pi pi-replay', routerLink: ['/refunds'], visible: auth.canRead('refunds') },
       { labelKey: 'NAV.DUES', icon: 'pi pi-credit-card', routerLink: ['/dues'], visible: auth.canRead('enrollments') },
+      { labelKey: 'NAV.BOOKINGS', icon: 'pi pi-calendar-plus', routerLink: ['/bookings'], visible: auth.canRead('enrollments') },
       // Hidden from the sidebar — receipts are reached from a student's page or
       // from a due, not browsed as a list. The /receipts route still works.
       { labelKey: 'NAV.RECEIPTS', icon: 'pi pi-receipt', routerLink: ['/receipts'], visible: false },

@@ -67,6 +67,7 @@ import { roomsRoutes } from './routes/rooms';
 import { sessionsRoutes } from './routes/sessions';
 import { attendanceRoutes } from './routes/attendance';
 import { timetableRoutes } from './routes/timetable';
+import { bookingsRoutes } from './routes/bookings';
 import { monthlySubscriptionsRoutes } from './routes/monthly-subscriptions';
 import { sessionPaymentsRoutes } from './routes/session-payments';
 import { whatsappTemplatesRoutes } from './routes/whatsappTemplates';
@@ -274,6 +275,15 @@ const router = {
   },
   timetable: {
     getDay: timetableRoutes.getDay,
+  },
+  bookings: {
+    publicInfo: bookingsRoutes.publicInfo,
+    publicCreate: bookingsRoutes.publicCreate,
+    getLink: bookingsRoutes.getLink,
+    list: bookingsRoutes.list,
+    getPhoto: bookingsRoutes.getPhoto,
+    accept: bookingsRoutes.accept,
+    reject: bookingsRoutes.reject,
   },
   monthlySubscriptions: {
     generate: monthlySubscriptionsRoutes.generate,
