@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -201,7 +201,14 @@ export class PublicBookingComponent implements OnInit {
   /** Set on the first submit click — before it, no red ink on an untouched form. */
   attempted = signal(false);
 
-  selectedCourse = computed(() => this.courses().find(c => c.id === this.form.courseId) || null);
+  /**
+   * A plain method, NOT a computed(): form.courseId is a mutable field, not a
+   * signal, and a computed that reads it evaluates once and caches null forever
+   * — which is exactly how the class picker never appeared.
+   */
+  selectedCourse(): BookingCourse | null {
+    return this.courses().find(c => c.id === this.form.courseId) || null;
+  }
 
   nameValid(): boolean { return this.form.studentName.trim().length >= 2; }
   phoneValid(): boolean { return this.form.phone.replace(/[^\d]/g, '').length >= 8; }
