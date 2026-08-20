@@ -932,6 +932,7 @@
     "CONTACT": "Contact",
     "PREPARING": "Preparing {{done}} / {{total}}…",
     "DOWNLOAD": "Download {{count}} cards (.zip)",
+    "DOWNLOAD_PLAIN": "Download {{count}} plain QR codes (.zip)",
     "CUSTOM_ART_MISSING": "This academy uses custom card artwork, but it is incomplete. Please ask them to finish it before printing.",
     "DOWNLOAD_FAILED": "Could not build the download. Please try again, or ask for a new link.",
     "EXPIRES": "This link stops working on {{date}}."

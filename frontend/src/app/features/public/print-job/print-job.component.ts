@@ -5,6 +5,7 @@ import { HttpClient } from '@angular/common/http';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import QRCode from 'qrcode';
 import { environment } from '../../../../environments/environment';
 import { canExportCustom, loadCardImages, renderAgnosticCardPng } from '../../students/card-render.util';
 // The types are not re-exported by card-render.util, so they come from where
@@ -90,6 +91,12 @@ interface PrintJob {
             <button class="download" [disabled]="!j.cards.length" (click)="download()">
               {{ 'PRINT_JOB.DOWNLOAD' | translate: { count: j.cards.length } }}
             </button>
+            <!-- The bare QR codes, no artwork — for shops that print the design
+                 themselves and only need the codes. Same files the admin
+                 console's cards download produces. -->
+            <button class="download plain" [disabled]="!j.cards.length" (click)="downloadPlain()">
+              {{ 'PRINT_JOB.DOWNLOAD_PLAIN' | translate: { count: j.cards.length } }}
+            </button>
           }
 
           @if (failed(); as f) { <p class="warn">{{ f | translate }}</p> }
@@ -125,6 +132,8 @@ interface PrintJob {
     }
     .download:hover:not(:disabled) { background: #4338ca; }
     .download:disabled { opacity: .5; cursor: default; }
+    .download.plain { background: #fff; color: #4f46e5; border: 1px solid #c7d2fe; margin-top: 10px; }
+    .download.plain:hover:not(:disabled) { background: #eef2ff; }
     .state { text-align: center; color: #64748b; padding: 16px 0; }
     .foot { margin: 16px 0 0; font-size: 12px; color: #94a3b8; text-align: center; }
   `],
@@ -219,6 +228,48 @@ export class PrintJobComponent implements OnInit {
 
       // Tell the office it was collected. Best effort — the printer already has
       // the file, so a failure here must not look like a failed download.
+      this.http.post(`${environment.apiUrl}/public/print-jobs/${this.token}/downloaded`, {}).subscribe({
+        next: () => {}, error: () => {},
+      });
+    } catch {
+      this.failed.set('PRINT_JOB.DOWNLOAD_FAILED');
+    } finally {
+      this.exporting.set(false);
+    }
+  }
+
+  /**
+   * The bare QR codes, one PNG per card, no artwork — the same files the admin
+   * console's cards download produces. For shops that print the design
+   * themselves and only need the codes; the serial is the filename.
+   */
+  protected async downloadPlain(): Promise<void> {
+    const j = this.job();
+    if (!j || !j.cards.length || this.exporting()) return;
+
+    this.failed.set(null);
+    this.exporting.set(true);
+    this.done.set(0);
+    this.total.set(j.cards.length);
+
+    try {
+      const zip = new JSZip();
+      const label = (s: number) => (s >= 900000 ? `0${s - 900000}` : s > 100000 ? `A${s - 100000}` : String(s));
+      let n = 0;
+      for (const card of j.cards) {
+        const canvas = document.createElement('canvas');
+        await QRCode.toCanvas(canvas, `${window.location.origin}/p/s/${card.token}`, {
+          width: 600, margin: 1, errorCorrectionLevel: 'M',
+        });
+        zip.file(`${label(card.serial).toLowerCase()}.png`, canvas.toDataURL('image/png').split(',')[1], { base64: true });
+        this.done.set(++n);
+        if (n % 25 === 0) await new Promise((r) => setTimeout(r));
+      }
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, `${j.academyName.replace(/[^\w؀-ۿ-]+/g, '_')}-qr.zip`);
+
+      // Same best-effort collection stamp as the designed download.
       this.http.post(`${environment.apiUrl}/public/print-jobs/${this.token}/downloaded`, {}).subscribe({
         next: () => {}, error: () => {},
       });
