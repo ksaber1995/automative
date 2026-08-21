@@ -12,6 +12,7 @@ import {
   ROLE_DEFAULT_PERMISSIONS,
 } from '@shared/interfaces/permissions.interface';
 import { LANGUAGE_STORAGE_KEY } from './language.service';
+import { setWhatsappDialCode } from '../utils/whatsapp.util';
 
 /**
  * Tenants trialling WhatsApp Cloud API messaging, by company id:
@@ -70,6 +71,9 @@ export class AuthService {
     this.currentUser.set(user);
     this.currentUserSubject.next(user);
     if (cache) this.setCachedUser(user);
+    // Click-to-chat assumes locally-written phones belong to the tenant's
+    // country — a Saudi academy's numbers must get 966, not Egypt's 20.
+    setWhatsappDialCode(user.countryCode);
     void this.vocabulary.use(user.vertical === 'SPORTS' ? 'SPORTS' : 'GENERAL');
   }
 

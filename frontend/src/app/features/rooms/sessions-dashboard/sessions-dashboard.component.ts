@@ -21,6 +21,7 @@ import { SessionService, Session, StartSessionTeacher } from '../services/sessio
 import { RoomService, Room } from '../services/room.service';
 import { AttendanceService, SessionAttendanceStudent, AbsenceStreakRow } from '../services/attendance.service';
 import { formatStudentCode } from '../../../core/utils/student-code.util';
+import { toWhatsappNumber } from '../../../core/utils/whatsapp.util';
 import { TeacherAttendanceService, SessionTeacherAttendanceRow } from '../../attendance/services/teacher-attendance.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ClassService } from '../../courses/services/class.service';
@@ -443,8 +444,8 @@ export class SessionsDashboardComponent implements OnInit {
 
   /** WhatsApp click-to-chat, same as the absence dialogs elsewhere. */
   waLink(phone: string | null | undefined): string | null {
-    const digits = (phone || '').replace(/[^\d]/g, '');
-    return digits ? `https://wa.me/${digits}` : null;
+    const number = toWhatsappNumber(phone);
+    return number ? `https://wa.me/${number}` : null;
   }
 
   hasPageFilters(): boolean {

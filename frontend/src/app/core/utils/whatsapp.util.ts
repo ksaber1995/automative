@@ -37,17 +37,39 @@ export const DEFAULT_WHATSAPP_TEMPLATES: Record<WhatsappTemplateType, string> = 
 };
 
 /**
- * Normalize a local phone number to a wa.me-ready international number
- * (digits only, no leading +). Defaults to Egypt (dial code 20): strips the
- * trunk leading zero and prefixes the dial code when absent.
- * Returns '' when there are no usable digits.
+ * The dial code assumed for locally-written numbers ('20' Egypt, '966' Saudi
+ * Arabia…). Set at login from the signed-in user's registration country code —
+ * AuthService.publishUser is the single writer — because student/parent phones
+ * are free-text fields typed the way the academy's country writes them locally.
+ * '20' matches the old hardcoded default, so a session with no country code
+ * behaves exactly as before.
  */
-export function toWhatsappNumber(phone: string | null | undefined, dialCode = '20'): string {
-  let digits = String(phone ?? '').replace(/\D/g, '');
+let defaultDialCode = '20';
+
+export function setWhatsappDialCode(code: string | null | undefined): void {
+  const digits = String(code ?? '').replace(/\D/g, '');
+  if (digits) defaultDialCode = digits;
+}
+
+/**
+ * Normalize a phone number to a wa.me-ready international number (digits only,
+ * no leading +). A number already written internationally ('+9665…' or
+ * '009665…') is trusted as-is; otherwise it is treated as local to the
+ * tenant's country: trunk leading zero stripped, dial code prefixed when
+ * absent. Returns '' when there are no usable digits.
+ */
+export function toWhatsappNumber(phone: string | null | undefined, dialCode?: string): string {
+  const raw = String(phone ?? '').trim();
+  let digits = raw.replace(/\D/g, '');
   if (!digits) return '';
+  // '+…' or '00…' is an explicit international prefix — no local number starts
+  // with a double zero, only one trunk zero — so the dial code is already there.
+  if (raw.startsWith('+')) return digits;
+  if (digits.startsWith('00')) return digits.replace(/^0+/, '');
+  const code = String(dialCode ?? defaultDialCode).replace(/\D/g, '') || '20';
   digits = digits.replace(/^0+/, '');
   if (!digits) return '';
-  if (!digits.startsWith(dialCode)) digits = dialCode + digits;
+  if (!digits.startsWith(code)) digits = code + digits;
   return digits;
 }
 
@@ -105,7 +127,7 @@ export function renderWhatsappTemplate(
 export function openWhatsappChat(
   phone: string | null | undefined,
   text: string,
-  dialCode = '20',
+  dialCode?: string,
 ): boolean {
   const number = toWhatsappNumber(phone, dialCode);
   if (!number) return false;
