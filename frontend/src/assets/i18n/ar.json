@@ -6433,6 +6433,7 @@
     "PARTIAL": "دفعة جزئية",
     "RECEIVED_BY": "استلمها",
     "PRINT": "طباعة الإيصال",
+    "DOWNLOAD": "تحميل PDF",
     "KIND": {
       "MONTHLY": "اشتراك شهري",
       "SESSION": "حصة",

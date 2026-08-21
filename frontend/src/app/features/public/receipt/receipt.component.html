@@ -8,7 +8,7 @@
     </div>
   } @else if (receipt(); as r) {
     <!-- The slip. Sized for an 80mm roll; the same markup is what prints. -->
-    <div class="slip">
+    <div class="slip" #slipEl>
       @if (r.voidedAt) {
         <!-- The receipt still resolves after a void; it must say so plainly,
              or a cancelled slip reads as proof of payment. -->
@@ -98,6 +98,10 @@
     <div class="actions no-print">
       <button type="button" class="print-btn" (click)="print()">
         <i class="pi pi-print"></i> {{ 'RECEIPT.PRINT' | translate }}
+      </button>
+      <button type="button" class="download-btn" (click)="download()" [disabled]="downloading()">
+        <i class="pi" [class.pi-download]="!downloading()" [class.pi-spin]="downloading()" [class.pi-spinner]="downloading()"></i>
+        {{ 'RECEIPT.DOWNLOAD' | translate }}
       </button>
       <button type="button" class="lang-btn" (click)="languageService.toggle()">
         {{ languageService.currentLang() === 'ar' ? 'English' : 'العربية' }}

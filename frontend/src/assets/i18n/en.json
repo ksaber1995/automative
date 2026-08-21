@@ -6433,6 +6433,7 @@
     "PARTIAL": "Partial payment",
     "RECEIVED_BY": "Received by",
     "PRINT": "Print receipt",
+    "DOWNLOAD": "Download PDF",
     "KIND": {
       "MONTHLY": "Monthly subscription",
       "SESSION": "Session",

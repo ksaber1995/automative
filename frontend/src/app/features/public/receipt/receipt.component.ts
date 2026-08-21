@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -66,6 +66,9 @@ export class ReceiptComponent implements OnInit {
   error = signal(false);
   receipt = signal<PaymentReceipt | null>(null);
   qrDataUrl = signal<string>('');
+  downloading = signal(false);
+
+  @ViewChild('slipEl') slipEl?: ElementRef<HTMLElement>;
 
   /** Set by ?print=1 — the app opens it this way straight after taking money. */
   autoPrint = false;
@@ -104,6 +107,34 @@ export class ReceiptComponent implements OnInit {
   }
 
   print() { window.print(); }
+
+  /**
+   * The digital copy: the rendered slip captured to a one-page PDF sized like
+   * the paper one. Rasterised rather than drawn with jsPDF's text API because
+   * the browser already shapes Arabic correctly and jsPDF alone does not.
+   */
+  async download() {
+    const slip = this.slipEl?.nativeElement;
+    const r = this.receipt();
+    if (!slip || !r || this.downloading()) return;
+    this.downloading.set(true);
+    try {
+      // Loaded on demand, same as the student exports — most visits only print.
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+      // The slip is only ~48mm wide; scale 4 keeps its small text crisp.
+      const canvas = await html2canvas(slip, { scale: 4, backgroundColor: '#ffffff', logging: false });
+      const wMm = 58; // the thermal roll width the slip is designed for
+      const hMm = (canvas.height / canvas.width) * wMm;
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [wMm, hMm] });
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, wMm, hMm);
+      pdf.save(`receipt-${r.receiptNumber}.pdf`);
+    } finally {
+      this.downloading.set(false);
+    }
+  }
 
   /** What this money was for, in words. */
   kindLabel(): string {
