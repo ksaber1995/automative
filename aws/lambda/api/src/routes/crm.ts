@@ -1010,7 +1010,11 @@ export const crmRoutes = {
         e.outstanding += amount;
       };
 
-      // Outstanding balance on active enrollments (unpaid dues).
+      // Outstanding balance on active enrollments (unpaid dues). ONE_TIME only —
+      // same rule as the dues list: a monthly/per-session enrollment's final_price
+      // is not a balance owed (those are paid via monthly_subscription_payments /
+      // session_payments, so enrollments.amount_paid stays 0 and the whole price
+      // would show as phantom debt). Overdue monthly bills are added below.
       const pDues: any[] = [cid];
       const duesBranch = branchCond(pDues, 'e.branch_id');
       const dues = await query<any>(
@@ -1018,6 +1022,7 @@ export const crmRoutes = {
                 SUM(GREATEST(COALESCE(e.final_price,0) - COALESCE(e.amount_paid,0), 0))::numeric AS balance
          FROM enrollments e JOIN students s ON s.id = e.student_id
          WHERE e.company_id = $1 AND s.is_active = true
+           AND e.payment_type = 'ONE_TIME'
            AND e.status IN ('ACTIVE', 'PENDING', 'ON_HOLD')
            AND COALESCE(e.final_price,0) > COALESCE(e.amount_paid,0)${duesBranch}
          GROUP BY e.student_id, s.name, s.phone, s.parent_name, s.parent_phone, e.branch_id`,
