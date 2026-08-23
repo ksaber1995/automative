@@ -212,13 +212,15 @@ export class CameraScanDialogComponent {
 
       this.currentCameraId.set(this.runningCameraId() ?? saved);
       // Only after start: enumeration needs the permission the start just won,
-      // and before it the labels come back empty on most phones. The device's
-      // own label names the lens ("Back Ultra Wide Camera", "camera 0, facing
-      // back") — keep it, and only number the ones that report nothing.
-      Html5Qrcode.getCameras()
-        .then((cams: Array<{ id: string; label: string }>) =>
-          this.cameras.set((cams || []).map((c, i) => ({ id: c.id, label: c.label || `Camera ${i + 1}` }))))
-        .catch(() => {});
+      // and before it the labels come back empty on most phones. Plain
+      // enumerateDevices, NOT Html5Qrcode.getCameras(): that helper opens the
+      // camera a second time to win permission, and on many Androids a second
+      // open while the preview is streaming fails "in use" — which silently
+      // left the list empty and the lens picker hidden. The running preview
+      // already holds the permission, so a bare enumeration returns every
+      // camera with its label ("Back Ultra Wide Camera", "camera 0, facing
+      // back"); only the ones that report nothing get numbered.
+      this.listCameras();
     } catch (e) {
       // Keep the dialog open with the reason and a Retry: the cure is usually
       // on the user's side (grant the permission, close the app holding the
@@ -234,6 +236,16 @@ export class CameraScanDialogComponent {
   retry(): void {
     this.errorKey.set(null);
     void this.start();
+  }
+
+  /** Every camera the device admits to, labels included — no hardware touched. */
+  private listCameras(): void {
+    navigator.mediaDevices?.enumerateDevices?.()
+      .then((devices) => {
+        const cams = (devices || []).filter((d) => d.kind === 'videoinput' && d.deviceId);
+        this.cameras.set(cams.map((c, i) => ({ id: c.deviceId, label: c.label || `Camera ${i + 1}` })));
+      })
+      .catch(() => {});
   }
 
   /** Higher = more likely the main back camera; used to order blind attempts. */
