@@ -664,6 +664,12 @@ CREATE TABLE enrollments (
     -- Denormalised from courses.payment_type for fast subscription/session queries
     payment_type VARCHAR(30) NOT NULL DEFAULT 'ONE_TIME'
         CHECK (payment_type IN ('ONE_TIME', 'MONTHLY_SUBSCRIPTION', 'PER_SESSION')),
+    -- The day this enrollment landed in its CURRENT class. Set by change-class
+    -- moves; NULL means it never moved and the join day is enrollment_date.
+    -- Derived absence reads a missing attendance row as a miss only from the
+    -- join day on, so without this a move marks the student absent for every
+    -- lesson the new class ran before they arrived.
+    class_joined_on DATE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,

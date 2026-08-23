@@ -10,10 +10,12 @@
  * attend.
  *
  * The join day is the earliest live enrolment onto that class: `enrollment_date`
- * on a direct one, `enrolled_at` on a bundle one. The same rows the rosters
- * read, so the two never disagree — a DROPPED or CANCELLED enrolment is not a
- * way into the class, and a student who left and came back is judged from the
- * enrolment that is still standing.
+ * on a direct one (`class_joined_on` when a change-class move re-homed it —
+ * the day it landed in its CURRENT class, or the earlier lessons of the new
+ * class would all read as misses), `enrolled_at` on a bundle one. The same rows
+ * the rosters read, so the two never disagree — a DROPPED or CANCELLED
+ * enrolment is not a way into the class, and a student who left and came back
+ * is judged from the enrolment that is still standing.
  *
  * Days, not timestamps: someone who joins on the 16th counts for the 16th's
  * lesson, which is usually the very lesson they joined to sit.
@@ -29,7 +31,7 @@
 export function classJoinDate(student: string, classId: string): string {
   return `COALESCE((
     SELECT MIN(joined_on) FROM (
-      SELECT en_join.enrollment_date AS joined_on
+      SELECT COALESCE(en_join.class_joined_on, en_join.enrollment_date) AS joined_on
         FROM enrollments en_join
        WHERE en_join.student_id = ${student} AND en_join.class_id = ${classId}
          AND en_join.status NOT IN ('DROPPED', 'CANCELLED')

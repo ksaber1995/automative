@@ -1580,7 +1580,25 @@ export const enrollmentsRoutes = {
         return apiError(400, 'ERRORS.ENROLLMENTS.CLASS_FINISHED', 'This class is finished. Enrollment is closed.');
       }
 
-      const updated = await update('enrollments', params.id, { class_id: body.classId });
+      // Moving to the class they are already in must not touch class_joined_on —
+      // stamping it would re-date their join and hide real earlier absences.
+      if (enrollment.class_id === body.classId) {
+        return { status: 200 as const, body: mapEnrollmentFromDB(enrollment) };
+      }
+
+      // Stamp the day the enrollment landed in its new class. Derived absence
+      // judges a missing attendance row from the join day on, and without this
+      // it keeps using enrollment_date — marking the student absent for every
+      // lesson the NEW class ran before they arrived. CURRENT_DATE in SQL, not
+      // a JS date: a local Date serialised through toISOString() lands a day
+      // early on any server east of UTC.
+      const updated = await queryOne(
+        `UPDATE enrollments
+            SET class_id = $1, class_joined_on = CURRENT_DATE, updated_at = NOW()
+          WHERE id = $2 AND company_id = $3
+          RETURNING *`,
+        [body.classId, params.id, context.companyId]
+      );
       return { status: 200 as const, body: mapEnrollmentFromDB(updated) };
     } catch (error) {
       console.error('Change class error:', error);
