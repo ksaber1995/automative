@@ -69,6 +69,23 @@ export interface CameraScanFeedback {
             appendTo="body"
           ></p-select>
         }
+        <!-- Many Androids expose ONE logical back camera to the browser — the
+             wide and main lenses are not separate devices, they are zoom levels
+             (0.5× is the wide lens). So when the running track reports a zoom
+             range, offer the presets it supports; on such phones this IS the
+             camera choice, and on the rest it helps focus on a small card. -->
+        @if (zoomOptions().length) {
+          <div class="flex justify-center gap-2">
+            @for (z of zoomOptions(); track z) {
+              <button type="button"
+                class="px-3 py-1 rounded-full border text-sm transition-colors"
+                [class.bg-indigo-600]="isZoom(z)" [class.text-white]="isZoom(z)" [class.border-indigo-600]="isZoom(z)"
+                [class.bg-white]="!isZoom(z)" [class.text-gray-700]="!isZoom(z)" [class.border-gray-300]="!isZoom(z)"
+                [disabled]="starting()"
+                (click)="setZoom(z)">{{ z }}×</button>
+            }
+          </div>
+        }
         @if (feedback) {
           <div class="rounded-md px-3 py-2 text-sm text-center"
             [class.bg-green-50]="!feedback.alreadyPresent" [class.text-green-700]="!feedback.alreadyPresent"
@@ -113,6 +130,11 @@ export class CameraScanDialogComponent {
   private scanConfig: any;
   /** Survives page loads: the lens that worked is the lens wanted next time. */
   private static readonly CAMERA_KEY = 'scanCameraId';
+  private static readonly ZOOM_KEY = 'scanCameraZoom';
+
+  /** Zoom presets the running camera supports; empty → no zoom row. */
+  zoomOptions = signal<number[]>([]);
+  currentZoom = signal<number | null>(null);
 
   open(): void {
     this.visible.set(true);
@@ -170,14 +192,60 @@ export class CameraScanDialogComponent {
     }
   }
 
-  private startWith(cameraSelector: any): Promise<void> {
-    return this.html5Qr.start(
+  private async startWith(cameraSelector: any): Promise<void> {
+    await this.html5Qr.start(
       cameraSelector,
       this.scanConfig,
       (decodedText: string) => this.handle(decodedText),
       // Per-frame decode failures are normal (no code in view) — ignore.
       () => {},
     );
+    // Capabilities can lag the stream by a beat on Android; read them after a
+    // short settle rather than immediately and getting an empty object.
+    setTimeout(() => this.refreshZoom(), 300);
+  }
+
+  /** The MediaStreamTrack behind the preview — the zoom lives on it. */
+  private videoTrack(): MediaStreamTrack | null {
+    try {
+      const video = document.getElementById(this.regionId)?.querySelector('video') as HTMLVideoElement | null;
+      const stream = video?.srcObject as MediaStream | null;
+      return stream?.getVideoTracks()[0] ?? null;
+    } catch { return null; }
+  }
+
+  private refreshZoom(): void {
+    const track = this.videoTrack();
+    const zoom = (track?.getCapabilities?.() as any)?.zoom;
+    if (!track || typeof zoom?.min !== 'number' || typeof zoom?.max !== 'number') {
+      this.zoomOptions.set([]);
+      this.currentZoom.set(null);
+      return;
+    }
+    const presets = [0.5, 1, 2, 3].filter((z) => z >= zoom.min && z <= zoom.max);
+    this.zoomOptions.set(presets.length > 1 ? presets : []);
+    this.currentZoom.set(typeof (track.getSettings?.() as any)?.zoom === 'number'
+      ? (track.getSettings() as any).zoom : null);
+    // The zoom that worked last time is the zoom wanted this time.
+    const saved = parseFloat(localStorage.getItem(CameraScanDialogComponent.ZOOM_KEY) || '');
+    if (presets.includes(saved) && !this.isZoom(saved)) void this.setZoom(saved);
+  }
+
+  isZoom(z: number): boolean {
+    const c = this.currentZoom();
+    return c !== null && Math.abs(c - z) < 0.01;
+  }
+
+  async setZoom(z: number): Promise<void> {
+    const track = this.videoTrack();
+    if (!track) return;
+    try {
+      await track.applyConstraints({ advanced: [{ zoom: z } as any] });
+      this.currentZoom.set(z);
+      try { localStorage.setItem(CameraScanDialogComponent.ZOOM_KEY, String(z)); } catch {}
+    } catch {
+      // The device refused this level — leave the buttons as they are.
+    }
   }
 
   /** Restart on the chosen camera and remember it for every later scan. */
@@ -208,6 +276,8 @@ export class CameraScanDialogComponent {
   }
 
   private stop(): void {
+    this.zoomOptions.set([]);
+    this.currentZoom.set(null);
     const qr = this.html5Qr;
     this.html5Qr = undefined;
     if (!qr) return;
