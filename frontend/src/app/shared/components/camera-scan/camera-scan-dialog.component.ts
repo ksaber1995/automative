@@ -47,6 +47,20 @@ export interface CameraScanFeedback {
           <p class="text-center text-sm text-gray-500">
             <i class="pi pi-spin pi-spinner me-1"></i>{{ 'SESSION_ATTENDANCE.SCAN_STARTING' | translate }}
           </p>
+        } @else if (errorKey(); as ek) {
+          <!-- Stays open on failure: the fix is usually on the user's side
+               (grant the permission, close the other app) and closing the
+               dialog would make them start over to find out if it worked. -->
+          <div class="rounded-md bg-red-50 text-red-700 px-3 py-2 text-sm text-center">
+            <i class="pi pi-exclamation-triangle me-1"></i>{{ ek | translate }}
+          </div>
+          <p-button
+            [label]="'SESSION_ATTENDANCE.SCAN_RETRY' | translate"
+            icon="pi pi-refresh"
+            size="small"
+            styleClass="w-full"
+            (onClick)="retry()"
+          ></p-button>
         } @else {
           <p class="text-center text-xs text-gray-500">{{ 'SESSION_ATTENDANCE.SCAN_HINT' | translate }}</p>
         }
@@ -118,6 +132,8 @@ export class CameraScanDialogComponent {
 
   visible = signal(false);
   starting = signal(false);
+  /** Why the camera could not start — an i18n key, shown with a Retry button. */
+  errorKey = signal<string | null>(null);
   private html5Qr?: any;
   // Suppress the rapid repeat decodes html5-qrcode fires for one physical scan.
   private lastScan = '';
@@ -139,6 +155,7 @@ export class CameraScanDialogComponent {
   open(): void {
     this.visible.set(true);
     this.lastScan = '';
+    this.errorKey.set(null);
     // The preview element only exists once the dialog has rendered.
     setTimeout(() => this.start(), 100);
   }
@@ -151,6 +168,8 @@ export class CameraScanDialogComponent {
   private async start(): Promise<void> {
     if (this.html5Qr) return;
     this.starting.set(true);
+    this.errorKey.set(null);
+    let lastError: any = null;
     try {
       // Loaded on demand: html5-qrcode is heavy and most scanning is done with a
       // reader, so it must not sit in the host page's chunk.
@@ -161,17 +180,35 @@ export class CameraScanDialogComponent {
       // A previously chosen lens beats the browser's guess — but a saved id can
       // go stale (another phone's id synced in, a browser reshuffle), so fall
       // back to the default rather than failing the whole dialog over it.
+      const attempts: any[] = [];
       const saved = this.savedCameraId();
-      if (saved) {
-        try {
-          await this.startWith({ deviceId: { exact: saved } });
-        } catch {
-          localStorage.removeItem(CameraScanDialogComponent.CAMERA_KEY);
-          await this.startWith({ facingMode: 'environment' });
+      if (saved) attempts.push({ deviceId: { exact: saved } });
+      attempts.push({ facingMode: 'environment' });
+
+      let started = false;
+      for (const selector of attempts) {
+        try { await this.startWith(selector); started = true; break; }
+        catch (e) {
+          lastError = e;
+          if (selector.deviceId) { try { localStorage.removeItem(CameraScanDialogComponent.CAMERA_KEY); } catch {} }
         }
-      } else {
-        await this.startWith({ facingMode: 'environment' });
       }
+
+      // Some older/locked-down Androids (Samsung A-series among them) refuse
+      // the facingMode constraint outright yet start the very same lens by its
+      // deviceId. Enumerate — the failed attempt above usually won the
+      // permission, so labels are readable now — and walk the list, back
+      // lenses first.
+      if (!started) {
+        let cams: Array<{ id: string; label: string }> = [];
+        try { cams = (await Html5Qrcode.getCameras()) || []; } catch (e) { lastError = lastError ?? e; }
+        const backFirst = [...cams].sort((a, b) => this.backRank(b.label) - this.backRank(a.label));
+        for (const cam of backFirst) {
+          try { await this.startWith({ deviceId: { exact: cam.id } }); started = true; break; }
+          catch (e) { lastError = e; }
+        }
+      }
+      if (!started) throw lastError ?? new Error('camera start failed');
 
       this.currentCameraId.set(this.runningCameraId() ?? saved);
       // Only after start: enumeration needs the permission the start just won,
@@ -182,14 +219,45 @@ export class CameraScanDialogComponent {
         .then((cams: Array<{ id: string; label: string }>) =>
           this.cameras.set((cams || []).map((c, i) => ({ id: c.id, label: c.label || `Camera ${i + 1}` }))))
         .catch(() => {});
-    } catch {
-      // Close rather than leave a black rectangle with no way forward.
+    } catch (e) {
+      // Keep the dialog open with the reason and a Retry: the cure is usually
+      // on the user's side (grant the permission, close the app holding the
+      // camera), and they need somewhere to try again from.
+      try { this.html5Qr?.clear?.(); } catch {}
       this.html5Qr = undefined;
-      this.visible.set(false);
-      this.notify.warning(this.translate.instant('NAV.QR_CAMERA_FAILED'));
+      this.errorKey.set(this.classifyCameraError(e ?? lastError));
     } finally {
       this.starting.set(false);
     }
+  }
+
+  retry(): void {
+    this.errorKey.set(null);
+    void this.start();
+  }
+
+  /** Higher = more likely the main back camera; used to order blind attempts. */
+  private backRank(label: string): number {
+    const l = (label || '').toLowerCase();
+    if (/back|rear|environment|خلفية/.test(l)) return /wide|ultra|tele|macro|depth/.test(l) ? 1 : 2;
+    if (/front|face|user|أمامية/.test(l)) return -1;
+    return 0;
+  }
+
+  /** Turn a getUserMedia failure into advice the user can act on. */
+  private classifyCameraError(e: any): string {
+    const text = `${String(e?.name ?? '')} ${String(e?.message ?? e ?? '')}`.toLowerCase();
+    if (text.includes('notallowed') || text.includes('permission') || text.includes('denied')) {
+      return 'SESSION_ATTENDANCE.SCAN_DENIED';
+    }
+    if (text.includes('notreadable') || text.includes('trackstart') || text.includes('in use')
+      || text.includes('hardware') || text.includes('aborterror')) {
+      return 'SESSION_ATTENDANCE.SCAN_BUSY';
+    }
+    if (text.includes('notfound') || text.includes('no camera') || text.includes('devicesnotfound')) {
+      return 'SESSION_ATTENDANCE.SCAN_NO_CAMERA';
+    }
+    return 'SESSION_ATTENDANCE.SCAN_FAILED';
   }
 
   private async startWith(cameraSelector: any): Promise<void> {
@@ -257,10 +325,10 @@ export class CameraScanDialogComponent {
       await this.startWith({ deviceId: { exact: id } });
       this.currentCameraId.set(id);
       try { localStorage.setItem(CameraScanDialogComponent.CAMERA_KEY, id); } catch {}
-    } catch {
+    } catch (e) {
+      try { this.html5Qr?.clear?.(); } catch {}
       this.html5Qr = undefined;
-      this.visible.set(false);
-      this.notify.warning(this.translate.instant('NAV.QR_CAMERA_FAILED'));
+      this.errorKey.set(this.classifyCameraError(e));
     } finally {
       this.starting.set(false);
     }
