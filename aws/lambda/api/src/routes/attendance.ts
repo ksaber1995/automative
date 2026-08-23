@@ -516,7 +516,11 @@ export const attendanceRoutes = {
          FROM session_attendance sa
          JOIN students s ON s.id = sa.student_id
          LEFT JOIN classes hc ON hc.id = sa.home_class_id
-         WHERE sa.session_id = $3 AND sa.attendance_type IN ('SUBSTITUTION', 'TRIAL')
+         -- NORMAL is in this list for students who have since LEFT the class
+         -- (moved to a sibling group, dropped): they are no longer on the
+         -- roster above, but the lesson they demonstrably sat is a record,
+         -- not something a later move is allowed to erase from the register.
+         WHERE sa.session_id = $3 AND sa.attendance_type IN ('NORMAL', 'SUBSTITUTION', 'TRIAL')
            AND sa.student_id NOT IN (
              SELECT student_id FROM enrollments
              WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
@@ -1230,21 +1234,32 @@ export const attendanceRoutes = {
           })}
         ) subst ON true
         WHERE s.company_id = $2
-          AND s.class_id IN (
-            SELECT class_id FROM enrollments
-            WHERE student_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
-            UNION
-            SELECT class_id FROM master_class_enrollments
-            WHERE student_id = $1 AND company_id = $2 AND status != 'DROPPED'
-          )
-          -- Lessons the class ran before this student joined it are not part of
-          -- their record: with nothing to attend, every one of them would read
-          -- ABSENT and drag the attendance rate down from the day they arrived.
-          -- A row (or a make-up) still wins — whatever they actually sat stays.
+          -- Two ways onto the page: sessions of classes they belong to NOW
+          -- (rows, make-ups, or derived absence from the join day on), and any
+          -- session they demonstrably sat in a class they have since left —
+          -- moving groups must not erase the lessons they attended. Only the
+          -- attended ones come back from a former class: its other lessons
+          -- stopped being theirs to miss when they left.
           AND (
-            sa.id IS NOT NULL
-            OR subst.sub_session_id IS NOT NULL
-            OR ${joinedBySession('$1', 's.class_id', 's.start_date')}
+            (
+              s.class_id IN (
+                SELECT class_id FROM enrollments
+                WHERE student_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+                UNION
+                SELECT class_id FROM master_class_enrollments
+                WHERE student_id = $1 AND company_id = $2 AND status != 'DROPPED'
+              )
+              -- Lessons the class ran before this student joined it are not part of
+              -- their record: with nothing to attend, every one of them would read
+              -- ABSENT and drag the attendance rate down from the day they arrived.
+              -- A row (or a make-up) still wins — whatever they actually sat stays.
+              AND (
+                sa.id IS NOT NULL
+                OR subst.sub_session_id IS NOT NULL
+                OR ${joinedBySession('$1', 's.class_id', 's.start_date')}
+              )
+            )
+            OR sa.id IS NOT NULL
           )
         ORDER BY s.start_date DESC`,
         [params.studentId, context.companyId]
