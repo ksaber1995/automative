@@ -1,7 +1,9 @@
 import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { DialogModule } from 'primeng/dialog';
 import { ButtonModule } from 'primeng/button';
+import { SelectModule } from 'primeng/select';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { GlobalScanService } from '../../../core/services/global-scan.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -28,7 +30,7 @@ export interface CameraScanFeedback {
 @Component({
   selector: 'app-camera-scan-dialog',
   standalone: true,
-  imports: [CommonModule, DialogModule, ButtonModule, TranslateModule],
+  imports: [CommonModule, FormsModule, DialogModule, ButtonModule, SelectModule, TranslateModule],
   template: `
     <p-dialog
       [visible]="visible()"
@@ -48,19 +50,24 @@ export interface CameraScanFeedback {
         } @else {
           <p class="text-center text-xs text-gray-500">{{ 'SESSION_ATTENDANCE.SCAN_HINT' | translate }}</p>
         }
-        <!-- Phones carry several back lenses and the browser's default is often
-             the wide one, which can't focus on a card — so the choice has to be
-             the user's. Hidden when there is nothing to choose between. -->
+        <!-- Phones carry several back lenses (main, wide, tele) and the browser's
+             default is often the wide one, which can't focus on a card — so the
+             choice has to be the user's. A named list, not a blind cycle button:
+             with three or four lenses the user should pick the one they mean.
+             Hidden when there is nothing to choose between. -->
         @if (cameras().length > 1) {
-          <p-button
-            [label]="'SESSION_ATTENDANCE.SWITCH_CAMERA' | translate"
-            icon="pi pi-sync"
-            [text]="true"
-            size="small"
-            styleClass="w-full"
+          <p-select
+            [options]="cameras()"
+            optionLabel="label"
+            optionValue="id"
+            [ngModel]="currentCameraId()"
+            (onChange)="selectCamera($event.value)"
+            [placeholder]="'SESSION_ATTENDANCE.CHOOSE_CAMERA' | translate"
             [disabled]="starting()"
-            (onClick)="switchCamera()"
-          ></p-button>
+            styleClass="w-full"
+            size="small"
+            appendTo="body"
+          ></p-select>
         }
         @if (feedback) {
           <div class="rounded-md px-3 py-2 text-sm text-center"
@@ -100,9 +107,9 @@ export class CameraScanDialogComponent {
   private lastScanAt = 0;
   private readonly DEDUP_MS = 2500;
 
-  /** The device's cameras, once known. More than one → the switch button shows. */
+  /** The device's cameras, once known. More than one → the picker shows. */
   cameras = signal<{ id: string; label: string }[]>([]);
-  private currentCameraId: string | null = null;
+  currentCameraId = signal<string | null>(null);
   private scanConfig: any;
   /** Survives page loads: the lens that worked is the lens wanted next time. */
   private static readonly CAMERA_KEY = 'scanCameraId';
@@ -144,12 +151,14 @@ export class CameraScanDialogComponent {
         await this.startWith({ facingMode: 'environment' });
       }
 
-      this.currentCameraId = this.runningCameraId() ?? saved;
+      this.currentCameraId.set(this.runningCameraId() ?? saved);
       // Only after start: enumeration needs the permission the start just won,
-      // and before it the labels come back empty on most phones.
+      // and before it the labels come back empty on most phones. The device's
+      // own label names the lens ("Back Ultra Wide Camera", "camera 0, facing
+      // back") — keep it, and only number the ones that report nothing.
       Html5Qrcode.getCameras()
         .then((cams: Array<{ id: string; label: string }>) =>
-          this.cameras.set((cams || []).map((c) => ({ id: c.id, label: c.label || '' }))))
+          this.cameras.set((cams || []).map((c, i) => ({ id: c.id, label: c.label || `Camera ${i + 1}` }))))
         .catch(() => {});
     } catch {
       // Close rather than leave a black rectangle with no way forward.
@@ -171,18 +180,15 @@ export class CameraScanDialogComponent {
     );
   }
 
-  /** Cycle to the next camera and remember it for every later scan. */
-  async switchCamera(): Promise<void> {
-    const cams = this.cameras();
-    if (cams.length < 2 || !this.html5Qr || this.starting()) return;
-    const idx = cams.findIndex((c) => c.id === this.currentCameraId);
-    const next = cams[(idx + 1) % cams.length];
+  /** Restart on the chosen camera and remember it for every later scan. */
+  async selectCamera(id: string | null): Promise<void> {
+    if (!id || id === this.currentCameraId() || !this.html5Qr || this.starting()) return;
     this.starting.set(true);
     try {
       await this.html5Qr.stop();
-      await this.startWith({ deviceId: { exact: next.id } });
-      this.currentCameraId = next.id;
-      try { localStorage.setItem(CameraScanDialogComponent.CAMERA_KEY, next.id); } catch {}
+      await this.startWith({ deviceId: { exact: id } });
+      this.currentCameraId.set(id);
+      try { localStorage.setItem(CameraScanDialogComponent.CAMERA_KEY, id); } catch {}
     } catch {
       this.html5Qr = undefined;
       this.visible.set(false);
