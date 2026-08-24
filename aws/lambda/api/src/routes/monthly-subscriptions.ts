@@ -1468,6 +1468,12 @@ export const monthlySubscriptionsRoutes = {
          LEFT JOIN master_courses mc     ON mc.id = me.master_course_id
          WHERE msp.company_id = $1
            AND msp.student_id = $2
+           -- Same guard as every monthly billing/dues query: converting a course
+           -- to per-session keeps its old monthly bills as history (their debt
+           -- lives on as bundles), and this is what stops them reading as unpaid
+           -- months on the student page. Master-bundle bills have no course row
+           -- and are always genuinely monthly.
+           AND (msp.master_enrollment_id IS NOT NULL OR c.payment_type = 'MONTHLY_SUBSCRIPTION')
          ORDER BY msp.billing_year DESC, msp.billing_month DESC, COALESCE(c.name, mc.name)`,
         [context.companyId, params.studentId]
       );

@@ -5177,6 +5177,7 @@
       "TYPE_ONE_TIME": "دفعة واحدة",
       "TYPE_MONTHLY": "اشتراك شهري",
       "TYPE_SESSION": "بالحصة",
+      "PACKAGE_TAG": "باقة · {{used}}/{{total}} حصة",
       "PT_ONE_TIME": "دفعة واحدة",
       "PT_MONTHLY_SUBSCRIPTION": "شهري",
       "PT_PER_SESSION": "بالحصة",

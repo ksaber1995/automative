@@ -788,14 +788,26 @@ export const enrollmentsRoutes = {
       { const b = buildBranch(meParams, 'me.branch_id'); if (b) meConditions.push(b); }
 
       const mParams: any[] = [context.companyId];
-      const mConditions = ['msp.company_id = $1', 'msp.amount_due > msp.amount_paid', "msp.payment_status NOT IN ('PAID', 'REFUNDED')", 'COALESCE(msp.refunded_amount, 0) = 0', "e.status = 'ACTIVE'", `(msp.billing_year * 12 + msp.billing_month) <= ${curPeriodExpr}`];
+      // The payment_type guard is the rule every monthly billing query lives by:
+      // converting a course to per-session keeps its old monthly bills as
+      // history (their debt lives on as bundles), and this is what stops them
+      // doubling up here as owed months.
+      const mConditions = ['msp.company_id = $1', 'msp.amount_due > msp.amount_paid', "msp.payment_status NOT IN ('PAID', 'REFUNDED')", 'COALESCE(msp.refunded_amount, 0) = 0', "e.status = 'ACTIVE'", "c.payment_type = 'MONTHLY_SUBSCRIPTION'", `(msp.billing_year * 12 + msp.billing_month) <= ${curPeriodExpr}`];
       { const b = buildBranch(mParams, 'msp.branch_id'); if (b) mConditions.push(b); }
 
       const sParams: any[] = [context.companyId];
       const sConditions = ['sp.company_id = $1', "sp.payment_status = 'PENDING'", 'sp.amount_due > sp.amount_paid', 'COALESCE(sp.refunded_amount, 0) = 0', "e.status = 'ACTIVE'"];
       { const b = buildBranch(sParams, 'sp.branch_id'); if (b) sConditions.push(b); }
 
-      const [enrollmentRows, masterRows, monthlyRows, sessionRows] = await Promise.all([
+      // Unpaid session bundles. A charge covered by a bundle is deliberately not
+      // a due (only PENDING charges are, above) — so without this branch a
+      // family that took a whole bundle on credit never appeared here at all:
+      // the money they owe lives on the bundle row, nowhere else.
+      const pkParams: any[] = [context.companyId];
+      const pkConditions = ['pk.company_id = $1', "pk.status <> 'REFUNDED'", 'pk.amount_due > pk.amount_paid', "e.status = 'ACTIVE'"];
+      { const b = buildBranch(pkParams, 'pk.branch_id'); if (b) pkConditions.push(b); }
+
+      const [enrollmentRows, masterRows, monthlyRows, sessionRows, packageRows] = await Promise.all([
         query(
           `SELECT e.id, e.student_id, e.course_id AS course_id, e.branch_id, e.enrollment_date,
                   e.final_price, e.amount_paid, COALESCE(e.total_refunded, 0) AS total_refunded,
@@ -848,6 +860,19 @@ export const enrollmentsRoutes = {
            ORDER BY sp.created_at DESC`,
           sParams
         ),
+        query(
+          `SELECT pk.id, pk.student_id, pk.course_id, pk.branch_id, pk.purchased_at::date AS purchase_date,
+                  pk.amount_due, pk.amount_paid, pk.sessions_total, pk.sessions_used,
+                  s.name AS student_name, c.name AS course_name, b.name AS branch_name
+           FROM session_packages pk
+           JOIN enrollments e ON e.id = pk.enrollment_id
+           JOIN students s ON s.id = pk.student_id
+           JOIN courses c ON c.id = pk.course_id
+           JOIN branches b ON b.id = pk.branch_id
+           WHERE ${pkConditions.join(' AND ')}
+           ORDER BY pk.purchased_at DESC`,
+          pkParams
+        ).catch(() => [] as any[]),  // per-session schema may not have self-applied yet
       ]);
 
       const today = new Date();
@@ -900,11 +925,27 @@ export const enrollmentsRoutes = {
         };
       };
 
+      const mapPackage = (r: any) => {
+        const due = parseFloat(r.amount_due), paid = parseFloat(r.amount_paid || 0);
+        return {
+          id: r.id, studentId: r.student_id, studentName: r.student_name,
+          courseId: r.course_id, courseName: r.course_name,
+          branchId: r.branch_id, branchName: r.branch_name,
+          enrollmentDate: r.purchase_date,
+          finalPrice: due, amountPaid: paid, remaining: Math.max(0, due - paid),
+          paymentStatus: paid > 0 ? 'PARTIAL' : 'PENDING', status: 'ACTIVE',
+          type: 'PACKAGE' as const, paymentType: 'PER_SESSION' as const,
+          sessionsTotal: parseInt(r.sessions_total, 10),
+          sessionsUsed: parseInt(r.sessions_used, 10),
+        };
+      };
+
       const combined = [
         ...enrollmentRows.map((r: any) => mapEnrollment(r, 'ENROLLMENT')),
         ...masterRows.map((r: any) => mapEnrollment(r, 'MASTER_ENROLLMENT')),
         ...monthlyRows.map(mapMonthly),
         ...sessionRows.map(mapSession),
+        ...packageRows.map(mapPackage),
       ].sort((a, b) => new Date(b.enrollmentDate).getTime() - new Date(a.enrollmentDate).getTime());
 
       return { status: 200 as const, body: combined };

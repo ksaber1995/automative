@@ -130,6 +130,10 @@
             @if (due.type === 'MASTER_ENROLLMENT') {
               <p-tag value="Master" severity="info" styleClass="ml-1 text-xs"></p-tag>
             }
+            @if (due.type === 'PACKAGE') {
+              <p-tag [value]="'DUES.LIST.PACKAGE_TAG' | translate: { used: due.sessionsUsed, total: due.sessionsTotal }"
+                severity="info" styleClass="ml-1 text-xs"></p-tag>
+            }
           </td>
           <td>
             <p-tag [value]="typeLabel(due)" [severity]="typeSeverity(due.paymentType)" styleClass="text-xs"></p-tag>

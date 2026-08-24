@@ -5053,6 +5053,7 @@
       "TYPE_ONE_TIME": "One-time",
       "TYPE_MONTHLY": "Monthly subscription",
       "TYPE_SESSION": "Per session",
+      "PACKAGE_TAG": "Package · {{used}}/{{total}} sessions",
       "PT_ONE_TIME": "One-time",
       "PT_MONTHLY_SUBSCRIPTION": "Monthly",
       "PT_PER_SESSION": "Session",

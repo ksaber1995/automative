@@ -220,6 +220,7 @@ export class DuesListComponent implements OnInit {
       case 'MASTER_ENROLLMENT': request$ = this.masterEnrollmentService.addPayment(due.id, dto); break;
       case 'MONTHLY': request$ = this.monthlyService.recordPayment(due.id, dto); break;
       case 'SESSION': request$ = this.sessionService.recordPayment(due.id, dto); break;
+      case 'PACKAGE': request$ = this.sessionService.payPackage(due.id, dto); break;
       default: request$ = this.enrollmentService.addPayment(due.id, dto);
     }
 
@@ -255,7 +256,8 @@ export class DuesListComponent implements OnInit {
   printReceipt(due: DueEnrollment) {
     const wanted = due.type === 'MASTER_ENROLLMENT' ? 'MASTER'
       : due.type === 'MONTHLY' ? 'MONTHLY'
-      : due.type === 'SESSION' ? 'SESSION' : 'ENROLLMENT';
+      : due.type === 'SESSION' ? 'SESSION'
+      : due.type === 'PACKAGE' ? 'PACKAGE' : 'ENROLLMENT';
     this.printingFor.set(due.id);
     this.api.get<any[]>(`receipts/student/${due.studentId}`).subscribe({
       next: (rows) => {
