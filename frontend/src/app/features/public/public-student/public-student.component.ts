@@ -53,17 +53,15 @@ export class PublicStudentComponent implements OnInit {
   // answer different questions for a parent — "how did they do on the test" vs
   // "are they doing the work" — so the page shows them as two sections.
   /**
-   * Nothing owed on any billing model. The feed now carries only outstanding
-   * items, so all four lists empty means the family is settled up — worth saying
-   * out loud, since the alternative is a blank space that reads as a failure.
+   * Nothing owed on any billing model — worth saying out loud, since the
+   * alternative is a blank space that reads as a failure. On the total, not
+   * the lists: a fully-paid ACTIVE package still shows (for its remaining
+   * sessions), and its presence must not hide the "all settled" banner.
    */
   nothingDue = () => {
     const p = this.profile()?.payments;
     if (!p) return false;
-    return (p.monthly?.length ?? 0) === 0
-      && (p.sessions?.length ?? 0) === 0
-      && (p.packages?.length ?? 0) === 0
-      && (p.oneTime?.length ?? 0) === 0;
+    return (p.totalOutstanding ?? 0) <= 0.005;
   };
 
   examOnly = () => (this.profile()?.exams ?? []).filter(e => !e.isHomework);

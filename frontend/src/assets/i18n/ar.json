@@ -5644,6 +5644,7 @@
     "PAID_ON": "دُفع في",
     "REMAINING": "المتبقّي",
     "SESSIONS_USED": "تم استخدام {{used}} من {{total}} حصة",
+    "SESSIONS_REMAINING": "متبقي {{count}} حصة",
     "PAYMENT": {
       "PAID": "مدفوع",
       "PARTIAL": "مدفوع جزئيًا",

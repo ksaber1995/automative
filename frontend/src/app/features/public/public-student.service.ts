@@ -68,6 +68,7 @@ export interface PublicSessionPackage {
   courseName: string;
   sessionsTotal: number;
   sessionsUsed: number;
+  sessionsRemaining: number;
   amountDue: number;
   amountPaid: number;
   status: string;

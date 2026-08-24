@@ -338,12 +338,23 @@
                     </div>
                   </div>
                   <div class="text-right whitespace-nowrap">
-                    <div class="text-sm font-semibold text-gray-800">
-                      {{ money(pk.amountPaid) }} <span class="text-gray-400">/ {{ money(pk.amountDue) }}</span>
-                    </div>
-                    <span class="inline-block mt-1 text-xs font-semibold px-2.5 py-1 rounded-full" [class]="statusClass(pk.status)">
-                      {{ paymentLabel(pk.status) }}
-                    </span>
+                    <!-- A settled package owes nothing — the number a parent wants
+                         there is how many sessions are left on it, not money. -->
+                    @if (pk.amountPaid >= pk.amountDue) {
+                      <div class="text-sm font-semibold text-gray-800">
+                        {{ 'PUBLIC_PROFILE.SESSIONS_REMAINING' | translate: { count: pk.sessionsRemaining } }}
+                      </div>
+                      <span class="inline-block mt-1 text-xs font-semibold px-2.5 py-1 rounded-full" [class]="statusClass('PAID')">
+                        {{ paymentLabel('PAID') }}
+                      </span>
+                    } @else {
+                      <div class="text-sm font-semibold text-gray-800">
+                        {{ money(pk.amountPaid) }} <span class="text-gray-400">/ {{ money(pk.amountDue) }}</span>
+                      </div>
+                      <span class="inline-block mt-1 text-xs font-semibold px-2.5 py-1 rounded-full" [class]="statusClass(pk.status)">
+                        {{ paymentLabel(pk.status) }}
+                      </span>
+                    }
                   </div>
                 </div>
               }

@@ -396,6 +396,7 @@ export const publicStudentsRoutes = {
         courseName: row.course_name,
         sessionsTotal: parseInt(row.sessions_total, 10),
         sessionsUsed: parseInt(row.sessions_used, 10),
+        sessionsRemaining: Math.max(0, parseInt(row.sessions_total, 10) - parseInt(row.sessions_used, 10)),
         amountDue: num(row.amount_due),
         amountPaid: num(row.amount_paid),
         status: row.status,
@@ -443,8 +444,19 @@ export const publicStudentsRoutes = {
             ? monthly.filter((m) => m.enrollmentId === enrollmentId)
                 .map((m) => ({ due: m.amountDue, paid: m.amountPaid, status: m.status }))
             : paymentType === 'PER_SESSION'
-              ? sessions.filter((s) => s.enrollmentId === enrollmentId)
-                  .map((s) => ({ due: s.amountDue, paid: s.amountPaid, status: s.status }))
+              // A COVERED charge's money lives on its package, so counting the
+              // charge AND the package would owe the same lesson twice — the
+              // package rows below carry that money. WAIVED/REFUNDED charges
+              // are not owed by anyone.
+              ? [
+                  ...sessions
+                    .filter((s) => s.enrollmentId === enrollmentId
+                      && s.status !== 'COVERED' && s.status !== 'WAIVED' && s.status !== 'REFUNDED')
+                    .map((s) => ({ due: s.amountDue, paid: s.amountPaid, status: s.status })),
+                  ...packages
+                    .filter((p) => p.enrollmentId === enrollmentId && p.status !== 'REFUNDED')
+                    .map((p) => ({ due: p.amountDue, paid: p.amountPaid, status: p.status })),
+                ]
               : [];
         if (!rows.length) return fallback;
         if (rows.some((r) => r.status === 'OVERDUE')) return 'OVERDUE';
@@ -454,16 +466,6 @@ export const publicStudentsRoutes = {
         return paid >= due ? 'PAID' : 'PARTIAL';
       };
 
-      // No paid-to-date total: that is a statement of account, and this page is
-      // behind nothing but the QR token printed on the student's card. The one
-      // number a parent scanning at the desk wants is what is still owed.
-      //
-      // What is still owed right now — future months a student has not reached are
-      // real bills, so they count, but nothing already settled does.
-      const totalOutstanding = monthly.reduce((t, m) => t + Math.max(0, m.amountDue - m.amountPaid), 0)
-        + sessions.reduce((t, s) => t + Math.max(0, s.amountDue - s.amountPaid), 0)
-        + oneTime.reduce((t, o) => t + o.remaining, 0);
-
       /**
        * The parent sees what is still OWED, not what has already been settled.
        *
@@ -472,17 +474,41 @@ export const publicStudentsRoutes = {
        * bill ever paid buries that answer. It also narrows what the QR token
        * exposes: a settled bill is history that nobody needs to hand over.
        *
-       * The unfiltered lists above still drive statusFor and the totals, so the
-       * course badges and "paid to date" stay right — only the line items shown
-       * are narrowed. A refunded per-session charge is not a due either.
+       * The unfiltered lists above still drive statusFor, so the course badges
+       * stay right — only the line items shown are narrowed. A refunded
+       * per-session charge is not a due either.
+       *
+       * COVERED charges never show and never count: their money lives on the
+       * covering package, which carries its own due below — listing both would
+       * bill the same lesson twice, and a lesson covered by a package the
+       * family already paid for is not owed at all. That charge's real story on
+       * this page is the package's remaining-session count.
        */
       const owed = (due: number, paid: number) => Math.max(0, due - paid) > 0.005;
       const monthlyDue = monthly.filter((m) => owed(m.amountDue, m.amountPaid));
       const sessionsDue = sessions.filter(
-        (s) => s.status !== 'REFUNDED' && s.status !== 'WAIVED' && owed(s.amountDue, s.amountPaid));
-      const packagesDue = packages.filter(
-        (p) => p.status !== 'REFUNDED' && owed(p.amountDue, p.amountPaid));
+        (s) => s.status !== 'REFUNDED' && s.status !== 'WAIVED' && s.status !== 'COVERED'
+          && owed(s.amountDue, s.amountPaid));
+      // ACTIVE packages show even when fully paid: the parent's question there
+      // is not money but "how many sessions are left on what we bought". An
+      // exhausted-and-settled package is history and stays off the page.
+      const packagesShown = packages.filter(
+        (p) => p.status === 'ACTIVE'
+          || (p.status !== 'REFUNDED' && owed(p.amountDue, p.amountPaid)));
       const oneTimeDue = oneTime.filter((o) => o.remaining > 0.005);
+
+      // No paid-to-date total: that is a statement of account, and this page is
+      // behind nothing but the QR token printed on the student's card. The one
+      // number a parent scanning at the desk wants is what is still owed.
+      //
+      // Summed from the narrowed lists, plus unpaid packages, so it agrees with
+      // the line items on the page: no COVERED double-count, nothing waived or
+      // refunded, and a bundle nobody has paid for is real money owed.
+      const totalOutstanding = monthlyDue.reduce((t, m) => t + Math.max(0, m.amountDue - m.amountPaid), 0)
+        + sessionsDue.reduce((t, s) => t + Math.max(0, s.amountDue - s.amountPaid), 0)
+        + packages.filter((p) => p.status !== 'REFUNDED')
+            .reduce((t, p) => t + Math.max(0, p.amountDue - p.amountPaid), 0)
+        + oneTimeDue.reduce((t, o) => t + o.remaining, 0);
 
       return {
         status: 200 as const,
@@ -502,7 +528,7 @@ export const publicStudentsRoutes = {
           payments: {
             monthly: monthlyDue,
             sessions: sessionsDue,
-            packages: packagesDue,
+            packages: packagesShown,
             oneTime: oneTimeDue,
             refunds,
             totalOutstanding,

@@ -5520,6 +5520,7 @@
     "PAID_ON": "Paid",
     "REMAINING": "Remaining",
     "SESSIONS_USED": "{{used}} of {{total}} sessions used",
+    "SESSIONS_REMAINING": "{{count}} sessions left",
     "PAYMENT": {
       "PAID": "Paid",
       "PARTIAL": "Partial",
