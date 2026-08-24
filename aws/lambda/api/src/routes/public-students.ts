@@ -227,7 +227,12 @@ export const publicStudentsRoutes = {
       // than one at once, so all three are read and merged. Every query is scoped
       // by the resolved student AND company, same as everything above.
 
-      // MONTHLY_SUBSCRIPTION: one row per billed month.
+      // MONTHLY_SUBSCRIPTION: one row per billed month. The payment_type guard
+      // matches every other monthly billing/dues query: converting a course to
+      // per-session deliberately KEEPS its old monthly bills as history (their
+      // debt lives on as bundles), and this filter is what makes them stop
+      // reading as money owed. Without it the parent page was the one place a
+      // converted tenant's leftovers still showed as OVERDUE.
       const monthlyRows = await query<any>(
         `SELECT m.billing_year, m.billing_month, m.amount_due, m.amount_paid,
                 m.payment_status, m.due_date, m.paid_date, m.enrollment_id,
@@ -237,6 +242,7 @@ export const publicStudentsRoutes = {
          LEFT JOIN enrollments e ON e.id = m.enrollment_id
          LEFT JOIN classes cl ON cl.id = e.class_id
          WHERE m.student_id = $1 AND m.company_id = $2
+           AND c.payment_type = 'MONTHLY_SUBSCRIPTION'
          ORDER BY m.billing_year DESC, m.billing_month DESC`,
         [student.id, student.company_id]
       );
