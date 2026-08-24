@@ -63,38 +63,6 @@
         </div>
       </div>
 
-      <!-- Attendance per class. The three tiles above blend every class into one
-           number; this says which class is actually being missed. Only worth
-           showing when there is more than one class to compare. -->
-      @if (p.attendance.byClass.length > 1) {
-        <div class="bg-white rounded-xl shadow-sm p-5 mb-6">
-          <h2 class="font-bold text-gray-900 mb-3">{{ 'PUBLIC_PROFILE.ATTENDANCE_BY_CLASS' | translate }}</h2>
-          <div class="space-y-3">
-            @for (c of p.attendance.byClass; track c.className) {
-              <div>
-                <div class="flex items-center justify-between text-sm mb-1 gap-2">
-                  <span class="font-medium text-gray-800 truncate">{{ c.className }}</span>
-                  <span class="text-gray-500 shrink-0">
-                    <span class="font-semibold"
-                      [class.text-green-600]="c.attendanceRate >= 75"
-                      [class.text-amber-600]="c.attendanceRate >= 50 && c.attendanceRate < 75"
-                      [class.text-red-500]="c.attendanceRate < 50">{{ c.attendanceRate }}%</span>
-                    · {{ 'PUBLIC_PROFILE.PRESENT_OF_TOTAL' | translate: { present: c.presentCount, total: c.totalSessions } }}
-                  </span>
-                </div>
-                <div class="w-full bg-gray-200 rounded-full h-2">
-                  <div class="h-2 rounded-full"
-                    [class.bg-green-500]="c.attendanceRate >= 75"
-                    [class.bg-amber-500]="c.attendanceRate >= 50 && c.attendanceRate < 75"
-                    [class.bg-red-400]="c.attendanceRate < 50"
-                    [style.width.%]="c.attendanceRate"></div>
-                </div>
-              </div>
-            }
-          </div>
-        </div>
-      }
-
       <!-- Courses -->
       <div class="bg-white rounded-xl shadow-sm p-5 mb-6">
         <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
