@@ -7,19 +7,20 @@
 } @else if (user()) {
   <div class="max-w-5xl mx-auto space-y-6">
 
-    <!-- Header -->
-    <div class="flex items-start justify-between">
-      <div class="flex items-center gap-4">
+    <!-- Header. Stacks on a phone: the name block and three labelled action
+         buttons cannot share one row on a 360px screen. -->
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div class="flex items-center gap-4 min-w-0">
         <button pButton icon="pi pi-arrow-left" class="p-button-text p-button-rounded p-button-secondary"
           (click)="back()">
         </button>
-        <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-xl font-bold"
+        <div class="w-14 h-14 shrink-0 rounded-2xl flex items-center justify-center text-white text-xl font-bold"
           [style.background]="getAvatarColor(user()!.role)">
           {{ getInitials(user()!) }}
         </div>
-        <div>
-          <h1 class="text-2xl font-bold text-gray-900">{{ user()!.firstName }} {{ user()!.lastName }}</h1>
-          <div class="flex items-center gap-2 mt-1">
+        <div class="min-w-0">
+          <h1 class="text-2xl font-bold text-gray-900 break-words">{{ user()!.firstName }} {{ user()!.lastName }}</h1>
+          <div class="flex items-center gap-2 mt-1 flex-wrap">
             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
               [class]="getRoleBadgeClass(user()!.role)">
               <i [class]="getRoleIcon(user()!.role) + ' text-xs'"></i>
@@ -37,7 +38,7 @@
           </div>
         </div>
       </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2 flex-wrap">
         <button pButton icon="pi pi-pencil" [label]="'USERS.DETAIL.EDIT' | translate" severity="warn"
           (click)="edit()">
         </button>
@@ -133,7 +134,7 @@
 
         <!-- Reset Password -->
         <div class="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-          <div class="flex items-center justify-between">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p class="font-medium text-gray-700">{{ 'USERS.DETAIL.RESET_PASSWORD_LABEL' | translate }}</p>
               <p class="text-xs text-gray-400 mt-0.5">{{ 'USERS.DETAIL.RESET_PASSWORD_DESC' | translate }}</p>
@@ -148,7 +149,7 @@
       <!-- Permissions Tab -->
       <p-tabpanel value="1">
         <div class="pt-4">
-          <div class="flex items-center justify-between mb-4">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
             <p class="text-sm text-gray-500">
               {{ 'USERS.DETAIL.EFFECTIVE_PERM' | translate }}
               <strong>{{ getRoleLabel(user()!.role) }}</strong>
@@ -162,8 +163,10 @@
             </button>
           </div>
 
-          <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <table class="w-full text-sm">
+          <!-- overflow-x-auto, not overflow-hidden: a four-column table does not
+               fit a phone, and hidden CLIPPED the action columns clean off. -->
+          <div class="bg-white border border-gray-200 rounded-xl overflow-x-auto">
+            <table class="w-full text-sm min-w-[480px]">
               <thead class="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th class="text-left px-4 py-3 font-semibold text-gray-600">{{ 'USERS.DETAIL.COL_RESOURCE' | translate }}</th>

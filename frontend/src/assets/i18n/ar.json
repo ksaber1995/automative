@@ -1016,6 +1016,7 @@
     "REFUND_BTN": "استرداد",
     "NO_RECORDS": "لا توجد رسوم حصص لهذه الفترة.",
     "NO_PACKAGES": "لا توجد باقات.",
+    "SEARCH_NAME": "البحث باسم الطالب",
     "STATUS_ALL": "الكل",
     "STATUS_PENDING": "لم يدفع",
     "STATUS_PARTIAL": "جزئي",

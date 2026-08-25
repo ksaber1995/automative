@@ -140,18 +140,27 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
   // Stable reference so the global scan handler can be unregistered on destroy.
   private readonly scanHandler = (token: string) => this.resolveToken(token);
 
+  /** Live student-name filter — narrows every table on the page. */
+  nameSearch = signal('');
+  private matchesName = (name: string | null | undefined): boolean => {
+    const q = this.nameSearch().trim().toLowerCase();
+    return !q || `${name ?? ''}`.toLowerCase().includes(q);
+  };
+
   filtered = computed(() => {
     const tab = this.selectedTab();
-    if (tab === 'ALL') return this.payments();
-    if (tab === 'ON_HOLD') return this.payments().filter(p => p.enrollmentStatus === 'ON_HOLD');
-    return this.payments().filter(p => this.effectiveStatus(p) === tab);
+    let rows = this.payments();
+    if (tab === 'ON_HOLD') rows = rows.filter(p => p.enrollmentStatus === 'ON_HOLD');
+    else if (tab !== 'ALL') rows = rows.filter(p => this.effectiveStatus(p) === tab);
+    return rows.filter(p => this.matchesName(p.studentName));
   });
 
   /** Packages filtered by the shared status tabs (same set as charges). */
   filteredPackages = computed(() => {
     const tab = this.selectedTab();
-    if (tab === 'ALL') return this.packages();
-    return this.packages().filter(p => this.packageEffectiveStatus(p) === tab);
+    let rows = this.packages();
+    if (tab !== 'ALL') rows = rows.filter(p => this.packageEffectiveStatus(p) === tab);
+    return rows.filter(p => this.matchesName(p.studentName));
   });
 
   /**
@@ -207,7 +216,7 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
   packagesTableRows = computed(() => {
     const pkgRows = this.filteredPackages().map(p => ({ kind: 'package' as const, p }));
     const renewalRows = this.renewalsVisible()
-      ? this.renewals().map(r => ({ kind: 'renewal' as const, r }))
+      ? this.renewals().filter(r => this.matchesName(r.studentName)).map(r => ({ kind: 'renewal' as const, r }))
       : [];
     return [...renewalRows, ...pkgRows];
   });

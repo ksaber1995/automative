@@ -1016,6 +1016,7 @@
     "REFUND_BTN": "Refund",
     "NO_RECORDS": "No session charges for this period.",
     "NO_PACKAGES": "No packages found.",
+    "SEARCH_NAME": "Search by student name",
     "STATUS_ALL": "All",
     "STATUS_PENDING": "Pending",
     "STATUS_PARTIAL": "Partial",
