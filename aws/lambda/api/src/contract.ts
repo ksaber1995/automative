@@ -8089,6 +8089,12 @@ export const contract = c.router({
           // For PER_SESSION courses: the session charge created by this check-in.
           // paymentStatus PENDING → prompt to collect; COVERED → paid by package.
           sessionCharge: SessionPaymentWithDetailsSchema.nullable().optional(),
+          // What the desk should know AT THE DOOR, on the same toast that
+          // confirms the scan: a run of missed lessons before this one, and
+          // money still owed from before today (this check-in's own fresh
+          // charge is excluded — it gets its own collect prompt).
+          absentStreak: z.number().optional(),
+          totalDue: z.number().optional(),
         }),
         400: ApiErrorSchema,
         401: ApiErrorSchema,

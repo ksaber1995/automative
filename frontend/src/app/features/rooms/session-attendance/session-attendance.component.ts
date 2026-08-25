@@ -121,7 +121,7 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
   // app-wide GlobalScanService handler, and the roster's search box resolves a
   // typed student code on Enter.
   resolvingCode = signal(false);
-  lastScanResult = signal<{ name: string; alreadyPresent: boolean; attendanceType?: AttendanceType | null; homeClassName?: string | null } | null>(null);
+  lastScanResult = signal<{ name: string; alreadyPresent: boolean; attendanceType?: AttendanceType | null; homeClassName?: string | null; warning?: string | null } | null>(null);
 
   // Session number inline edit
   editingNumber = signal(false);
@@ -814,7 +814,8 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
         // A trial attendee has no enrolment in this class either, so like a
         // substitution they must be appended to the roster rather than matched.
         const isTrial = res.attendanceType === 'TRIAL';
-        this.lastScanResult.set({ name, alreadyPresent: res.alreadyPresent, attendanceType: res.attendanceType, homeClassName: res.homeClassName });
+        const warning = this.checkinWarning(res);
+        this.lastScanResult.set({ name, alreadyPresent: res.alreadyPresent, attendanceType: res.attendanceType, homeClassName: res.homeClassName, warning });
         this.playBeep(!res.alreadyPresent);
         // Reflect in the local roster so a later checkbox save doesn't drop it.
         // Substitution attendees may not be in the enrolled roster — add them.
@@ -844,6 +845,9 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
         } else {
           this.notificationService.success(this.translate.instant('SESSION_QR.CHECKED_IN', { name }));
         }
+        // The things the desk should know while the student is still standing
+        // there: a run of missed lessons, and money owed from before today.
+        if (warning) this.notificationService.warning(`${name}: ${warning}`);
         // PER_SESSION courses: prompt to collect this check-in's charge (fresh
         // only), and reflect it on the roster immediately whatever its status.
         if (!res.alreadyPresent && res.sessionCharge) {
@@ -857,6 +861,18 @@ export class SessionAttendanceComponent implements OnInit, OnDestroy {
         this.lastScanResult.set(null);
       },
     });
+  }
+
+  /** "absent for the last N sessions · owes X" — or null when there is nothing to flag. */
+  private checkinWarning(res: { absentStreak?: number; totalDue?: number }): string | null {
+    const parts: string[] = [];
+    if ((res.absentStreak ?? 0) > 0) {
+      parts.push(this.translate.instant('SESSION_QR.WAS_ABSENT', { count: res.absentStreak }));
+    }
+    if ((res.totalDue ?? 0) > 0) {
+      parts.push(this.translate.instant('SESSION_QR.HAS_DUES', { amount: res.totalDue }));
+    }
+    return parts.length ? parts.join(' · ') : null;
   }
 
   ngOnDestroy() {

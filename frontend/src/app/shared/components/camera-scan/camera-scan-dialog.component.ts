@@ -13,6 +13,8 @@ import { cameraScanConfig } from '../../../core/utils/scanner-formats.util';
 export interface CameraScanFeedback {
   name: string;
   alreadyPresent: boolean;
+  /** Worth flagging while they stand there: an absence run, money owed. */
+  warning?: string | null;
 }
 
 /**
@@ -108,6 +110,12 @@ export interface CameraScanFeedback {
             {{ feedback.name }}
             @if (feedback.alreadyPresent) { · {{ 'SESSIONS_DASHBOARD.PRESENT' | translate }} }
           </div>
+          <!-- Flags worth acting on while the student is still at the door. -->
+          @if (feedback.warning) {
+            <div class="rounded-md bg-amber-50 text-amber-800 px-3 py-2 text-sm text-center">
+              <i class="pi pi-exclamation-triangle me-1"></i>{{ feedback.warning }}
+            </div>
+          }
         }
       </div>
 

@@ -73,6 +73,10 @@ export interface QrCheckinResult {
   message: string;
   /** PER_SESSION courses: the charge created by this check-in (PENDING → prompt to pay). */
   sessionCharge?: SessionPaymentWithDetails | null;
+  /** Missed lessons in a row before this one — 0 when their last lesson was attended. */
+  absentStreak?: number;
+  /** Money still owed from BEFORE today (this check-in's fresh charge excluded). */
+  totalDue?: number;
 }
 
 /** One thing a student still owes for the class a session belongs to. */

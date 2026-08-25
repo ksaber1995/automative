@@ -5762,7 +5762,9 @@
     "CHECKED_IN": "تم تسجيل حضور {{name}}",
     "ALREADY_PRESENT": "{{name}} مسجّل حاضر بالفعل",
     "SUBSTITUTION_CHECKED_IN": "تم تسجيل حضور {{name}} كتعويض (مسجّل في {{className}})",
-    "TRIAL_CHECKED_IN": "انضم {{name}} إلى الحصة المجانية"
+    "TRIAL_CHECKED_IN": "انضم {{name}} إلى الحصة المجانية",
+    "WAS_ABSENT": "غاب آخر {{count}} حصة",
+    "HAS_DUES": "عليه مستحقات {{amount}}"
   },
   "SESSION_HISTORY": {
     "TITLE": "سجل الحصص",

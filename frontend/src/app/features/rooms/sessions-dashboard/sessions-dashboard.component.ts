@@ -1133,7 +1133,8 @@ export class SessionsDashboardComponent implements OnInit {
     this.attendanceService.checkinByQr(sessionId, token).subscribe({
       next: (res) => {
         const name = `${res.studentName}`.trim();
-        this.scanFeedback.set({ name, alreadyPresent: res.alreadyPresent });
+        const warning = this.checkinWarning(res);
+        this.scanFeedback.set({ name, alreadyPresent: res.alreadyPresent, warning });
         // Reflect locally so the next debounced save does not drop the row —
         // a substitution or trial attendee is not on the enrolled roster at all.
         this.attendanceBySession.set({
@@ -1164,10 +1165,25 @@ export class SessionsDashboardComponent implements OnInit {
           if (res.sessionCharge) this.payDialog?.enqueue([res.sessionCharge]);
           this.loadDuesForSession(sessionId);
         }
+        // The things the desk should know while the student is still standing
+        // there: a run of missed lessons, and money owed from before today.
+        if (warning) this.notificationService.warning(`${name}: ${warning}`);
       },
       // Interceptor toasts the translated server error (unknown token / not enrolled).
       error: () => this.scanFeedback.set(null),
     });
+  }
+
+  /** "absent for the last N sessions · owes X" — or null when there is nothing to flag. */
+  private checkinWarning(res: { absentStreak?: number; totalDue?: number }): string | null {
+    const parts: string[] = [];
+    if ((res.absentStreak ?? 0) > 0) {
+      parts.push(this.translate.instant('SESSION_QR.WAS_ABSENT', { count: res.absentStreak }));
+    }
+    if ((res.totalDue ?? 0) > 0) {
+      parts.push(this.translate.instant('SESSION_QR.HAS_DUES', { amount: res.totalDue }));
+    }
+    return parts.length ? parts.join(' · ') : null;
   }
 
   /** After a collection: refresh every roster whose dues are already on screen.

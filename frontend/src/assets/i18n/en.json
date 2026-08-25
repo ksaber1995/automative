@@ -5638,7 +5638,9 @@
     "CHECKED_IN": "{{name}} marked present",
     "ALREADY_PRESENT": "{{name}} was already present",
     "SUBSTITUTION_CHECKED_IN": "{{name}} marked present by substitution (enrolled in {{className}})",
-    "TRIAL_CHECKED_IN": "{{name}} joined the free session"
+    "TRIAL_CHECKED_IN": "{{name}} joined the free session",
+    "WAS_ABSENT": "absent for the last {{count}} session(s)",
+    "HAS_DUES": "owes {{amount}}"
   },
   "SESSION_HISTORY": {
     "TITLE": "Session History",

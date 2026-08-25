@@ -1071,6 +1071,37 @@ export const attendanceRoutes = {
           console.error('Per-session charge (checkinByQr) error:', billErr);
         }
 
+        // What the desk should know AT THE DOOR, on the toast that confirms the
+        // scan: a run of missed lessons before this one, and money still owed.
+        // Best-effort — a stats failure must never fail the check-in.
+        let absentStreak = 0;
+        let totalDue = 0;
+        try {
+          const stats = await absenceStats(
+            context.companyId, session.class_id, params.sessionId, session.start_date ?? new Date(),
+          );
+          absentStreak = stats.get(student.id)?.absentStreak ?? 0;
+        } catch (statErr) {
+          console.error('Absence streak (checkinByQr) error:', statErr);
+        }
+        try {
+          const start = new Date(session.start_date);
+          const { byStudent } = await classDues(
+            context, session.class_id,
+            start.getFullYear() * 12 + (start.getMonth() + 1), session.start_date,
+          );
+          const d = byStudent.get(student.id);
+          totalDue = d ? d.items.reduce((sum, i) => sum + i.amount, 0) : 0;
+          // This check-in's own fresh PENDING charge is not "prior debt" — it
+          // gets its own collect prompt, so it would be counted twice here.
+          if (sessionCharge && sessionCharge.paymentStatus === 'PENDING') {
+            totalDue -= Math.max(0, (sessionCharge.amountDue ?? 0) - (sessionCharge.amountPaid ?? 0));
+          }
+          totalDue = Math.max(0, Math.round(totalDue * 100) / 100);
+        } catch (duesErr) {
+          console.error('Dues lookup (checkinByQr) error:', duesErr);
+        }
+
         return {
           status: 200 as const,
           body: {
@@ -1084,6 +1115,8 @@ export const attendanceRoutes = {
             code: alreadyPresent ? 'ATTENDANCE.ALREADY_PRESENT' : 'ATTENDANCE.CHECKED_IN',
             message: alreadyPresent ? 'Student was already marked present' : 'Student marked present',
             sessionCharge,
+            absentStreak,
+            totalDue,
           },
         };
       }
