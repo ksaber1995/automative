@@ -40,6 +40,59 @@ export class PublicStudentComponent implements OnInit {
   loading = signal(true);
   error = signal(false);
   profile = signal<PublicStudentProfile | null>(null);
+
+  // ── Course filter ───────────────────────────────────────────────────────────
+  // A student with several courses (= several teachers) gets one blended page;
+  // the filter answers the parent's real question — attendance and dues for
+  // WHICH teacher/course. 'ALL' shows everything, as before.
+  courseFilter = signal<string>('ALL');
+
+  /** The courses to filter by, labelled with the teacher when known. */
+  courseOptions = (): { name: string; label: string }[] => {
+    const p = this.profile();
+    if (!p) return [];
+    const teacherByCourse = new Map<string, string>();
+    for (const r of p.attendance?.recent ?? []) {
+      if (r.courseName && r.teacherName && !teacherByCourse.has(r.courseName)) {
+        teacherByCourse.set(r.courseName, r.teacherName);
+      }
+    }
+    const names = new Set<string>();
+    for (const r of p.attendance?.recent ?? []) if (r.courseName) names.add(r.courseName);
+    for (const c of p.courses ?? []) if (c.courseName) names.add(c.courseName);
+    for (const m of p.payments?.monthly ?? []) names.add(m.courseName);
+    for (const s of p.payments?.sessions ?? []) names.add(s.courseName);
+    for (const pk of p.payments?.packages ?? []) names.add(pk.courseName);
+    for (const o of p.payments?.oneTime ?? []) names.add(o.courseName);
+    return [...names].map((n) => ({
+      name: n,
+      label: teacherByCourse.has(n) ? `${n} — ${teacherByCourse.get(n)}` : n,
+    }));
+  };
+
+  private matchCourse = (name: string | null | undefined): boolean =>
+    this.courseFilter() === 'ALL' || name === this.courseFilter();
+
+  attendanceRows = () =>
+    (this.profile()?.attendance?.recent ?? []).filter((r) => this.matchCourse(r.courseName));
+  /** The list shown — the filtered set, newest first, kept to a readable length. */
+  recentRows = () => this.attendanceRows().slice(0, 15);
+
+  /** The three tiles: server totals unfiltered, recomputed per course when filtered. */
+  attendanceTiles = () => {
+    const p = this.profile()!;
+    if (this.courseFilter() === 'ALL') {
+      return { rate: p.attendance.attendanceRate, present: p.attendance.presentCount, absent: p.attendance.absentCount };
+    }
+    const rows = this.attendanceRows();
+    const present = rows.filter((r) => r.status !== 'ABSENT').length;
+    return { rate: rows.length ? Math.round((present / rows.length) * 100) : 0, present, absent: rows.length - present };
+  };
+
+  monthlyRows = () => (this.profile()?.payments?.monthly ?? []).filter((m) => this.matchCourse(m.courseName));
+  sessionRows = () => (this.profile()?.payments?.sessions ?? []).filter((s) => this.matchCourse(s.courseName));
+  packageRows = () => (this.profile()?.payments?.packages ?? []).filter((pk) => this.matchCourse(pk.courseName));
+  oneTimeRows = () => (this.profile()?.payments?.oneTime ?? []).filter((o) => this.matchCourse(o.courseName));
   /** Set when the token is a blank pool card rather than a student's. */
   unassignedCard = signal<PublicUnassignedCard | null>(null);
 

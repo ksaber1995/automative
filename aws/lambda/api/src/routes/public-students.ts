@@ -151,6 +151,11 @@ export const publicStudentsRoutes = {
             s.start_date AS session_start_date,
             s.session_number AS session_number,
             cl.name AS class_name,
+            crs.name AS course_name,
+            -- Who teaches this group — the class's own instructor, else the
+            -- course's. A parent with children across several teachers reads
+            -- the list by teacher, not by internal group name.
+            NULLIF(TRIM(CONCAT(emp.first_name, ' ', emp.last_name)), '') AS teacher_name,
             r.code AS room_code,
             CASE WHEN sa.id IS NOT NULL THEN true ELSE false END AS is_present_normal,
             -- Recorded as a visitor's row, and the group they were in then.
@@ -163,6 +168,8 @@ export const publicStudentsRoutes = {
             COALESCE(sa.created_at, subst.sub_checked_in_at) AS checked_in_at
          FROM sessions s
          JOIN classes cl ON s.class_id = cl.id
+         LEFT JOIN courses crs ON crs.id = cl.course_id
+         LEFT JOIN employees emp ON emp.id = COALESCE(cl.instructor_id, crs.instructor_id)
          LEFT JOIN rooms r ON s.room_id = r.id
          -- Any row on a session of their own class means they were there; see
          -- the same join in attendance.getByStudent.
@@ -215,6 +222,8 @@ export const publicStudentsRoutes = {
             sub_session.start_date AS session_start_date,
             sub_session.session_number AS session_number,
             sub_class.name AS class_name,
+            crs2.name AS course_name,
+            NULLIF(TRIM(CONCAT(emp2.first_name, ' ', emp2.last_name)), '') AS teacher_name,
             r2.code AS room_code,
             false AS is_present_normal,
             sub_class.name AS substituted_in_class_name,
@@ -223,6 +232,8 @@ export const publicStudentsRoutes = {
          FROM session_attendance sub
          JOIN sessions sub_session ON sub_session.id = sub.session_id
          JOIN classes sub_class ON sub_class.id = sub_session.class_id
+         LEFT JOIN courses crs2 ON crs2.id = sub_class.course_id
+         LEFT JOIN employees emp2 ON emp2.id = COALESCE(sub_class.instructor_id, crs2.instructor_id)
          LEFT JOIN rooms r2 ON r2.id = sub_session.room_id
          WHERE sub.student_id = $1
            AND sub.attendance_type = 'SUBSTITUTION'
@@ -555,12 +566,17 @@ export const publicStudentsRoutes = {
             absentCount,
             attendanceRate,
             byClass: attendanceByClass,
-            recent: withStatus.slice(0, 10).map((row: any) => ({
+            // Enough rows for the page's course filter to work client-side (the
+            // tiles are recomputed from these when a course is picked). Capped —
+            // a student's own sessions, so the real count is small anyway.
+            recent: withStatus.slice(0, 200).map((row: any) => ({
               sessionStartDate: row.session_start_date,
               sessionNumber: row.session_number === null || row.session_number === undefined
                 ? null
                 : parseInt(row.session_number, 10),
               className: row.class_name,
+              courseName: row.course_name || null,
+              teacherName: row.teacher_name || null,
               roomCode: row.room_code,
               status: row.status,
               // When the student was actually marked in. Null for an absence —

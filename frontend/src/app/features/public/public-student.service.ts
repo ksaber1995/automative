@@ -14,6 +14,10 @@ export interface PublicStudentAttendanceRecent {
   sessionStartDate: string;
   sessionNumber?: number | null;
   className: string;
+  /** The course this session belongs to — drives the page's course filter. */
+  courseName?: string | null;
+  /** Who teaches the group (class instructor, else the course's). */
+  teacherName?: string | null;
   roomCode: string | null;
   isPresent: boolean;
   status?: 'PRESENT' | 'ABSENT' | 'SUBSTITUTED';
