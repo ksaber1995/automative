@@ -779,12 +779,18 @@ export const enrollmentsRoutes = {
       // back in the parent's hand, so the balance is owed again and must show
       // here. A refund that ended the deal still hides via status (DROPPED /
       // CANCELLED), exactly as before.
+      // A student who has LEFT is not someone this page's collection queue
+      // should chase — marking them left is the act staff perform, and their
+      // enrollments usually stay ACTIVE, so status alone never hides them.
+      // Every source below joins `students s`.
+      const STUDENT_PRESENT = 'COALESCE(s.is_active, true)';
+
       const eParams: any[] = [context.companyId];
-      const eConditions = ['e.company_id = $1', "e.payment_type = 'ONE_TIME'", '(e.amount_paid - COALESCE(e.total_refunded, 0)) < e.final_price', "e.status <> 'DROPPED'"];
+      const eConditions = ['e.company_id = $1', "e.payment_type = 'ONE_TIME'", '(e.amount_paid - COALESCE(e.total_refunded, 0)) < e.final_price', "e.status <> 'DROPPED'", STUDENT_PRESENT];
       { const b = buildBranch(eParams, 'e.branch_id'); if (b) eConditions.push(b); }
 
       const meParams: any[] = [context.companyId];
-      const meConditions = ['me.company_id = $1', '(me.amount_paid - COALESCE(me.total_refunded, 0)) < me.final_price', "me.status <> 'CANCELLED'"];
+      const meConditions = ['me.company_id = $1', '(me.amount_paid - COALESCE(me.total_refunded, 0)) < me.final_price', "me.status <> 'CANCELLED'", STUDENT_PRESENT];
       { const b = buildBranch(meParams, 'me.branch_id'); if (b) meConditions.push(b); }
 
       const mParams: any[] = [context.companyId];
@@ -792,11 +798,11 @@ export const enrollmentsRoutes = {
       // converting a course to per-session keeps its old monthly bills as
       // history (their debt lives on as bundles), and this is what stops them
       // doubling up here as owed months.
-      const mConditions = ['msp.company_id = $1', 'msp.amount_due > msp.amount_paid', "msp.payment_status NOT IN ('PAID', 'REFUNDED')", 'COALESCE(msp.refunded_amount, 0) = 0', "e.status = 'ACTIVE'", "c.payment_type = 'MONTHLY_SUBSCRIPTION'", `(msp.billing_year * 12 + msp.billing_month) <= ${curPeriodExpr}`];
+      const mConditions = ['msp.company_id = $1', 'msp.amount_due > msp.amount_paid', "msp.payment_status NOT IN ('PAID', 'REFUNDED')", 'COALESCE(msp.refunded_amount, 0) = 0', "e.status = 'ACTIVE'", "c.payment_type = 'MONTHLY_SUBSCRIPTION'", STUDENT_PRESENT, `(msp.billing_year * 12 + msp.billing_month) <= ${curPeriodExpr}`];
       { const b = buildBranch(mParams, 'msp.branch_id'); if (b) mConditions.push(b); }
 
       const sParams: any[] = [context.companyId];
-      const sConditions = ['sp.company_id = $1', "sp.payment_status = 'PENDING'", 'sp.amount_due > sp.amount_paid', 'COALESCE(sp.refunded_amount, 0) = 0', "e.status = 'ACTIVE'"];
+      const sConditions = ['sp.company_id = $1', "sp.payment_status = 'PENDING'", 'sp.amount_due > sp.amount_paid', 'COALESCE(sp.refunded_amount, 0) = 0', "e.status = 'ACTIVE'", STUDENT_PRESENT];
       { const b = buildBranch(sParams, 'sp.branch_id'); if (b) sConditions.push(b); }
 
       // Unpaid session bundles. A charge covered by a bundle is deliberately not
@@ -804,7 +810,7 @@ export const enrollmentsRoutes = {
       // family that took a whole bundle on credit never appeared here at all:
       // the money they owe lives on the bundle row, nowhere else.
       const pkParams: any[] = [context.companyId];
-      const pkConditions = ['pk.company_id = $1', "pk.status <> 'REFUNDED'", 'pk.amount_due > pk.amount_paid', "e.status = 'ACTIVE'"];
+      const pkConditions = ['pk.company_id = $1', "pk.status <> 'REFUNDED'", 'pk.amount_due > pk.amount_paid', "e.status = 'ACTIVE'", STUDENT_PRESENT];
       { const b = buildBranch(pkParams, 'pk.branch_id'); if (b) pkConditions.push(b); }
 
       const [enrollmentRows, masterRows, monthlyRows, sessionRows, packageRows] = await Promise.all([
