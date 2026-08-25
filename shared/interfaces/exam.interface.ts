@@ -143,6 +143,8 @@ export interface QrExamResult {
 export interface StudentExamResult {
   examName: string;
   courseName: string;
+  /** Who set it (class instructor, else the course's). */
+  teacherName?: string | null;
   examDate: string;
   grade: string;
   maxGrade?: number | null;

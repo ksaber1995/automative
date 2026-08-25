@@ -1614,7 +1614,10 @@
           <ng-template pTemplate="body" let-row>
             <tr>
               <td>{{ row.examDate | date: 'mediumDate' }}</td>
-              <td>{{ row.courseName }}</td>
+              <td>
+                {{ row.courseName }}
+                @if (row.teacherName) { <span class="text-gray-400 text-xs block"><i class="pi pi-user text-[10px]"></i> {{ row.teacherName }}</span> }
+              </td>
               <td class="font-medium">{{ row.examName }}</td>
               <td>
                 @if (row.notMarked || row.isAbsent) {
@@ -1670,6 +1673,7 @@
               <td>
                 {{ row.courseName }}
                 @if (row.className) { <span class="text-gray-400 text-xs block">{{ row.className }}</span> }
+                @if (row.teacherName) { <span class="text-gray-400 text-xs block"><i class="pi pi-user text-[10px]"></i> {{ row.teacherName }}</span> }
               </td>
               <td class="font-medium">{{ row.examName }}</td>
               <td>
