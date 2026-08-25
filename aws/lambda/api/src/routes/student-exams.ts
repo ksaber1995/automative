@@ -153,6 +153,10 @@ async function drawPaper(exam: any, student: StudentContext): Promise<any | 'CON
        FROM lesson_questions q
        JOIN exam_lessons el ON el.lesson_id = q.lesson_id
       WHERE el.exam_id = $1 AND q.is_active = true AND q.company_id = $2
+        -- Never draw a question whose key is unset (imports arrive that way):
+        -- it cannot be marked, so it is not on any paper until a teacher sets it.
+        AND EXISTS (SELECT 1 FROM lesson_question_options o
+                     WHERE o.question_id = q.id AND o.is_correct = true)
       ORDER BY random()
       LIMIT $3`,
     [exam.id, student.companyId, parseInt(exam.question_count, 10)],

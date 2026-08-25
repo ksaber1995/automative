@@ -122,10 +122,12 @@ function mapQuestionFromDB(row: any, options: any[]) {
 /**
  * Validates the option list of a whole-question write, and returns it cleaned.
  *
- * The rules are the ones an MCQ needs to be answerable and markable: enough
- * options to choose between, not so many nobody reads them, no blank text, and
- * EXACTLY one right answer — none means the question can never be got right, two
- * means marking it is a coin toss.
+ * The rules are the ones an MCQ needs to be answerable: enough options to
+ * choose between, not so many nobody reads them, no blank text, and AT MOST one
+ * right answer — two means marking it is a coin toss. NONE is allowed on
+ * purpose: an imported bank can arrive with the keys unset for the teacher to
+ * fill in later, and a keyless question is simply excluded from exam pools
+ * (see lessonPoolSize / drawPaper) until it gets one.
  *
  * Returns a string error key on failure, so callers can turn it into a 400 with
  * the message the client already has a translation for.
@@ -140,7 +142,7 @@ function validateOptions(input: any): { error: string } | { options: { text: str
     return { error: 'ERRORS.LESSONS.OPTION_COUNT' };
   }
   if (options.some((o) => !o.text)) return { error: 'ERRORS.LESSONS.OPTION_TEXT_REQUIRED' };
-  if (options.filter((o) => o.isCorrect).length !== 1) {
+  if (options.filter((o) => o.isCorrect).length > 1) {
     return { error: 'ERRORS.LESSONS.ONE_CORRECT_REQUIRED' };
   }
   return { options };
@@ -159,7 +161,11 @@ export async function lessonPoolSize(lessonIds: string[], companyId: string): Pr
   const row = await queryOne<any>(
     `SELECT COUNT(*) AS total
        FROM lesson_questions q
-      WHERE q.lesson_id = ANY($1::uuid[]) AND q.company_id = $2 AND q.is_active = true`,
+      WHERE q.lesson_id = ANY($1::uuid[]) AND q.company_id = $2 AND q.is_active = true
+        -- A question with no key set (imports arrive that way) cannot be
+        -- marked, so it is not part of any exam's pool until the teacher sets one.
+        AND EXISTS (SELECT 1 FROM lesson_question_options o
+                     WHERE o.question_id = q.id AND o.is_correct = true)`,
     [lessonIds, companyId]
   );
   return parseInt(row?.total ?? '0', 10);

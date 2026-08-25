@@ -2331,7 +2331,24 @@
       "CREATE": "Create",
       "UPDATE": "Update",
       "CREATE_SUCCESS": "Question added",
-      "UPDATE_SUCCESS": "Question updated"
+      "UPDATE_SUCCESS": "Question updated",
+      "IMPORT": "Import from Excel",
+      "IMPORT_TITLE": "Import questions from Excel",
+      "IMPORT_HINT": "The sheet needs these columns: question, answer_a, answer_b, answer_c, answer_d (optional) and right_answer (a, b, c or d — optional, you can set it later). Questions without a right answer stay out of exam papers until you set one.",
+      "IMPORT_TEMPLATE": "Download template",
+      "IMPORT_PICK_FILE": "Choose Excel file",
+      "IMPORT_PROGRESS": "Importing {{done}} of {{total}}…",
+      "IMPORT_DONE": "{{count}} questions imported",
+      "IMPORT_EMPTY": "No questions found in the file. Check the column names against the template.",
+      "IMPORT_UNREADABLE": "Could not read this file. Save it as .xlsx and try again.",
+      "IMPORT_ROW_NO_QUESTION": "Row {{row}}: the question column is empty",
+      "IMPORT_ROW_FEW_ANSWERS": "Row {{row}}: at least two answers are needed",
+      "IMPORT_ROW_BAD_KEY": "Row {{row}}: right_answer must be a, b, c or d and point at a filled answer",
+      "IMPORT_ROW_SAVE_FAILED": "Row {{row}}: could not be saved",
+      "IMPORT_AI_TITLE": "Have your questions in another format?",
+      "IMPORT_COPY_PROMPT": "Copy prompt",
+      "IMPORT_PROMPT_COPIED": "Prompt copied — paste it into any AI together with your file",
+      "IMPORT_AI_PROMPT": "Convert the attached file (photo, PDF, Word, or text) into an Excel sheet with EXACTLY these column headers in the first row: question, answer_a, answer_b, answer_c, answer_d, right_answer. One row per multiple-choice question. Put each answer choice in its own column; leave answer_d empty when a question has only three choices. In right_answer put only the letter a, b, c or d of the correct choice, or leave it empty if unknown. Do not add, rename or reorder columns, do not merge cells, and do not include any commentary — give me the result as a downloadable .xlsx file named questions.xlsx."
     }
   },
   "SCHOOL_LEVELS": {

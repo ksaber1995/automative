@@ -2331,7 +2331,24 @@
       "CREATE": "إنشاء",
       "UPDATE": "تحديث",
       "CREATE_SUCCESS": "تمت إضافة السؤال",
-      "UPDATE_SUCCESS": "تم تحديث السؤال"
+      "UPDATE_SUCCESS": "تم تحديث السؤال",
+      "IMPORT": "استيراد من إكسل",
+      "IMPORT_TITLE": "استيراد الأسئلة من إكسل",
+      "IMPORT_HINT": "يجب أن يحتوي الملف على الأعمدة: question و answer_a و answer_b و answer_c و answer_d (اختياري) و right_answer (a أو b أو c أو d — اختياري، يمكنك تحديده لاحقًا). الأسئلة بدون إجابة صحيحة لا تدخل في أوراق الامتحانات حتى تحددها.",
+      "IMPORT_TEMPLATE": "تحميل القالب",
+      "IMPORT_PICK_FILE": "اختر ملف إكسل",
+      "IMPORT_PROGRESS": "جارٍ استيراد {{done}} من {{total}}…",
+      "IMPORT_DONE": "تم استيراد {{count}} سؤال",
+      "IMPORT_EMPTY": "لا توجد أسئلة في الملف. راجع أسماء الأعمدة مقارنةً بالقالب.",
+      "IMPORT_UNREADABLE": "تعذّرت قراءة الملف. احفظه بصيغة .xlsx وحاول مرة أخرى.",
+      "IMPORT_ROW_NO_QUESTION": "الصف {{row}}: عمود السؤال فارغ",
+      "IMPORT_ROW_FEW_ANSWERS": "الصف {{row}}: مطلوب إجابتان على الأقل",
+      "IMPORT_ROW_BAD_KEY": "الصف {{row}}: يجب أن يكون right_answer حرف a أو b أو c أو d ويشير إلى إجابة غير فارغة",
+      "IMPORT_ROW_SAVE_FAILED": "الصف {{row}}: تعذّر الحفظ",
+      "IMPORT_AI_TITLE": "أسئلتك في ملف بصيغة أخرى؟",
+      "IMPORT_COPY_PROMPT": "نسخ البرومبت",
+      "IMPORT_PROMPT_COPIED": "تم نسخ البرومبت — الصقه في أي ذكاء اصطناعي مع ملفك",
+      "IMPORT_AI_PROMPT": "حوّل الملف المرفق (صورة أو PDF أو Word أو نص) إلى ملف إكسل بهذه الأعمدة بالضبط في الصف الأول: question, answer_a, answer_b, answer_c, answer_d, right_answer. كل سؤال اختيار من متعدد في صف واحد، وكل اختيار في عموده؛ اترك answer_d فارغًا إذا كان للسؤال ثلاثة اختيارات فقط. ضع في right_answer حرف الإجابة الصحيحة فقط a أو b أو c أو d، أو اتركه فارغًا إذا لم تكن معروفة. لا تُضف أعمدة ولا تغيّر أسماءها أو ترتيبها، ولا تدمج خلايا، ولا تكتب أي شرح — أعطني النتيجة كملف .xlsx قابل للتحميل باسم questions.xlsx."
     }
   },
   "SCHOOL_LEVELS": {

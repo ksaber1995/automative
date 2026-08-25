@@ -20,6 +20,7 @@ import { RadioButtonModule } from 'primeng/radiobutton';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { firstValueFrom } from 'rxjs';
 import { LessonService } from '../services/lesson.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -235,6 +236,151 @@ export class LessonQuestionsComponent implements OnInit {
         error: fail,
       });
     }
+  }
+
+  // ── Excel import ──────────────────────────────────────────────────────────
+  // A teacher's bank usually already exists somewhere — a Word file, a PDF, a
+  // paper past exam. The dialog takes our one fixed sheet shape, hands out a
+  // template of it, and hands out a prompt that turns ANY of those sources into
+  // that shape via whatever AI the teacher already uses.
+  showImport = signal(false);
+  importing = signal(false);
+  importDone = signal(0);
+  importTotal = signal(0);
+  importErrors = signal<string[]>([]);
+
+  openImport() {
+    this.importErrors.set([]);
+    this.importDone.set(0);
+    this.importTotal.set(0);
+    this.showImport.set(true);
+  }
+
+  closeImport() {
+    if (this.importing()) return;
+    this.showImport.set(false);
+  }
+
+  /** The exact sheet the import reads, with one example row to copy the shape of. */
+  async downloadTemplate() {
+    // Loaded on demand — SheetJS is heavy and most visits never import.
+    const XLSX = await import('xlsx');
+    const ws = XLSX.utils.json_to_sheet(
+      [{
+        question: 'What is 2 + 2?',
+        answer_a: '3',
+        answer_b: '4',
+        answer_c: '5',
+        answer_d: '22',
+        right_answer: 'b',
+      }],
+      { header: ['question', 'answer_a', 'answer_b', 'answer_c', 'answer_d', 'right_answer'] },
+    );
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'questions');
+    XLSX.writeFile(wb, 'questions-template.xlsx');
+  }
+
+  aiPrompt(): string {
+    return this.translate.instant('LESSONS.QUESTIONS.IMPORT_AI_PROMPT');
+  }
+
+  copyAiPrompt() {
+    navigator.clipboard?.writeText(this.aiPrompt()).then(
+      () => this.notificationService.success(this.translate.instant('LESSONS.QUESTIONS.IMPORT_PROMPT_COPIED')),
+      () => {},
+    );
+  }
+
+  async onImportFile(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';   // so the same file can be picked again after a fix
+    if (!file || this.importing()) return;
+
+    this.importErrors.set([]);
+    const XLSX = await import('xlsx');
+    let rows: any[] = [];
+    try {
+      const wb = XLSX.read(await file.arrayBuffer());
+      rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+    } catch {
+      this.importErrors.set([this.translate.instant('LESSONS.QUESTIONS.IMPORT_UNREADABLE')]);
+      return;
+    }
+
+    // Headers matched case/space-insensitively: "Answer A" and "answer_a" are
+    // the same column to whoever typed the sheet.
+    const norm = (v: any) => String(v ?? '').trim();
+    const get = (row: any, key: string) => {
+      const found = Object.keys(row).find(
+        (k) => k.trim().toLowerCase().replace(/\s+/g, '_') === key,
+      );
+      return found ? norm(row[found]) : '';
+    };
+
+    const errors: string[] = [];
+    const parsed: { questionText: string; options: { optionText: string; isCorrect: boolean }[] }[] = [];
+    rows.forEach((row, i) => {
+      const rowNo = i + 2;   // 1-based, plus the header row
+      const question = get(row, 'question');
+      if (!question) {
+        // A fully blank row is padding, not a mistake worth reporting.
+        if (Object.values(row).some((v) => norm(v))) {
+          errors.push(this.translate.instant('LESSONS.QUESTIONS.IMPORT_ROW_NO_QUESTION', { row: rowNo }));
+        }
+        return;
+      }
+      const letters = ['a', 'b', 'c', 'd'];
+      const present = letters
+        .map((letter) => ({ letter, text: get(row, `answer_${letter}`) }))
+        .filter((a) => a.text);
+      if (present.length < MIN_OPTIONS) {
+        errors.push(this.translate.instant('LESSONS.QUESTIONS.IMPORT_ROW_FEW_ANSWERS', { row: rowNo }));
+        return;
+      }
+      // The key is optional — the teacher can set it afterwards; a question
+      // without one stays out of exam papers until they do.
+      const right = get(row, 'right_answer').toLowerCase();
+      if (right && !present.some((a) => a.letter === right)) {
+        errors.push(this.translate.instant('LESSONS.QUESTIONS.IMPORT_ROW_BAD_KEY', { row: rowNo }));
+        return;
+      }
+      parsed.push({
+        questionText: question,
+        options: present.map((a) => ({ optionText: a.text, isCorrect: !!right && a.letter === right })),
+      });
+    });
+
+    if (!parsed.length) {
+      this.importErrors.set(errors.length ? errors : [this.translate.instant('LESSONS.QUESTIONS.IMPORT_EMPTY')]);
+      return;
+    }
+
+    this.importing.set(true);
+    this.importTotal.set(parsed.length);
+    this.importDone.set(0);
+    let created = 0;
+    // One at a time: the bank keeps the sheet's order, and a mid-file failure
+    // reports exactly which rows made it.
+    for (let i = 0; i < parsed.length; i++) {
+      try {
+        await firstValueFrom(this.lessonService.createQuestion(this.lessonId, {
+          questionText: parsed[i].questionText,
+          explanation: null,
+          options: parsed[i].options,
+        }));
+        created++;
+      } catch {
+        errors.push(this.translate.instant('LESSONS.QUESTIONS.IMPORT_ROW_SAVE_FAILED', { row: i + 2 }));
+      }
+      this.importDone.set(i + 1);
+    }
+    this.importing.set(false);
+    this.importErrors.set(errors);
+    this.notificationService.success(this.translate.instant('LESSONS.QUESTIONS.IMPORT_DONE', { count: created }));
+    this.loadQuestions();
+    if (!errors.length) this.showImport.set(false);
   }
 
   deleteQuestion(question: LessonQuestionModel) {
