@@ -1,5 +1,7 @@
 import { Component, OnInit, OnDestroy, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ActivatedRoute, Router } from '@angular/router';
+import { TablePageMemory } from '../../../core/utils/table-page-memory';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subject, takeUntil, forkJoin } from 'rxjs';
@@ -92,6 +94,13 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
       isMaster: true,
     })),
   ]);
+
+  // Pagination that survives leaving the page — see TablePageMemory.
+  private pageRouter = inject(Router);
+  private pageRoute = inject(ActivatedRoute);
+  billsPage = new TablePageMemory(this.pageRouter, this.pageRoute, {
+    storeKey: 'monthlySubsBillsPage', defaultRows: 10, allowedRows: [10, 20, 50],
+  });
 
   // Data — signals so async-loaded data renders without needing a user interaction.
   payments = signal<MonthlyPaymentWithDetails[]>([]);

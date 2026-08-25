@@ -1,6 +1,8 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { TablePageMemory } from '../../../core/utils/table-page-memory';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { forkJoin, Observable } from 'rxjs';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
@@ -68,6 +70,18 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
 
   /** Teacher-type companies have a single implicit branch — hide the filter. */
   isTeacher = (): boolean => this.auth.isTeacher();
+
+  // Pagination that survives leaving the page — one memory per table, so the
+  // charges and packages positions travel in their own params.
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  chargesPage = new TablePageMemory(this.router, this.route, {
+    storeKey: 'sessionPaymentsChargesPage', defaultRows: 20, allowedRows: [10, 20, 50],
+  });
+  packagesPage = new TablePageMemory(this.router, this.route, {
+    storeKey: 'sessionPaymentsPackagesPage', defaultRows: 20, allowedRows: [10, 20, 50],
+    pageParam: 'pkgPage', rowsParam: 'pkgRows',
+  });
   private translate = inject(TranslateService);
   private confirmationService = inject(ConfirmationService);
 

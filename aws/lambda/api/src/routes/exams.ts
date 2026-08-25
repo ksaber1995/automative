@@ -464,11 +464,15 @@ async function isEnrolledInCourse(
 export const studentExamFeedSql = `
   SELECT e.name AS exam_name, c.name AS course_name, cl.name AS class_name,
          e.exam_date, e.max_grade, e.is_homework, e.is_online,
+         -- Who set it: the class's own instructor, else the course's. A parent
+         -- with children across several teachers reads the feed by teacher.
+         NULLIF(TRIM(CONCAT(emp.first_name, ' ', emp.last_name)), '') AS teacher_name,
          r.grade, r.is_absent,
          (r.exam_id IS NULL) AS not_marked
     FROM exams e
     JOIN courses c ON c.id = e.course_id
     LEFT JOIN classes cl ON cl.id = e.class_id
+    LEFT JOIN employees emp ON emp.id = COALESCE(cl.instructor_id, c.instructor_id)
     LEFT JOIN exam_results r ON r.exam_id = e.id AND r.student_id = $1
    WHERE e.company_id = $2
      AND e.is_active = true
@@ -506,6 +510,7 @@ export function mapStudentExamRow(row: any, rating: boolean) {
     examName: row.exam_name,
     courseName: row.course_name,
     className: row.class_name ?? null,
+    teacherName: row.teacher_name ?? null,
     examDate: row.exam_date,
     grade: row.grade ?? '',
     maxGrade,

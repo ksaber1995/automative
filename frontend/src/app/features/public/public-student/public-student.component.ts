@@ -64,6 +64,9 @@ export class PublicStudentComponent implements OnInit {
     for (const s of p.payments?.sessions ?? []) names.add(s.courseName);
     for (const pk of p.payments?.packages ?? []) names.add(pk.courseName);
     for (const o of p.payments?.oneTime ?? []) names.add(o.courseName);
+    // Marks survive leaving a course, so the exam feed can name one nothing
+    // else on the page still does.
+    for (const e of p.exams ?? []) if (e.courseName) names.add(e.courseName);
     return [...names].map((n) => ({
       name: n,
       label: teacherByCourse.has(n) ? `${n} — ${teacherByCourse.get(n)}` : n,
@@ -117,8 +120,12 @@ export class PublicStudentComponent implements OnInit {
     return (p.totalOutstanding ?? 0) <= 0.005;
   };
 
-  examOnly = () => (this.profile()?.exams ?? []).filter(e => !e.isHomework);
-  homeworkOnly = () => (this.profile()?.exams ?? []).filter(e => e.isHomework === true);
+  // Exams and homework follow the course filter too: an academy parent asks
+  // "how are they doing with THIS teacher", not for one blended list.
+  examOnly = () => (this.profile()?.exams ?? [])
+    .filter(e => !e.isHomework && this.matchCourse(e.courseName));
+  homeworkOnly = () => (this.profile()?.exams ?? [])
+    .filter(e => e.isHomework === true && this.matchCourse(e.courseName));
 
   /**
    * A mark recorded by rating reads as the word the teacher chose — "Excellent",

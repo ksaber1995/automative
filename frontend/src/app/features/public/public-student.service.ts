@@ -124,6 +124,8 @@ export interface PublicStudentExam {
   courseName: string;
   /** Null when the exam is course-wide rather than set for one class. */
   className?: string | null;
+  /** Who set it (class instructor, else the course's). */
+  teacherName?: string | null;
   examDate: string;
   grade: string;
   maxGrade?: number | null;

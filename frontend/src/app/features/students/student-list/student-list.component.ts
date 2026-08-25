@@ -3,6 +3,7 @@ import { formatStudentCode, normalizeStudentCode } from '../../../core/utils/stu
 import { matchesSearchTokens } from '../../../core/utils/search.util';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
+import { TablePageMemory } from '../../../core/utils/table-page-memory';
 import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
@@ -196,48 +197,13 @@ export class StudentListComponent implements OnInit {
     this.searchTerm.set(value);
   }
 
-  // ── Pagination that survives leaving the page ───────────────────────────────
-  // The page lives in the URL (?page=3), so a deep link and the browser's Back
-  // both land on it. The app's own "back to the list" navigations go to a bare
-  // /students though, so the last position is ALSO kept in sessionStorage and
-  // restored when the URL says nothing — opening a student to edit and coming
-  // back returns to the same page, not page one.
+  // Pagination that survives leaving the page — see TablePageMemory.
   private route = inject(ActivatedRoute);
-  tableFirst = signal(0);
-  tableRows = signal(10);
-  private static readonly PAGE_STORE_KEY = 'studentsListPage';
-
-  private restorePagination() {
-    let page = parseInt(this.route.snapshot.queryParamMap.get('page') ?? '', 10);
-    let rows = parseInt(this.route.snapshot.queryParamMap.get('rows') ?? '', 10);
-    if (!Number.isFinite(page)) {
-      try {
-        const saved = JSON.parse(sessionStorage.getItem(StudentListComponent.PAGE_STORE_KEY) ?? 'null');
-        if (saved) { page = saved.page; rows = rows || saved.rows; }
-      } catch { /* a corrupt entry restores nothing */ }
-    }
-    if ([10, 25, 50].includes(rows)) this.tableRows.set(rows);
-    if (Number.isFinite(page) && page > 1) this.tableFirst.set((page - 1) * this.tableRows());
-  }
-
-  onPageChange(e: { first: number; rows: number }) {
-    this.tableFirst.set(e.first);
-    this.tableRows.set(e.rows);
-    const page = Math.floor(e.first / e.rows) + 1;
-    try {
-      sessionStorage.setItem(StudentListComponent.PAGE_STORE_KEY, JSON.stringify({ page, rows: e.rows }));
-    } catch { /* private mode — the URL still carries it */ }
-    // replaceUrl: paging is one position, not a trail of history entries.
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: { page: page > 1 ? page : null, rows: e.rows !== 10 ? e.rows : null },
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
-    });
-  }
+  pageMem = new TablePageMemory(this.router, this.route, {
+    storeKey: 'studentsListPage', defaultRows: 10, allowedRows: [10, 25, 50],
+  });
 
   ngOnInit() {
-    this.restorePagination();
     this.loadBranches();
     this.loadCourses();
     this.loadStudents();

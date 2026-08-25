@@ -188,7 +188,10 @@
               <div class="py-2.5 flex items-center justify-between gap-3">
                 <div class="min-w-0">
                   <div class="text-sm font-medium text-gray-800 truncate">{{ ex.examName }}</div>
-                  <div class="text-xs text-gray-500">{{ ex.courseName }} · {{ formatDate(ex.examDate) }}</div>
+                  <div class="text-xs text-gray-500">
+                    @if (ex.teacherName) { <i class="pi pi-user text-[10px]"></i> {{ ex.teacherName }} · }
+                    {{ ex.courseName }} · {{ formatDate(ex.examDate) }}
+                  </div>
                 </div>
                 @if (ex.notMarked || ex.isAbsent) {
                   <span class="text-xs font-semibold text-red-700 bg-red-100 px-2.5 py-1 rounded-full whitespace-nowrap">
@@ -221,6 +224,7 @@
                 <div class="min-w-0">
                   <div class="text-sm font-medium text-gray-800 truncate">{{ hw.examName }}</div>
                   <div class="text-xs text-gray-500">
+                    @if (hw.teacherName) { <i class="pi pi-user text-[10px]"></i> {{ hw.teacherName }} · }
                     {{ hw.courseName }}@if (hw.className) { · {{ hw.className }} } · {{ formatDate(hw.examDate) }}
                   </div>
                 </div>

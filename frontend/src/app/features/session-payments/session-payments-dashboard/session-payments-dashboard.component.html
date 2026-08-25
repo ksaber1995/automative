@@ -156,7 +156,9 @@
       <!-- Table -->
       <!-- On a phone course, session and date fold under the student name; the
            columns come back as the screen widens. -->
-      <p-table [value]="filtered()" [loading]="loading()" [paginator]="true" [rows]="20" [rowsPerPageOptions]="[10,20,50]" styleClass="mt-4">
+      <p-table [value]="filtered()" [loading]="loading()" [paginator]="true"
+        [first]="chargesPage.first()" [rows]="chargesPage.rows()" (onPage)="chargesPage.onPage($event)"
+        [rowsPerPageOptions]="[10,20,50]" styleClass="mt-4">
         <ng-template pTemplate="header">
           <tr>
             <th>{{ 'SESSION_PAYMENTS.COL_STUDENT' | translate }}</th>
@@ -248,7 +250,9 @@
            renewal-due students (last bundle used up, owe the next) as amber rows
            on top: it shows the sessions they finished, any unpaid overflow
            sessions, and a Renew action. -->
-      <p-table [value]="packagesTableRows()" [loading]="loading()" [paginator]="true" [rows]="20" [rowsPerPageOptions]="[10,20,50]" styleClass="mt-4">
+      <p-table [value]="packagesTableRows()" [loading]="loading()" [paginator]="true"
+        [first]="packagesPage.first()" [rows]="packagesPage.rows()" (onPage)="packagesPage.onPage($event)"
+        [rowsPerPageOptions]="[10,20,50]" styleClass="mt-4">
         <ng-template pTemplate="header">
           <tr>
             <th>{{ 'SESSION_PAYMENTS.COL_STUDENT' | translate }}</th>
