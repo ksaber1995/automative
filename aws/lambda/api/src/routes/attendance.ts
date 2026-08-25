@@ -1236,6 +1236,10 @@ export const attendanceRoutes = {
           cl.name AS class_name,
           co.id AS course_id,
           co.name AS course_name,
+          -- Who teaches this group — the class's own instructor, else the
+          -- course's. The page reads a multi-course student's history by
+          -- teacher, not by internal group name.
+          NULLIF(TRIM(CONCAT(emp.first_name, ' ', emp.last_name)), '') AS teacher_name,
           r.code AS room_code,
           CASE WHEN sa.id IS NOT NULL THEN true ELSE false END AS is_present_normal,
           -- How they got onto this roster, and which group they belonged to at
@@ -1248,6 +1252,7 @@ export const attendanceRoutes = {
         FROM sessions s
         JOIN classes cl ON s.class_id = cl.id
         JOIN courses co ON co.id = cl.course_id
+        LEFT JOIN employees emp ON emp.id = COALESCE(cl.instructor_id, co.instructor_id)
         LEFT JOIN rooms r ON s.room_id = r.id
         -- SUBSTITUTION counts here, not just NORMAL: this session belongs to a
         -- class they are enrolled in, and a row on it means they were in the
@@ -1374,6 +1379,7 @@ export const attendanceRoutes = {
           className: row.class_name,
           courseId: row.course_id,
           courseName: row.course_name,
+          teacherName: row.teacher_name ?? null,
           isFree: row.is_free === true,
           roomCode: row.room_code,
           status,

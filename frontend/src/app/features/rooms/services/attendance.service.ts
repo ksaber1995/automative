@@ -45,6 +45,8 @@ export interface StudentAttendanceRecord {
   className: string;
   courseId?: string | null;
   courseName?: string | null;
+  /** Who teaches the group (class instructor, else the course's). */
+  teacherName?: string | null;
   /** The session was a free (trial) one — nobody was billed for it. */
   isFree?: boolean;
   roomCode?: string | null;

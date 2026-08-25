@@ -1503,8 +1503,12 @@
                     </span>
                   }
                 </div>
-                @if (rec.courseName) {
-                  <div class="text-xs text-gray-400">{{ rec.courseName }}</div>
+                @if (rec.courseName || rec.teacherName) {
+                  <div class="text-xs text-gray-400">
+                    @if (rec.teacherName) { <i class="pi pi-user text-[10px]"></i> {{ rec.teacherName }} }
+                    @if (rec.teacherName && rec.courseName) { · }
+                    {{ rec.courseName }}
+                  </div>
                 }
               </td>
               <td class="text-gray-600 text-sm">{{ rec.roomCode || '—' }}</td>
