@@ -85,6 +85,10 @@ function mapPaymentWithDetailsFromDB(row: any) {
     parentPhone: row.parent_phone || null,
     parentName: row.parent_name || null,
     enrollmentStatus: row.enrollment_status || null,
+    // False only when the row's query selected it and the student has LEFT —
+    // the dashboard moves their unpaid bills to their own tab instead of
+    // mixing them with students who are still expected to pay.
+    studentIsActive: row.student_is_active !== false,
   };
 }
 
@@ -692,7 +696,8 @@ export const monthlySubscriptionsRoutes = {
            mc.id        AS master_course_id,
            b.name       AS branch_name,
            cl.name      AS class_name,
-           COALESCE(e.status, me.status) AS enrollment_status
+           COALESCE(e.status, me.status) AS enrollment_status,
+           COALESCE(s.is_active, true)   AS student_is_active
          FROM monthly_subscription_payments msp
          JOIN students s  ON msp.student_id = s.id
          JOIN branches b  ON msp.branch_id  = b.id

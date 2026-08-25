@@ -123,7 +123,9 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
 
   // Status filter
   statusFilter = signal('ALL');
-  readonly statuses = ['ALL', 'PENDING', 'PARTIAL', 'PAID', 'OVERDUE', 'ON_HOLD', 'REFUNDED'];
+  readonly statuses = ['ALL', 'PENDING', 'PARTIAL', 'PAID', 'OVERDUE', 'ON_HOLD', 'REFUNDED', 'LEFT_UNPAID'];
+  /** The statuses that mean "money still expected". */
+  private readonly UNPAID_STATUSES = ['PENDING', 'PARTIAL', 'OVERDUE'];
 
   // Client-side search by student name over the loaded rows.
   nameSearch = signal('');
@@ -562,7 +564,16 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     const status = this.statusFilter();
     const q = this.nameSearch().trim().toLowerCase();
     let rows = this.payments();
-    if (status !== 'ALL') rows = rows.filter(p => p.paymentStatus === status);
+    // A student who LEFT is not someone the desk should be chasing — their
+    // unpaid bills live on their own tab, off the pending/partial/overdue
+    // lists that staff work through at collection time.
+    if (status === 'LEFT_UNPAID') {
+      rows = rows.filter(p => p.studentIsActive === false && this.UNPAID_STATUSES.includes(p.paymentStatus));
+    } else if (this.UNPAID_STATUSES.includes(status)) {
+      rows = rows.filter(p => p.paymentStatus === status && p.studentIsActive !== false);
+    } else if (status !== 'ALL') {
+      rows = rows.filter(p => p.paymentStatus === status);
+    }
     if (q) rows = rows.filter(p => `${p.studentName}`.toLowerCase().includes(q));
     this.filteredPayments.set([...rows]);
   }
@@ -583,6 +594,12 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     if (status === 'ON_HOLD') return this.heldSubscriptions().length;
     const all = this.payments();
     if (status === 'ALL') return all.length;
+    if (status === 'LEFT_UNPAID') {
+      return all.filter(p => p.studentIsActive === false && this.UNPAID_STATUSES.includes(p.paymentStatus)).length;
+    }
+    if (this.UNPAID_STATUSES.includes(status)) {
+      return all.filter(p => p.paymentStatus === status && p.studentIsActive !== false).length;
+    }
     return all.filter(p => p.paymentStatus === status).length;
   }
 

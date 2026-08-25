@@ -42,6 +42,8 @@ export interface MonthlyPaymentWithDetails extends MonthlySubscriptionPayment {
    * creates the real bill at that moment.
    */
   projected?: boolean;
+  /** False when the student has LEFT — their unpaid bills get their own tab. */
+  studentIsActive?: boolean;
 }
 
 /** A monthly subscription currently on hold (generates no bills until resumed). */

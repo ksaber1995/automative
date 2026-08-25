@@ -1208,7 +1208,8 @@
       "PAID": "Paid",
       "OVERDUE": "Overdue",
       "ON_HOLD": "On Hold",
-      "REFUNDED": "Refunded"
+      "REFUNDED": "Refunded",
+      "LEFT_UNPAID": "Left with dues"
     },
     "RESUME": "Resume",
     "HOLD": "Hold",
