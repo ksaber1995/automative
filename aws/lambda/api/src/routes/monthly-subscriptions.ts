@@ -864,7 +864,8 @@ export const monthlySubscriptionsRoutes = {
       // cash already collected does not stop existing because someone left.
       const rows = await query(
         `SELECT msp.student_id, msp.payment_status, msp.due_date, msp.amount_due, msp.amount_paid, msp.refunded_amount,
-                (COALESCE(e.status, me.status) = 'ACTIVE' AND COALESCE(s.is_active, true)) AS is_live_billing
+                (COALESCE(e.status, me.status) = 'ACTIVE' AND COALESCE(s.is_active, true)) AS is_live_billing,
+                COALESCE(s.is_active, true) AS student_is_active
          FROM monthly_subscription_payments msp
          LEFT JOIN enrollments e ON e.id = msp.enrollment_id
          LEFT JOIN master_enrollments me ON me.id = msp.master_enrollment_id
@@ -902,10 +903,16 @@ export const monthlySubscriptionsRoutes = {
         totalExpected += parseFloat(r.amount_due);
         // Net of any partial refund recorded against a still-active bill.
         totalRevenue += parseFloat(r.amount_paid || 0) - refunded;
+        // The unpaid counters match the tabs below them: a student who has
+        // LEFT is not pending/partial/overdue — their bills live on the
+        // Left-with-dues tab. Paid stays paid whoever paid it, and the money
+        // sums above deliberately keep every row.
         if (status === 'PAID') paidCount++;
-        else if (status === 'PARTIAL') partialCount++;
-        else if (status === 'OVERDUE') overdueCount++;
-        else pendingCount++;
+        else if (r.student_is_active !== false) {
+          if (status === 'PARTIAL') partialCount++;
+          else if (status === 'OVERDUE') overdueCount++;
+          else pendingCount++;
+        }
       }
 
       // Fold in PROJECTED future months so the counters agree with the table
