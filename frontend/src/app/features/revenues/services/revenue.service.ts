@@ -19,6 +19,8 @@ export interface RevenueItem {
   paymentStatus: string | null;
   studentName: string | null;
   courseName: string | null;
+  /** Who teaches what was paid for (class instructor, else the course's). */
+  teacherName?: string | null;
   productName: string | null;
   eventId: string | null;
   eventName: string | null;

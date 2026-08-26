@@ -237,7 +237,12 @@
               [severity]="getSourceBadge(revenue.source).severity">
             </p-tag>
           </td>
-          <td>{{ revenue.description }}</td>
+          <td>
+            {{ revenue.description }}
+            @if (revenue.teacherName) {
+              <div class="text-xs text-gray-400"><i class="pi pi-user text-[10px]"></i> {{ revenue.teacherName }}</div>
+            }
+          </td>
           <td>
             @if (revenue.totalRefunded > 0) {
               <div class="line-through text-gray-400">{{ revenue.amount | amount }}</div>

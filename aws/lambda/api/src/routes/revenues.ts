@@ -115,6 +115,7 @@ export const revenuesRoutes = {
           NULL::text as payment_method,
           s.name as student_name,
           c.name as course_name,
+          NULLIF(TRIM(CONCAT(emp.first_name, ' ', emp.last_name)), '') as teacher_name,
           NULL::text as product_name,
           e.student_id as student_id,
           e.created_at,
@@ -124,6 +125,8 @@ export const revenuesRoutes = {
         JOIN branches b ON e.branch_id = b.id
         JOIN students s ON e.student_id = s.id
         JOIN courses c ON e.course_id = c.id
+        LEFT JOIN classes cle ON cle.id = e.class_id
+        LEFT JOIN employees emp ON emp.id = COALESCE(cle.instructor_id, c.instructor_id)
         WHERE e.company_id = $1 AND e.payment_status IN ('PAID', 'PARTIAL', 'REFUNDED')`;
         const b = applyBranch('e.branch_id');
         if (b) sql += ` AND ${b}`;
@@ -147,6 +150,7 @@ export const revenuesRoutes = {
           ps.payment_method,
           ps.customer_name as student_name,
           NULL::text as course_name,
+          NULL::text as teacher_name,
           p.name as product_name,
           NULL::uuid as student_id,
           ps.created_at,
@@ -181,6 +185,7 @@ export const revenuesRoutes = {
           me.payment_method,
           s.name as student_name,
           mc.name as course_name,
+          NULL::text as teacher_name,
           NULL::text as product_name,
           me.student_id as student_id,
           me.created_at,
@@ -219,6 +224,7 @@ export const revenuesRoutes = {
           COALESCE(s.name,
                    NULLIF(TRIM(CONCAT(es.external_first_name, ' ', es.external_last_name)), '')) as student_name,
           NULL::text as course_name,
+          NULL::text as teacher_name,
           NULL::text as product_name,
           es.student_id,
           es.created_at,
@@ -266,6 +272,7 @@ export const revenuesRoutes = {
           NULL::text as payment_method,
           s.name as student_name,
           c.name as course_name,
+          NULLIF(TRIM(CONCAT(emp.first_name, ' ', emp.last_name)), '') as teacher_name,
           NULL::text as product_name,
           msi.student_id as student_id,
           msi.created_at,
@@ -276,6 +283,9 @@ export const revenuesRoutes = {
         JOIN branches b ON msi.branch_id = b.id
         JOIN students s ON msi.student_id = s.id
         JOIN courses c ON msi.course_id = c.id
+        LEFT JOIN enrollments em ON em.id = msi.enrollment_id
+        LEFT JOIN classes clm ON clm.id = em.class_id
+        LEFT JOIN employees emp ON emp.id = COALESCE(clm.instructor_id, c.instructor_id)
         WHERE msi.company_id = $1 AND msi.amount > 0`;
         const b = applyBranch('msi.branch_id');
         if (b) sql += ` AND ${b}`;
@@ -312,6 +322,7 @@ export const revenuesRoutes = {
           NULL::text as payment_method,
           s.name as student_name,
           c.name as course_name,
+          NULLIF(TRIM(CONCAT(emp.first_name, ' ', emp.last_name)), '') as teacher_name,
           NULL::text as product_name,
           pki.student_id as student_id,
           pki.created_at,
@@ -322,6 +333,9 @@ export const revenuesRoutes = {
         JOIN branches b ON pki.branch_id = b.id
         JOIN students s ON pki.student_id = s.id
         JOIN courses c ON pki.course_id = c.id
+        LEFT JOIN enrollments ep ON ep.id = spkg.enrollment_id
+        LEFT JOIN classes clp ON clp.id = ep.class_id
+        LEFT JOIN employees emp ON emp.id = COALESCE(clp.instructor_id, c.instructor_id)
         WHERE pki.company_id = $1 AND pki.amount > 0`;
         const bp = applyBranch('pki.branch_id');
         if (bp) pkgSql += ` AND ${bp}`;
@@ -348,6 +362,7 @@ export const revenuesRoutes = {
           NULL::text as payment_method,
           s.name as student_name,
           c.name as course_name,
+          NULLIF(TRIM(CONCAT(emp.first_name, ' ', emp.last_name)), '') as teacher_name,
           NULL::text as product_name,
           spi.student_id as student_id,
           spi.created_at,
@@ -358,6 +373,9 @@ export const revenuesRoutes = {
         JOIN branches b ON spi.branch_id = b.id
         JOIN students s ON spi.student_id = s.id
         JOIN courses c ON spi.course_id = c.id
+        LEFT JOIN enrollments es2 ON es2.id = sp.enrollment_id
+        LEFT JOIN classes cls ON cls.id = es2.class_id
+        LEFT JOIN employees emp ON emp.id = COALESCE(cls.instructor_id, c.instructor_id)
         WHERE spi.company_id = $1 AND spi.amount > 0`;
         const bs = applyBranch('spi.branch_id');
         if (bs) spSql += ` AND ${bs}`;
@@ -391,6 +409,7 @@ export const revenuesRoutes = {
           paymentStatus: row.payment_status,
           studentName: row.student_name,
           courseName: row.course_name,
+          teacherName: row.teacher_name ?? null,
           productName: row.product_name,
           eventId: row.event_id,
           eventName: row.event_name,
