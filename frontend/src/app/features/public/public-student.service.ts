@@ -36,6 +36,7 @@ export interface PublicStudentAttendanceRecent {
 export interface PublicMonthlyPayment {
   courseName: string;
   className: string | null;
+  teacherName?: string | null;
   billingYear: number;
   billingMonth: number;
   amountDue: number;
@@ -49,6 +50,7 @@ export interface PublicMonthlyPayment {
 export interface PublicSessionPayment {
   courseName: string;
   className: string | null;
+  teacherName?: string | null;
   sessionNumber: number | null;
   sessionStartDate: string | null;
   attendanceState: string | null;
@@ -70,6 +72,7 @@ export interface PublicStudentClassAttendance {
 /** A prepaid bundle of sessions. */
 export interface PublicSessionPackage {
   courseName: string;
+  teacherName?: string | null;
   sessionsTotal: number;
   sessionsUsed: number;
   sessionsRemaining: number;
@@ -83,6 +86,7 @@ export interface PublicSessionPackage {
 export interface PublicOneTimePayment {
   courseName: string;
   className: string | null;
+  teacherName?: string | null;
   paymentMode: string;
   originalPrice: number;
   discountAmount: number;

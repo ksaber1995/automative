@@ -256,11 +256,13 @@ export const publicStudentsRoutes = {
       const monthlyRows = await query<any>(
         `SELECT m.billing_year, m.billing_month, m.amount_due, m.amount_paid,
                 m.payment_status, m.due_date, m.paid_date, m.enrollment_id,
-                c.name AS course_name, cl.name AS class_name
+                c.name AS course_name, cl.name AS class_name,
+                NULLIF(TRIM(CONCAT(emp.first_name, ' ', emp.last_name)), '') AS teacher_name
          FROM monthly_subscription_payments m
          JOIN courses c ON c.id = m.course_id
          LEFT JOIN enrollments e ON e.id = m.enrollment_id
          LEFT JOIN classes cl ON cl.id = e.class_id
+         LEFT JOIN employees emp ON emp.id = COALESCE(cl.instructor_id, c.instructor_id)
          WHERE m.student_id = $1 AND m.company_id = $2
            AND c.payment_type = 'MONTHLY_SUBSCRIPTION'
          ORDER BY m.billing_year DESC, m.billing_month DESC`,
@@ -276,20 +278,26 @@ export const publicStudentsRoutes = {
           `SELECT sp.attendance_state, sp.amount_due, sp.amount_paid, sp.payment_status,
                   sp.paid_date, sp.enrollment_id,
                   ss.start_date AS session_start_date, ss.session_number,
-                  c.name AS course_name, cl.name AS class_name
+                  c.name AS course_name, cl.name AS class_name,
+                  NULLIF(TRIM(CONCAT(emp.first_name, ' ', emp.last_name)), '') AS teacher_name
            FROM session_payments sp
            JOIN courses c ON c.id = sp.course_id
            LEFT JOIN sessions ss ON ss.id = sp.session_id
            LEFT JOIN classes cl ON cl.id = ss.class_id
+           LEFT JOIN employees emp ON emp.id = COALESCE(cl.instructor_id, c.instructor_id)
            WHERE sp.student_id = $1 AND sp.company_id = $2
            ORDER BY ss.start_date DESC NULLS LAST`,
           [student.id, student.company_id]
         );
         sessionPackages = await query<any>(
           `SELECT pk.sessions_total, pk.sessions_used, pk.amount_due, pk.amount_paid,
-                  pk.status, pk.purchased_at, pk.enrollment_id, c.name AS course_name
+                  pk.status, pk.purchased_at, pk.enrollment_id, c.name AS course_name,
+                  NULLIF(TRIM(CONCAT(emp.first_name, ' ', emp.last_name)), '') AS teacher_name
            FROM session_packages pk
            JOIN courses c ON c.id = pk.course_id
+           LEFT JOIN enrollments e ON e.id = pk.enrollment_id
+           LEFT JOIN classes cl ON cl.id = e.class_id
+           LEFT JOIN employees emp ON emp.id = COALESCE(cl.instructor_id, c.instructor_id)
            WHERE pk.student_id = $1 AND pk.company_id = $2
            ORDER BY pk.purchased_at DESC`,
           [student.id, student.company_id]
@@ -305,10 +313,12 @@ export const publicStudentsRoutes = {
         `SELECT e.id AS enrollment_id, e.payment_mode, e.original_price, e.discount_amount,
                 e.final_price, e.down_payment, e.amount_paid, e.total_refunded,
                 e.payment_status, e.enrollment_date,
-                c.name AS course_name, cl.name AS class_name
+                c.name AS course_name, cl.name AS class_name,
+                NULLIF(TRIM(CONCAT(emp.first_name, ' ', emp.last_name)), '') AS teacher_name
          FROM enrollments e
          JOIN courses c ON c.id = e.course_id
          LEFT JOIN classes cl ON cl.id = e.class_id
+         LEFT JOIN employees emp ON emp.id = COALESCE(cl.instructor_id, c.instructor_id)
          WHERE e.student_id = $1 AND e.company_id = $2 AND e.payment_type = 'ONE_TIME'
          ORDER BY e.enrollment_date DESC`,
         [student.id, student.company_id]
@@ -392,6 +402,7 @@ export const publicStudentsRoutes = {
       const monthly = monthlyRows.map((row: any) => ({
         courseName: row.course_name,
         className: row.class_name || null,
+        teacherName: row.teacher_name || null,
         billingYear: parseInt(row.billing_year, 10),
         billingMonth: parseInt(row.billing_month, 10),
         amountDue: num(row.amount_due),
@@ -407,6 +418,7 @@ export const publicStudentsRoutes = {
       const sessions = sessionCharges.map((row: any) => ({
         courseName: row.course_name,
         className: row.class_name || null,
+        teacherName: row.teacher_name || null,
         sessionNumber: row.session_number === null || row.session_number === undefined
           ? null : parseInt(row.session_number, 10),
         sessionStartDate: row.session_start_date || null,
@@ -420,6 +432,7 @@ export const publicStudentsRoutes = {
 
       const packages = sessionPackages.map((row: any) => ({
         courseName: row.course_name,
+        teacherName: row.teacher_name || null,
         sessionsTotal: parseInt(row.sessions_total, 10),
         sessionsUsed: parseInt(row.sessions_used, 10),
         sessionsRemaining: Math.max(0, parseInt(row.sessions_total, 10) - parseInt(row.sessions_used, 10)),
@@ -433,6 +446,7 @@ export const publicStudentsRoutes = {
       const oneTime = oneTimeRows.map((row: any) => ({
         courseName: row.course_name,
         className: row.class_name || null,
+        teacherName: row.teacher_name || null,
         paymentMode: row.payment_mode,
         originalPrice: num(row.original_price),
         discountAmount: num(row.discount_amount),
