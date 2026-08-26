@@ -6487,6 +6487,8 @@
     "PAY_AND_PRINT": "دفع وطباعة",
     "PAY_AND_PDF": "دفع و PDF",
     "DIGITAL_RECEIPT": "إيصال رقمي (PDF)",
+    "WA_SEND": "إرسال عبر واتساب",
+    "WA_TEXT": "إيصال دفع رقم {{number}} من {{academy}}:\n{{link}}",
     "LIST": {
       "TITLE": "الإيصالات",
       "SUBTITLE": "كل الإيصالات الصادرة — ابحث عن إيصال وأعد طباعته",

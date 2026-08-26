@@ -6487,6 +6487,8 @@
     "PAY_AND_PRINT": "Pay & print",
     "PAY_AND_PDF": "Pay & PDF",
     "DIGITAL_RECEIPT": "Digital receipt (PDF)",
+    "WA_SEND": "Send via WhatsApp",
+    "WA_TEXT": "Payment receipt #{{number}} from {{academy}}:\n{{link}}",
     "LIST": {
       "TITLE": "Receipts",
       "SUBTITLE": "Every receipt issued — find one and print it again",

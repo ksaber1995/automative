@@ -106,6 +106,11 @@
         <i class="pi" [class.pi-download]="!downloading()" [class.pi-spin]="downloading()" [class.pi-spinner]="downloading()"></i>
         {{ 'RECEIPT.DOWNLOAD' | translate }}
       </button>
+      @if (waPhone()) {
+        <button type="button" class="wa-btn" (click)="sendWhatsapp()">
+          <i class="pi pi-whatsapp"></i> {{ 'RECEIPT.WA_SEND' | translate }}
+        </button>
+      }
       <button type="button" class="lang-btn" (click)="languageService.toggle()">
         {{ languageService.currentLang() === 'ar' ? 'English' : 'العربية' }}
       </button>

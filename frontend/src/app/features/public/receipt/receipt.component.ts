@@ -5,6 +5,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import QRCode from 'qrcode';
 import { ApiService } from '../../../core/services/api.service';
 import { LanguageService } from '../../../core/services/language.service';
+import { openWhatsappChat } from '../../../core/utils/whatsapp.util';
 
 export interface PaymentReceipt {
   id: string;
@@ -112,6 +113,29 @@ export class ReceiptComponent implements OnInit {
   }
 
   print() { window.print(); }
+
+  /** Someone on the slip we can message — the parent first, else the student. */
+  waPhone(): string | null {
+    const r = this.receipt();
+    return r?.parentPhone || r?.studentPhone || null;
+  }
+
+  /**
+   * Send the digital receipt over WhatsApp: the same public link the QR
+   * encodes, prefilled into a chat with the parent. The page it opens shows
+   * the slip and offers the PDF — no attachment juggling needed.
+   */
+  sendWhatsapp() {
+    const r = this.receipt();
+    if (!r) return;
+    const link = `${window.location.origin}/r/${r.publicToken}`;
+    const text = this.translate.instant('RECEIPT.WA_TEXT', {
+      number: r.receiptNumber,
+      academy: r.companyName ?? '',
+      link,
+    });
+    openWhatsappChat(this.waPhone(), text);
+  }
 
   /**
    * The digital copy: the rendered slip captured to a one-page PDF sized like
