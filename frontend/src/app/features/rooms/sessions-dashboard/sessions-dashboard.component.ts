@@ -38,6 +38,8 @@ import { StudentAbsenceBadgeComponent } from '../../../shared/components/student
 import { DuesCollectDialogComponent } from '../../../shared/components/student-dues/dues-collect-dialog.component';
 import { CameraScanDialogComponent, CameraScanFeedback } from '../../../shared/components/camera-scan/camera-scan-dialog.component';
 import { StudentSessionDues } from '../services/attendance.service';
+import { PriorAbsenteesDialogComponent } from '../prior-absentees/prior-absentees-dialog.component';
+import { toLocalYmd } from '../../../core/utils/date.util';
 
 interface DialogTeacherRow {
   employeeId: string;
@@ -99,6 +101,7 @@ function endTimeAfterStartValidator(startDate: string) {
     StudentAbsenceBadgeComponent,
     DuesCollectDialogComponent,
     CameraScanDialogComponent,
+    PriorAbsenteesDialogComponent,
   ],
   providers: [ConfirmationService],
   templateUrl: './sessions-dashboard.component.html',
@@ -110,6 +113,7 @@ export class SessionsDashboardComponent implements OnInit {
   @ViewChild(SessionPayDialogComponent) payDialog?: SessionPayDialogComponent;
   @ViewChild(DuesCollectDialogComponent) collectDialog?: DuesCollectDialogComponent;
   @ViewChild(CameraScanDialogComponent) cameraDialog?: CameraScanDialogComponent;
+  @ViewChild(PriorAbsenteesDialogComponent) priorAbsenteesDialog?: PriorAbsenteesDialogComponent;
   private sessionService = inject(SessionService);
   private roomService = inject(RoomService);
   private classService = inject(ClassService);
@@ -618,6 +622,14 @@ export class SessionsDashboardComponent implements OnInit {
   }
 
   /** Same dialog, but the session it starts is free — see `startingFree`. */
+  /** The day's follow-up list: every group meeting today, who missed last time. */
+  openPriorAbsentees(): void {
+    this.priorAbsenteesDialog?.open({
+      date: toLocalYmd(new Date()),
+      branchId: this.selectedBranchId() || undefined,
+    });
+  }
+
   openFreeStartDialog() {
     this.startingFree.set(true);
     const only = this.branchState.onlyBranchId();

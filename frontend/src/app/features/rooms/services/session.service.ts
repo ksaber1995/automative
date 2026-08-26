@@ -86,6 +86,28 @@ export interface FreeSessionRow {
   trialCount: number;
 }
 
+/** One student who missed their class's previous session. */
+export interface PriorAbsentStudent {
+  id: string;
+  name: string;
+  studentCode: number | null;
+  phone: string | null;
+  parentPhone: string | null;
+  /** They sat the missed lesson with a sibling class — no call needed. */
+  madeUp: boolean;
+}
+
+/** One class's "who missed last time" list, as printed for the teacher. */
+export interface PriorAbsenteesGroup {
+  classId: string;
+  className: string;
+  courseName: string | null;
+  todaySessionId: string;
+  todaySessionNumber: number | null;
+  prevSession: { id: string; sessionNumber: number | null; date: string } | null;
+  students: PriorAbsentStudent[];
+}
+
 export interface FreeSessionSummary {
   sessions: FreeSessionRow[];
   totalSessions: number;
@@ -173,6 +195,19 @@ export class SessionService {
   /** Every free session of a class, with how many students each one drew. */
   freeSummary(classId: string): Observable<FreeSessionSummary> {
     return this.api.get<FreeSessionSummary>('sessions/free-summary', { classId });
+  }
+
+  /**
+   * Who missed their class's previous session — scoped to one open session
+   * (the register's button) or to a whole day (every group with a session
+   * that day). The teacher prints this and works the phones before class.
+   */
+  priorAbsentees(scope: { sessionId?: string; date?: string; branchId?: string }): Observable<PriorAbsenteesGroup[]> {
+    const params: Record<string, string> = {};
+    if (scope.sessionId) params['sessionId'] = scope.sessionId;
+    if (scope.date) params['date'] = scope.date;
+    if (scope.branchId) params['branchId'] = scope.branchId;
+    return this.api.get<PriorAbsenteesGroup[]>('sessions/prior-absentees', params);
   }
 
   /** Edit a session's number, notes, or the lesson it covered, after it started. */

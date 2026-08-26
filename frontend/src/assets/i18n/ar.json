@@ -5913,6 +5913,27 @@
     "ABSENCE_STREAK": "غاب آخر {{count}} حصص متتالية",
     "ABSENCE_MONTH": "غاب {{count}} من {{total}} في {{month}}"
   },
+  "PRIOR_ABSENTEES": {
+    "BUTTON": "غياب الحصة السابقة",
+    "BUTTON_DAY": "غياب الحصة السابقة",
+    "BUTTON_DAY_HINT": "لكل مجموعة عندها حصة اليوم: الطلاب اللي غابوا عن الحصة السابقة، جاهزة للطباعة والمتابعة.",
+    "TITLE": "غياب الحصة السابقة",
+    "TITLE_DAY": "غياب الحصة السابقة — {{date}}",
+    "TODAY_SESSION": "اليوم: حصة {{number}}",
+    "PREV_SESSION": "حصة {{number}} · {{date}}",
+    "NO_PREV": "لا توجد حصة سابقة لهذه المجموعة بعد.",
+    "NO_GROUPS": "لا توجد مجموعات لديها حصة اليوم.",
+    "ALL_PRESENT": "الجميع حضروا الحصة السابقة.",
+    "COUNT": "{{count}} غائب",
+    "MADE_UP": "عوّض مع مجموعة أخرى",
+    "COL_CODE": "الكود",
+    "COL_NAME": "الطالب",
+    "COL_PHONE": "الهاتف",
+    "COL_PARENT_PHONE": "هاتف ولي الأمر",
+    "COL_NOTES": "ملاحظات",
+    "PRINT": "طباعة",
+    "CLOSE": "إغلاق"
+  },
   "SESSIONS_DASHBOARD": {
     "TITLE": "الحصص",
     "SUBTITLE": "تتبع استخدام الغرف وإدارة الحصص النشطة",

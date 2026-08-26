@@ -33,6 +33,7 @@ import { toLocalYmd } from '../../../core/utils/date.util';
 import { CameraScanDialogComponent } from '../../../shared/components/camera-scan/camera-scan-dialog.component';
 import { SessionPayDialogComponent } from '../../session-payments/session-pay-dialog/session-pay-dialog.component';
 import { SessionHomeworkPanelComponent } from '../session-homework/session-homework-panel.component';
+import { PriorAbsenteesDialogComponent } from '../prior-absentees/prior-absentees-dialog.component';
 import { CompanyService } from '../../../core/services/company.service';
 import { LessonService } from '../../lessons/services/lesson.service';
 
@@ -70,7 +71,7 @@ function endTimeAfterStartValidator(startDate: string) {
 @Component({
   selector: 'app-session-attendance',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, ConfirmDialogModule, TextareaModule, TooltipModule, TranslateModule, CameraScanDialogComponent, StudentDuesBadgeComponent, StudentAbsenceBadgeComponent, SessionChargeBadgeComponent, DuesCollectDialogComponent, SessionPayDialogComponent, SessionHomeworkPanelComponent],
+  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule, CardModule, ButtonModule, CheckboxModule, InputTextModule, SelectModule, DialogModule, ConfirmDialogModule, TextareaModule, TooltipModule, TranslateModule, CameraScanDialogComponent, StudentDuesBadgeComponent, StudentAbsenceBadgeComponent, SessionChargeBadgeComponent, DuesCollectDialogComponent, SessionPayDialogComponent, SessionHomeworkPanelComponent, PriorAbsenteesDialogComponent],
   providers: [ConfirmationService],
   templateUrl: './session-attendance.component.html',
 })

@@ -104,6 +104,14 @@
           (onClick)="toggleTeacherPanel()"></p-button>
       }
 
+      <!-- The proactive follow-up list: who missed this class's previous
+           session — printable, worked through before or during the lesson. -->
+      @if (session()) {
+        <p-button icon="pi pi-user-minus" severity="warn" [outlined]="true" size="small"
+          [label]="'PRIOR_ABSENTEES.BUTTON' | translate"
+          (onClick)="priorAbsentees.open({ sessionId: sessionId })"></p-button>
+      }
+
       <!-- The main action on this page after attendance: filled, not outlined. -->
       @if (session()) {
         <p-button icon="pi pi-book" severity="help" size="small" [outlined]="homeworkOpen()"
@@ -577,6 +585,9 @@
 
 <!-- PER_SESSION pay-confirmation popup -->
 <app-session-pay-dialog (settled)="loadStudents(); loadDues()"></app-session-pay-dialog>
+
+<!-- Who missed this class's previous session — the printable follow-up list -->
+<app-prior-absentees-dialog #priorAbsentees></app-prior-absentees-dialog>
 
 <!-- Confirm before un-checking deletes a per-session charge/payment -->
 <p-confirmDialog></p-confirmDialog>

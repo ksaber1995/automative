@@ -1214,6 +1214,27 @@
     "SCAN_TITLE": "Scan trainee cards",
     "SCAN_HINT": "Point the camera at a trainee's QR or barcode. It keeps scanning — go through them one after another."
   },
+  "PRIOR_ABSENTEES": {
+    "BUTTON": "Absent last training",
+    "BUTTON_DAY": "Absent last training",
+    "BUTTON_DAY_HINT": "For every group training today: the members who missed their previous training, ready to print and follow up.",
+    "TITLE": "Absent last training",
+    "TITLE_DAY": "Absent last training — {{date}}",
+    "TODAY_SESSION": "Today: training {{number}}",
+    "PREV_SESSION": "Training {{number}} · {{date}}",
+    "NO_PREV": "No previous training for this group yet.",
+    "NO_GROUPS": "No groups have a training today.",
+    "ALL_PRESENT": "Everyone attended the previous training.",
+    "COUNT": "{{count}} absent",
+    "MADE_UP": "Made up in another group",
+    "COL_CODE": "Code",
+    "COL_NAME": "Member",
+    "COL_PHONE": "Phone",
+    "COL_PARENT_PHONE": "Parent phone",
+    "COL_NOTES": "Notes",
+    "PRINT": "Print",
+    "CLOSE": "Close"
+  },
   "SESSIONS_DASHBOARD": {
     "TITLE": "Trainings",
     "SUBTITLE": "Track pitch usage and manage active trainings",

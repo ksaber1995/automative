@@ -252,6 +252,7 @@ const router = {
     nextNumber: sessionsRoutes.nextNumber,
     lessonsTaught: sessionsRoutes.lessonsTaught,
     freeSummary: sessionsRoutes.freeSummary,
+    priorAbsentees: sessionsRoutes.priorAbsentees,
     activeForStudent: sessionsRoutes.activeForStudent,
     checkinTarget: sessionsRoutes.checkinTarget,
     getById: sessionsRoutes.getById,

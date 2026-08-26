@@ -1807,6 +1807,167 @@ export const sessionsRoutes = {
   },
 
   /**
+   * GET /api/sessions/prior-absentees?sessionId=… | ?date=YYYY-MM-DD[&branchId=…]
+   * The proactive follow-up list: students who missed their class's PREVIOUS
+   * session. Two callers, one shape:
+   *  - sessionId: the open register — "who missed last time" for that class.
+   *  - date: every class with a session that day, one group per class.
+   *
+   * "Previous" is the latest real lesson before the reference — started, not a
+   * free taster (nobody is absent from those). Absence follows the register's
+   * rules: enrolled, active, joined on/before the lesson, no attendance row.
+   * A make-up sat with a sibling class doesn't erase the miss — it is flagged
+   * (`madeUp`) so the teacher can skip the call, not lose the fact.
+   */
+  priorAbsentees: async ({ query: queryParams, headers }: {
+    query: { sessionId?: string; date?: string; branchId?: string };
+    headers: { authorization: string };
+  }) => {
+    try {
+      await ensureStartedColumn();
+      await ensureFreeSessionSchema();
+      await ensureAttendanceMagicColumns();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const { sessionId, date, branchId } = queryParams;
+      if (!sessionId && !date) {
+        return apiError(400, 'ERRORS.SESSIONS.PRIOR_ABSENTEES_SCOPE_REQUIRED', 'sessionId or date is required');
+      }
+      if (branchId && !canAccessBranch(context, branchId)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+
+      // One reference row per class: the session the teacher is looking AT
+      // (today's / the open one), which the previous session is measured from.
+      let refs: any[];
+      if (sessionId) {
+        const ref = await queryOne<any>(
+          `SELECT s.id AS today_session_id, s.session_number AS today_session_number,
+                  s.start_date AS ref_ts, s.class_id, cl.name AS class_name,
+                  co.name AS course_name, co.branch_id
+           FROM sessions s
+           JOIN classes cl ON cl.id = s.class_id
+           JOIN courses co ON co.id = cl.course_id
+           WHERE s.id = $1 AND s.company_id = $2`,
+          [sessionId, context.companyId]
+        );
+        if (!ref) return apiError(404, 'ERRORS.SESSIONS.NOT_FOUND', 'Session not found');
+        if (!canAccessBranch(context, ref.branch_id)) {
+          return apiError(403, 'ERRORS.SESSIONS.ACCESS_DENIED', 'Access denied to this session');
+        }
+        refs = [ref];
+      } else {
+        // The day's classes, one row each. When a class holds several sessions
+        // that day the earliest stands in — the previous LESSON is the same.
+        const params: any[] = [context.companyId, date];
+        let sql = `
+          SELECT DISTINCT ON (s.class_id)
+                 s.id AS today_session_id, s.session_number AS today_session_number,
+                 s.start_date AS ref_ts, s.class_id, cl.name AS class_name,
+                 co.name AS course_name, co.branch_id
+          FROM sessions s
+          JOIN classes cl ON cl.id = s.class_id
+          JOIN courses co ON co.id = cl.course_id
+          WHERE s.company_id = $1 AND s.start_date::date = $2::date
+            AND cl.deleted_at IS NULL`;
+        if (branchId) {
+          params.push(branchId);
+          sql += ` AND co.branch_id = $${params.length}`;
+        } else {
+          const branchClause = appendBranchSqlFilter(context, params, 'co.branch_id');
+          if (branchClause) sql += ` AND ${branchClause}`;
+        }
+        sql += ' ORDER BY s.class_id, s.start_date ASC';
+        refs = await query<any>(sql, params);
+        refs.sort((a, b) => String(a.class_name).localeCompare(String(b.class_name)));
+      }
+
+      const groups = [];
+      for (const ref of refs) {
+        // The last real lesson before the reference: started, not free, and in
+        // date mode strictly on an earlier day (an earlier slot the same day is
+        // still "today", not "last time").
+        const prev = await queryOne<any>(
+          sessionId
+            ? `SELECT id, session_number, start_date FROM sessions
+               WHERE class_id = $1 AND company_id = $2 AND id <> $3
+                 AND COALESCE(started, true) = true AND COALESCE(is_free, false) = false
+                 AND start_date < $4
+               ORDER BY start_date DESC LIMIT 1`
+            : `SELECT id, session_number, start_date FROM sessions
+               WHERE class_id = $1 AND company_id = $2 AND id <> $3
+                 AND COALESCE(started, true) = true AND COALESCE(is_free, false) = false
+                 AND start_date::date < $4::date
+               ORDER BY start_date DESC LIMIT 1`,
+          [ref.class_id, context.companyId, ref.today_session_id, sessionId ? ref.ref_ts : date]
+        );
+
+        let students: any[] = [];
+        if (prev) {
+          // The register's absence rule (see pushSessionAbsences), plus the
+          // made-up flag: a SUBSTITUTION row elsewhere claiming this lesson.
+          students = await query<any>(
+            `SELECT st.id, st.name, st.student_code, st.phone, st.parent_phone,
+                    EXISTS (SELECT 1 FROM session_attendance mu
+                            WHERE mu.substitute_for_session_id = $3 AND mu.student_id = st.id) AS made_up
+             FROM students st
+             JOIN (
+               SELECT student_id FROM enrollments
+                WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+               UNION
+               SELECT student_id FROM master_class_enrollments
+                WHERE class_id = $1 AND company_id = $2 AND status <> 'DROPPED'
+             ) enr ON enr.student_id = st.id
+             WHERE COALESCE(st.is_active, true)
+               AND NOT EXISTS (SELECT 1 FROM session_attendance sa
+                                WHERE sa.session_id = $3 AND sa.student_id = st.id)
+               AND COALESCE(
+                     (SELECT MIN(COALESCE(e2.class_joined_on, e2.enrollment_date))
+                        FROM enrollments e2
+                       WHERE e2.student_id = st.id AND e2.class_id = $1
+                         AND e2.status NOT IN ('DROPPED', 'CANCELLED')),
+                     '-infinity'::date
+                   ) <= $4::date
+             ORDER BY st.name ASC`,
+            [ref.class_id, context.companyId, prev.id, prev.start_date]
+          );
+        }
+
+        groups.push({
+          classId: ref.class_id,
+          className: ref.class_name,
+          courseName: ref.course_name ?? null,
+          todaySessionId: ref.today_session_id,
+          todaySessionNumber: ref.today_session_number != null ? parseInt(ref.today_session_number, 10) : null,
+          prevSession: prev
+            ? {
+                id: prev.id,
+                sessionNumber: prev.session_number != null ? parseInt(prev.session_number, 10) : null,
+                date: prev.start_date,
+              }
+            : null,
+          students: students.map((s) => ({
+            id: s.id,
+            name: s.name,
+            studentCode: s.student_code != null ? parseInt(s.student_code, 10) : null,
+            phone: s.phone ?? null,
+            parentPhone: s.parent_phone ?? null,
+            madeUp: s.made_up === true,
+          })),
+        });
+      }
+
+      return { status: 200 as const, body: groups };
+    } catch (error) {
+      console.error('Prior absentees error:', error);
+      return mapThrownError(error, 'ERRORS.SESSIONS.PRIOR_ABSENTEES_FAILED', 'Failed to load prior absentees');
+    }
+  },
+
+  /**
    * GET /api/sessions/next-number?classId=…
    * Suggested next session number for a class (max+1 for that class only).
    * Used to prefill the Start dialog; the teacher can still edit it.

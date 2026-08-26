@@ -5789,6 +5789,27 @@
     "ABSENCE_STREAK": "Missed the last {{count}} in a row",
     "ABSENCE_MONTH": "{{count}} of {{total}} missed in {{month}}"
   },
+  "PRIOR_ABSENTEES": {
+    "BUTTON": "Absent last session",
+    "BUTTON_DAY": "Absent last session",
+    "BUTTON_DAY_HINT": "For every group with a session today: the students who missed their previous session, ready to print and follow up.",
+    "TITLE": "Absent last session",
+    "TITLE_DAY": "Absent last session — {{date}}",
+    "TODAY_SESSION": "Today: session {{number}}",
+    "PREV_SESSION": "Session {{number}} · {{date}}",
+    "NO_PREV": "No previous session for this group yet.",
+    "NO_GROUPS": "No groups have a session today.",
+    "ALL_PRESENT": "Everyone attended the previous session.",
+    "COUNT": "{{count}} absent",
+    "MADE_UP": "Made up in another group",
+    "COL_CODE": "Code",
+    "COL_NAME": "Student",
+    "COL_PHONE": "Phone",
+    "COL_PARENT_PHONE": "Parent phone",
+    "COL_NOTES": "Notes",
+    "PRINT": "Print",
+    "CLOSE": "Close"
+  },
   "SESSIONS_DASHBOARD": {
     "TITLE": "Sessions",
     "SUBTITLE": "Track room usage and manage active sessions",

@@ -8440,6 +8440,43 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    // The proactive follow-up list: who missed their class's previous session.
+    // Scoped by an open session (the register's button) or by a calendar day
+    // (all of that day's groups at once). Static path — keep above `/:id`.
+    priorAbsentees: {
+      method: 'GET' as const,
+      path: '/api/sessions/prior-absentees',
+      query: z.object({
+        sessionId: z.string().optional(),
+        date: z.string().optional(),
+        branchId: z.string().optional(),
+      }),
+      responses: {
+        200: z.array(z.object({
+          classId: UUIDSchema,
+          className: z.string(),
+          courseName: z.string().nullable(),
+          todaySessionId: z.string(),
+          todaySessionNumber: z.number().nullable(),
+          prevSession: z.object({
+            id: z.string(),
+            sessionNumber: z.number().nullable(),
+            date: z.any(),
+          }).nullable(),
+          students: z.array(z.object({
+            id: z.string(),
+            name: z.string(),
+            studentCode: z.number().nullable(),
+            phone: z.string().nullable(),
+            parentPhone: z.string().nullable(),
+            madeUp: z.boolean(),
+          })),
+        })),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
     update: {
       method: 'PATCH' as const,
       path: '/api/sessions/:id',
