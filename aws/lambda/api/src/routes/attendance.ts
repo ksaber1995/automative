@@ -5,6 +5,7 @@ import { apiError, mapThrownError } from '../utils/api-error';
 import { ensureAttendanceMagicColumns, ensureFreeSessionSchema } from './sessions';
 import { ensureFreeTrialLimitColumn } from './companies';
 import { notifyCheckin } from './telegram';
+import { pushCheckin } from '../utils/push';
 import { chargeSessionAttendance, chargeSingleCheckin, reverseUnattendedCharges, reverseStudentCharge, ensurePerSessionSchema, pendingChargesForStudents } from './session-payments';
 import {
   ensureSubstitutionLinkSchema,
@@ -1006,6 +1007,7 @@ export const attendanceRoutes = {
         const alreadyPresentFree = insertedFree.length === 0;
 
         await notifyCheckin(context.companyId, params.sessionId, student.id);
+      await pushCheckin(context.companyId, params.sessionId, student.id);
 
         return {
           status: 200 as const,
@@ -1061,6 +1063,7 @@ export const attendanceRoutes = {
 
         // Best-effort Telegram present notification (no-op unless enabled).
         await notifyCheckin(context.companyId, params.sessionId, student.id);
+      await pushCheckin(context.companyId, params.sessionId, student.id);
 
         // PER_SESSION courses: create/consume the charge for this check-in.
         // Best-effort — billing must never fail the check-in itself.
@@ -1180,6 +1183,7 @@ export const attendanceRoutes = {
 
       // Best-effort Telegram present notification (no-op unless enabled).
       await notifyCheckin(context.companyId, params.sessionId, student.id);
+      await pushCheckin(context.companyId, params.sessionId, student.id);
 
       return {
         status: 200 as const,

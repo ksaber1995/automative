@@ -5,6 +5,7 @@ import { notifySessionAttendance } from './telegram';
 import { ensureAutoManageSessionsColumn, assertOnlineExams, isOnlineExamsEnabled } from './companies';
 import { ensureLessonSchema } from './lessons';
 import { chargeAbsencesAtSessionEnd } from './session-payments';
+import { pushSessionAbsences } from '../utils/push';
 import { ensureClassDayTimesSchema } from './classes';
 import { claimPendingSubstitutions, ensureSubstitutionLinkSchema, substitutionCoversExists } from '../db/substitutions';
 import { joinedBySession } from '../db/enrollment-start';
@@ -1056,6 +1057,10 @@ export const sessionsRoutes = {
 
       // Best-effort Telegram present/absent notifications (no-op unless enabled).
       await notifySessionAttendance(context.companyId, params.id);
+
+      // Best-effort parent push: "absent" only becomes a fact once the register
+      // is closed, so absences push here; presence pushed at check-in already.
+      await pushSessionAbsences(context.companyId, params.id);
 
       // PER_SESSION courses: bill absent students now that the roster is final
       // (only if the course opted into charging absences). Best-effort.

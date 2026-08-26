@@ -1,4 +1,5 @@
 import { query, queryOne } from './connection';
+import { pushPayment } from '../utils/push';
 
 /**
  * Printed payment receipts.
@@ -242,7 +243,14 @@ export async function issueReceipt(input: IssueReceiptInput): Promise<ReceiptRow
             input.periodLabel || null, input.paymentDate || null, input.notes || null,
           ],
         );
-        return mapReceipt((rows as any[])[0]);
+        const receipt = mapReceipt((rows as any[])[0]);
+        // Best-effort parent push. The receipt is where every collection
+        // converges, whatever billing model took the money — one hook covers
+        // them all, and the notification links straight to the slip.
+        if (input.studentId) {
+          await pushPayment(input.companyId, input.studentId, amount, receipt.courseName, receipt.publicToken);
+        }
+        return receipt;
       } catch (e: any) {
         if (e?.code === '23505' && attempt < 2) continue;   // number/token race — retry
         throw e;

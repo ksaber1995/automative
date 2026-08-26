@@ -11,6 +11,7 @@ import {
 import { joinedBySession } from '../db/enrollment-start';
 import { resolveStatus } from './monthly-subscriptions';
 import { isRatingCompany, mapStudentExamRow, studentExamFeedSql } from './exams';
+import { getPushPublicKey, savePushSubscription } from '../utils/push';
 
 type AuthHeaders = { authorization?: string };
 
@@ -94,6 +95,49 @@ export const publicStudentsRoutes = {
     } catch (error) {
       console.error('Public card lookup error:', error);
       return apiError(404, 'ERRORS.QR_CARDS.NOT_FOUND', 'Not found');
+    }
+  },
+
+  /** The VAPID public key the parent's browser subscribes with. */
+  pushKey: async () => {
+    try {
+      return { status: 200 as const, body: { publicKey: await getPushPublicKey() } };
+    } catch {
+      return { status: 200 as const, body: { publicKey: null } };
+    }
+  },
+
+  /**
+   * A parent enabling notifications: their browser's push subscription, tied
+   * to the one student the scanned token resolves to. Same credential, same
+   * rate limit, same generic 404 as the profile itself.
+   */
+  pushSubscribe: async ({ params, body }: { params: { qrToken: string }; body: any; headers: AuthHeaders }) => {
+    enforceByIp(RATE_LIMITS.PUBLIC_PROFILE_IP);
+    try {
+      const token = (params.qrToken || '').trim();
+      if (!/^[a-f0-9]{16,64}$/i.test(token)) {
+        return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Not found');
+      }
+      await ensureQrCardSchema();
+      const student = await queryOne<any>(
+        `SELECT s.id, s.company_id FROM students s
+          WHERE ${qrStudentMatchPublic('$1')} AND s.is_active = true`,
+        [token],
+      );
+      if (!student) return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Not found');
+
+      const endpoint = String(body?.endpoint ?? '');
+      const p256dh = String(body?.p256dh ?? '');
+      const auth = String(body?.auth ?? '');
+      if (!endpoint.startsWith('https://') || !p256dh || !auth) {
+        return apiError(400, 'ERRORS.STUDENTS.NOT_FOUND', 'Invalid subscription');
+      }
+      await savePushSubscription(student.company_id, student.id, { endpoint, p256dh, auth });
+      return { status: 200 as const, body: { ok: true } };
+    } catch (error) {
+      console.error('Public push subscribe error:', error);
+      return apiError(400, 'ERRORS.STUDENTS.NOT_FOUND', 'Failed to subscribe');
     }
   },
 

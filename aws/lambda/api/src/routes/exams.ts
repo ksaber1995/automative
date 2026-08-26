@@ -15,6 +15,7 @@ import { ensureHomeworkGradingColumn, assertOnlineExams, isOnlineExamsEnabled } 
 import { ensureLessonSchema, lessonPoolSize, lessonsInCourse } from './lessons';
 import { ensureStudentAuthSchema } from './student-auth';
 import { gradeAttempt } from '../db/exam-grading';
+import { pushExamResult } from '../utils/push';
 
 type AuthHeaders = { authorization: string };
 
@@ -1291,6 +1292,9 @@ export const examsRoutes = {
         [params.id, context.companyId, exam.course_id, student.id, grade],
       );
       const alreadyRecorded = !(upserted?.inserted);
+      // Best-effort parent push — a mark landed on their child's record.
+      await pushExamResult(context.companyId, student.id, exam.name, grade,
+        exam.max_grade != null ? parseFloat(exam.max_grade) : null, exam.is_homework === true);
 
       return {
         status: 200 as const,
@@ -1359,6 +1363,9 @@ export const examsRoutes = {
         [params.id, context.companyId, exam.course_id, student.id, grade],
       );
       const alreadyRecorded = !(upserted?.inserted);
+      // Best-effort parent push — a mark landed on their child's record.
+      await pushExamResult(context.companyId, student.id, exam.name, grade,
+        exam.max_grade != null ? parseFloat(exam.max_grade) : null, exam.is_homework === true);
 
       return {
         status: 200 as const,
@@ -1411,6 +1418,9 @@ export const examsRoutes = {
          DO UPDATE SET grade = EXCLUDED.grade, is_absent = false, recorded_at = NOW(), updated_at = NOW()`,
         [params.id, context.companyId, exam.course_id, body.studentId, grade],
       );
+      // Best-effort parent push — a mark landed on their child's record.
+      await pushExamResult(context.companyId, body.studentId, exam.name, grade,
+        exam.max_grade != null ? parseFloat(exam.max_grade) : null, exam.is_homework === true);
       return { status: 200 as const, body: { success: true, code: 'EXAMS.GRADE_SAVED', message: 'Grade saved' } };
     } catch (error: any) {
       console.error('Exam save-result error:', error);

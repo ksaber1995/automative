@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { LanguageService } from '../../../core/services/language.service';
 import { PublicStudentService, PublicStudentProfile, PublicUnassignedCard } from '../public-student.service';
@@ -40,6 +41,73 @@ export class PublicStudentComponent implements OnInit {
   loading = signal(true);
   error = signal(false);
   profile = signal<PublicStudentProfile | null>(null);
+  private qrToken = '';
+
+  // ── Push notifications ──────────────────────────────────────────────────────
+  // Scan → enable → the phone hears about every check-in, absence, payment and
+  // mark without opening anything. iOS only delivers push to pages installed on
+  // the Home Screen, so Safari gets instructions instead of a dead button.
+  pushEnabled = signal(false);
+  pushBusy = signal(false);
+  pushError = signal(false);
+
+  pushSupported = (): boolean =>
+    typeof navigator !== 'undefined' && 'serviceWorker' in navigator
+    && typeof window !== 'undefined' && 'PushManager' in window && 'Notification' in window;
+
+  /** iOS Safari outside a Home-Screen install: push cannot work from here. */
+  iosNeedsInstall = (): boolean => {
+    const ua = navigator.userAgent || '';
+    const isIos = /iphone|ipad|ipod/i.test(ua);
+    const standalone = (window.navigator as any).standalone === true
+      || window.matchMedia?.('(display-mode: standalone)')?.matches === true;
+    return isIos && !standalone;
+  };
+
+  private pushAlreadyOn(): boolean {
+    try { return localStorage.getItem(`pushEnabled:${this.qrToken}`) === '1'; } catch { return false; }
+  }
+
+  async enablePush(): Promise<void> {
+    if (this.pushBusy() || !this.pushSupported()) return;
+    this.pushBusy.set(true);
+    this.pushError.set(false);
+    try {
+      const { publicKey } = await firstValueFrom(this.service.getPushKey());
+      if (!publicKey) throw new Error('push not configured');
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') throw new Error('denied');
+      const reg = await navigator.serviceWorker.register('/assets/push-sw.js');
+      await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: this.vapidKeyBytes(publicKey),
+      });
+      const json = sub.toJSON();
+      if (!json.endpoint || !json.keys?.['p256dh'] || !json.keys?.['auth']) throw new Error('bad subscription');
+      await firstValueFrom(this.service.subscribePush(this.qrToken, {
+        endpoint: json.endpoint,
+        p256dh: json.keys['p256dh'],
+        auth: json.keys['auth'],
+      }));
+      try { localStorage.setItem(`pushEnabled:${this.qrToken}`, '1'); } catch {}
+      this.pushEnabled.set(true);
+    } catch {
+      this.pushError.set(true);
+    } finally {
+      this.pushBusy.set(false);
+    }
+  }
+
+  /** base64url → the byte view the Push API wants. */
+  private vapidKeyBytes(key: string): Uint8Array<ArrayBuffer> {
+    const padding = '='.repeat((4 - (key.length % 4)) % 4);
+    const base64 = (key + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(base64);
+    const bytes = new Uint8Array(new ArrayBuffer(raw.length));
+    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+    return bytes;
+  }
 
   // ── Course filter ───────────────────────────────────────────────────────────
   // A student with several courses (= several teachers) gets one blended page;
@@ -145,6 +213,8 @@ export class PublicStudentComponent implements OnInit {
       this.error.set(true);
       return;
     }
+    this.qrToken = token;
+    this.pushEnabled.set(this.pushAlreadyOn());
     this.service.getProfile(token).subscribe({
       next: (p) => {
         this.profile.set(p);

@@ -183,6 +183,16 @@ export class PublicStudentService {
     return this.api.get<PublicStudentProfile>(`public/students/${qrToken}`);
   }
 
+  /** The VAPID public key push subscriptions are made with; null until configured. */
+  getPushKey(): Observable<{ publicKey: string | null }> {
+    return this.api.get<{ publicKey: string | null }>('public/push-key');
+  }
+
+  /** Tie this browser's push subscription to the scanned student. */
+  subscribePush(qrToken: string, sub: { endpoint: string; p256dh: string; auth: string }): Observable<{ ok: boolean }> {
+    return this.api.post<{ ok: boolean }>(`public/students/${qrToken}/push`, sub);
+  }
+
   /**
    * Whose blank card is this? Only resolves for a card with no student on it —
    * a linked card belongs on the profile above.

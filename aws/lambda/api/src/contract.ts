@@ -4309,6 +4309,34 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    /** The VAPID public key the browser subscribes with; null until configured. */
+    pushKey: {
+      method: 'GET',
+      path: '/api/public/push-key',
+      responses: {
+        200: z.object({ publicKey: z.string().nullable() }),
+      },
+    },
+    /**
+     * Store a parent's push subscription against the scanned student. The
+     * qrToken is the credential, exactly like the profile itself — registered
+     * above `profile` because this path carries an extra segment.
+     */
+    pushSubscribe: {
+      method: 'POST',
+      path: '/api/public/students/:qrToken/push',
+      pathParams: z.object({ qrToken: z.string().min(16).max(64) }),
+      body: z.object({
+        endpoint: z.string().min(1).max(2000),
+        p256dh: z.string().min(1).max(500),
+        auth: z.string().min(1).max(500),
+      }),
+      responses: {
+        200: z.object({ ok: z.boolean() }),
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
     profile: {
       method: 'GET',
       path: '/api/public/students/:qrToken',
