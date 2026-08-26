@@ -5,6 +5,7 @@ import { extractTenantContext, checkGranularPermission, canAccessBranch } from '
 import { apiError, mapThrownError } from '../utils/api-error';
 import { releaseSubstitutionClaims } from '../db/substitutions';
 import { joinedBySession } from '../db/enrollment-start';
+import { pushCheckin } from '../utils/push';
 
 /**
  * Telegram attendance bot + auto-notifications (Phase 1, Bot API only).
@@ -449,6 +450,7 @@ async function handleAttendanceCommand(settings: TgSettings, chatId: number, tex
 
   // Fire the parent/student PRESENT notification too (best-effort, deduped).
   if (!already) {
+    await pushCheckin(settings.company_id, session.id, student.id);
     const settings2 = await loadSettings(settings.company_id);
     if (settings2?.notify_on_present) {
       const ctx = await loadSessionCtx(settings.company_id, session.id);

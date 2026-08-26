@@ -792,6 +792,16 @@ export const attendanceRoutes = {
         console.error('Substitution re-settle (saveForSession) error:', subErr);
       }
 
+      // Parent push for whoever this save NEWLY marked present. The register
+      // editor is how most tenants take attendance — without this only QR
+      // check-ins ever announced themselves. previouslyPresent keeps the
+      // debounced re-saves from repeating the news on every toggle.
+      for (const sid of presentIds) {
+        if (!previouslyPresent.has(sid)) {
+          await pushCheckin(context.companyId, params.sessionId, sid);
+        }
+      }
+
       // PER_SESSION courses: create/consume per-session charges for this save.
       // Returns the newly-created PENDING charges that still need collection.
       // Best-effort: a billing hiccup must never fail the attendance save itself.

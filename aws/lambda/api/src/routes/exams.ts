@@ -1293,7 +1293,7 @@ export const examsRoutes = {
       );
       const alreadyRecorded = !(upserted?.inserted);
       // Best-effort parent push — a mark landed on their child's record.
-      await pushExamResult(context.companyId, student.id, exam.name, grade,
+      await pushExamResult(context.companyId, student.id, params.id, exam.name, grade,
         exam.max_grade != null ? parseFloat(exam.max_grade) : null, exam.is_homework === true);
 
       return {
@@ -1364,7 +1364,7 @@ export const examsRoutes = {
       );
       const alreadyRecorded = !(upserted?.inserted);
       // Best-effort parent push — a mark landed on their child's record.
-      await pushExamResult(context.companyId, student.id, exam.name, grade,
+      await pushExamResult(context.companyId, student.id, params.id, exam.name, grade,
         exam.max_grade != null ? parseFloat(exam.max_grade) : null, exam.is_homework === true);
 
       return {
@@ -1419,7 +1419,7 @@ export const examsRoutes = {
         [params.id, context.companyId, exam.course_id, body.studentId, grade],
       );
       // Best-effort parent push — a mark landed on their child's record.
-      await pushExamResult(context.companyId, body.studentId, exam.name, grade,
+      await pushExamResult(context.companyId, body.studentId, params.id, exam.name, grade,
         exam.max_grade != null ? parseFloat(exam.max_grade) : null, exam.is_homework === true);
       return { status: 200 as const, body: { success: true, code: 'EXAMS.GRADE_SAVED', message: 'Grade saved' } };
     } catch (error: any) {

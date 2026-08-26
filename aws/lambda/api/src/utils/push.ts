@@ -133,11 +133,19 @@ export async function sendPushToStudent(
 // Arabic-first, like the tenants. One place for the wording so every trigger
 // says the same thing.
 
+/** "حصة كورس (مجموعة) مع مدرس" — the shared tail every session-ish body ends with. */
+function lessonPhrase(courseName: string, className: string | null, teacherName: string | null): string {
+  return `حصة ${courseName}${className ? ` (${className})` : ''}${teacherName ? ` مع ${teacherName}` : ''}`;
+}
+
 /** Present: fired at check-in, while the parent still remembers the drop-off. */
 export async function pushCheckin(companyId: string, sessionId: string, studentId: string): Promise<void> {
   try {
     const ctx = await queryOne<any>(
-      `SELECT st.name AS student_name, cl.name AS class_name, co.name AS course_name
+      `SELECT st.name AS student_name, cl.name AS class_name, co.name AS course_name,
+              (SELECT NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), '')
+                 FROM employees e
+                WHERE e.id = COALESCE(cl.instructor_id, co.instructor_id)) AS teacher_name
          FROM sessions se
          JOIN classes cl ON cl.id = se.class_id
          JOIN courses co ON co.id = cl.course_id
@@ -148,7 +156,7 @@ export async function pushCheckin(companyId: string, sessionId: string, studentI
     if (!ctx) return;
     await sendPushToStudent(companyId, studentId, {
       title: 'تسجيل حضور ✅',
-      body: `${ctx.student_name} حضر حصة ${ctx.course_name}${ctx.class_name ? ` (${ctx.class_name})` : ''} اليوم.`,
+      body: `${ctx.student_name} حضر ${lessonPhrase(ctx.course_name, ctx.class_name, ctx.teacher_name)} اليوم.`,
     });
   } catch (e) {
     console.error('push: pushCheckin failed (ignored):', e);
@@ -165,7 +173,10 @@ export async function pushSessionAbsences(companyId: string, sessionId: string):
   try {
     const session = await queryOne<any>(
       `SELECT s.id, s.class_id, s.start_date, COALESCE(s.is_free, false) AS is_free,
-              cl.name AS class_name, co.name AS course_name
+              cl.name AS class_name, co.name AS course_name,
+              (SELECT NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), '')
+                 FROM employees e
+                WHERE e.id = COALESCE(cl.instructor_id, co.instructor_id)) AS teacher_name
          FROM sessions s JOIN classes cl ON cl.id = s.class_id JOIN courses co ON co.id = cl.course_id
         WHERE s.id = $1 AND s.company_id = $2`,
       [sessionId, companyId],
@@ -200,7 +211,7 @@ export async function pushSessionAbsences(companyId: string, sessionId: string):
     for (const a of absentees) {
       await sendPushToStudent(companyId, a.id, {
         title: 'غياب ❌',
-        body: `${a.name} تغيب عن حصة ${session.course_name}${session.class_name ? ` (${session.class_name})` : ''} اليوم.`,
+        body: `${a.name} تغيب عن ${lessonPhrase(session.course_name, session.class_name, session.teacher_name)} اليوم.`,
       });
     }
   } catch (e) {
@@ -214,11 +225,12 @@ export async function pushPayment(
   studentId: string,
   amount: number,
   courseName: string | null,
+  teacherName: string | null,
   receiptToken: string | null,
 ): Promise<void> {
   await sendPushToStudent(companyId, studentId, {
     title: 'تم تسجيل دفعة 💰',
-    body: `تم تسجيل دفعة بقيمة ${amount}${courseName ? ` — ${courseName}` : ''}.`,
+    body: `تم تسجيل دفعة بقيمة ${amount}${courseName ? ` — ${courseName}` : ''}${teacherName ? ` مع ${teacherName}` : ''}.`,
     url: receiptToken ? `/r/${receiptToken}` : undefined,
   });
 }
@@ -227,13 +239,33 @@ export async function pushPayment(
 export async function pushExamResult(
   companyId: string,
   studentId: string,
+  examId: string,
   examName: string,
   grade: string | number,
   maxGrade: number | null,
   isHomework: boolean,
 ): Promise<void> {
-  await sendPushToStudent(companyId, studentId, {
-    title: isHomework ? 'تسجيل واجب 📚' : 'نتيجة امتحان 📝',
-    body: `${examName}: ${grade}${maxGrade != null ? ` / ${maxGrade}` : ''}`,
-  });
+  try {
+    // Which course, whose group: the exam's class teacher, else the course's.
+    const ctx = await queryOne<any>(
+      `SELECT co.name AS course_name,
+              (SELECT NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), '')
+                 FROM employees e
+                WHERE e.id = COALESCE(cl.instructor_id, co.instructor_id)) AS teacher_name
+         FROM exams ex
+         JOIN courses co ON co.id = ex.course_id
+         LEFT JOIN classes cl ON cl.id = ex.class_id
+        WHERE ex.id = $1 AND ex.company_id = $2`,
+      [examId, companyId],
+    );
+    const tail = ctx
+      ? ` — ${ctx.course_name}${ctx.teacher_name ? ` مع ${ctx.teacher_name}` : ''}`
+      : '';
+    await sendPushToStudent(companyId, studentId, {
+      title: isHomework ? 'تسجيل واجب 📚' : 'نتيجة امتحان 📝',
+      body: `${examName}${tail}: ${grade}${maxGrade != null ? ` / ${maxGrade}` : ''}`,
+    });
+  } catch (e) {
+    console.error('push: pushExamResult failed (ignored):', e);
+  }
 }

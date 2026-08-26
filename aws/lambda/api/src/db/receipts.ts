@@ -248,7 +248,7 @@ export async function issueReceipt(input: IssueReceiptInput): Promise<ReceiptRow
         // converges, whatever billing model took the money — one hook covers
         // them all, and the notification links straight to the slip.
         if (input.studentId) {
-          await pushPayment(input.companyId, input.studentId, amount, receipt.courseName, receipt.publicToken);
+          await pushPayment(input.companyId, input.studentId, amount, receipt.courseName, receipt.teacherName, receipt.publicToken);
         }
         return receipt;
       } catch (e: any) {
