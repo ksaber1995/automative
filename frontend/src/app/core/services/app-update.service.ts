@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Router, NavigationStart } from '@angular/router';
+import { Router, NavigationStart, NavigationError } from '@angular/router';
 
 /** Re-check cadence while the tab stays open. */
 const CHECK_INTERVAL_MS = 15 * 60 * 1000;
@@ -67,6 +67,20 @@ export class AppUpdateService {
         this.updateAvailable = false;
         setTimeout(() => window.location.reload());
       }
+      // A lazy chunk that fails to load IS the staleness signal, arriving
+      // before any periodic check could: the release this tab booted from is
+      // gone, so its route click 404s and the navigation silently dies —
+      // "the page is unresponsive". Turn that exact failure into a full page
+      // load at the URL the user asked for; the fresh index.html brings the
+      // matching chunks. Guarded per-URL so a genuinely broken build cannot
+      // reload-loop.
+      if (e instanceof NavigationError && this.isChunkLoadFailure(e.error)) {
+        const key = `netrofit-chunkfail-reloaded:${e.url}`;
+        if (sessionStorage.getItem(key) !== this.runningMainBundle()) {
+          sessionStorage.setItem(key, this.runningMainBundle() ?? 'unknown');
+          window.location.assign(e.url);
+        }
+      }
     });
   }
 
@@ -97,6 +111,12 @@ export class AppUpdateService {
     }
     this.updateAvailable = true;
     if (document.hidden) window.location.reload();
+  }
+
+  /** A failed dynamic import of a route chunk, in every browser's phrasing. */
+  private isChunkLoadFailure(error: unknown): boolean {
+    const text = `${(error as any)?.name ?? ''} ${(error as any)?.message ?? error ?? ''}`;
+    return /ChunkLoadError|Loading chunk|dynamically imported module|error loading|import\(\) failed|Importing a module script failed/i.test(text);
   }
 
   /** The main bundle this tab actually booted from. */

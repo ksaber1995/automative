@@ -248,7 +248,12 @@ ${useFunctionFallback ? `  if (uri.indexOf('/api/') === 0) return request;
       destinationBucket: bucket,
       distribution,
       distributionPaths: ['/*'],
-      prune: true,
+      // NO pruning: a tab that loaded the app before a deploy still lazy-loads
+      // LAST release's chunks by name. Pruning them made every deploy break
+      // every open tab (route clicks silently 404 → "the page is unresponsive")
+      // until a manual refresh. The names are content-hashed so releases never
+      // collide; old ones are just a little S3 dust.
+      prune: false,
       // s3 sync applies these filters to the destination too, so the files the
       // second pass owns are neither uploaded nor pruned here.
       exclude: FOREVER,
