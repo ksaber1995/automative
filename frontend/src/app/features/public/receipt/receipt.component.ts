@@ -18,6 +18,7 @@ export interface PaymentReceipt {
   studentCode: number | null;
   courseName: string | null;
   className: string | null;
+  teacherName: string | null;
   branchName: string | null;
   companyName: string | null;
   recordedBy: string | null;

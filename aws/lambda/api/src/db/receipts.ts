@@ -54,6 +54,10 @@ const RECEIPTS_DDL = [
      voided_at        TIMESTAMP WITH TIME ZONE,
      created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
    )`,
+  // Who taught what was paid for (class instructor, else the course's) —
+  // snapshotted like every other name on the slip. NULL on receipts issued
+  // before the column existed; the page simply omits the line.
+  `ALTER TABLE payment_receipts ADD COLUMN IF NOT EXISTS teacher_name TEXT`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_receipts_token ON payment_receipts(public_token)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_receipts_company_number ON payment_receipts(company_id, receipt_number)`,
   `CREATE INDEX IF NOT EXISTS idx_receipts_source ON payment_receipts(source_type, source_id)`,
@@ -117,6 +121,7 @@ export interface ReceiptRow {
   studentCode: number | null;
   courseName: string | null;
   className: string | null;
+  teacherName: string | null;
   branchName: string | null;
   companyName: string | null;
   recordedBy: string | null;
@@ -146,6 +151,7 @@ export function mapReceipt(row: any): ReceiptRow {
     studentCode: row.student_code === null || row.student_code === undefined ? null : Number(row.student_code),
     courseName: row.course_name ?? null,
     className: row.class_name ?? null,
+    teacherName: row.teacher_name ?? null,
     branchName: row.branch_name ?? null,
     companyName: row.company_name ?? null,
     recordedBy: row.recorded_by ?? null,
@@ -188,6 +194,12 @@ export async function issueReceipt(input: IssueReceiptInput): Promise<ReceiptRow
          (SELECT s.student_code FROM students s WHERE s.id = $2)            AS student_code,
          (SELECT c.name FROM courses c WHERE c.id = $3)                     AS course_name,
          (SELECT cl.name FROM classes cl WHERE cl.id = $4)                  AS class_name,
+         (SELECT NULLIF(TRIM(CONCAT(emp.first_name, ' ', emp.last_name)), '')
+            FROM employees emp
+           WHERE emp.id = COALESCE(
+             (SELECT cl2.instructor_id FROM classes cl2 WHERE cl2.id = $4),
+             (SELECT c2.instructor_id FROM courses c2 WHERE c2.id = $3)
+           ))                                                               AS teacher_name,
          (SELECT b.name FROM branches b WHERE b.id = $5)                    AS branch_name,
          (SELECT TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,''))
             FROM users u WHERE u.id = $6)                                   AS recorded_by`,
@@ -211,20 +223,21 @@ export async function issueReceipt(input: IssueReceiptInput): Promise<ReceiptRow
           `INSERT INTO payment_receipts
              (company_id, receipt_number, public_token, source_type, source_id, student_id,
               student_name, student_phone, parent_phone, student_code,
-              course_name, class_name, branch_name, company_name, recorded_by,
+              course_name, class_name, teacher_name, branch_name, company_name, recorded_by,
               amount, total_due, paid_to_date, remaining, is_full_payment,
               period_label, payment_date, notes)
            VALUES ($1,
                    (SELECT COALESCE(MAX(receipt_number), 0) + 1 FROM payment_receipts WHERE company_id = $1),
                    replace(uuid_generate_v4()::text, '-', ''),
-                   $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-                   $14, $15, $16, $17, $18, $19, COALESCE($20::date, CURRENT_DATE), $21)
+                   $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+                   $15, $16, $17, $18, $19, $20, COALESCE($21::date, CURRENT_DATE), $22)
            RETURNING *`,
           [
             input.companyId, input.sourceType, input.sourceId || null, input.studentId || null,
             snap?.student_name ?? null, snap?.student_phone ?? null, snap?.parent_phone ?? null,
             snap?.student_code ?? null, snap?.course_name ?? null, snap?.class_name ?? null,
-            snap?.branch_name ?? null, snap?.company_name ?? null, snap?.recorded_by ?? null,
+            snap?.teacher_name ?? null, snap?.branch_name ?? null, snap?.company_name ?? null,
+            snap?.recorded_by ?? null,
             amount, totalDue, paidToDate, remaining, isFull,
             input.periodLabel || null, input.paymentDate || null, input.notes || null,
           ],

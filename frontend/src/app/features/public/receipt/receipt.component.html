@@ -50,6 +50,9 @@
         @if (r.className) {
           <div class="row"><span>{{ 'RECEIPT.CLASS' | translate }}</span><strong>{{ r.className }}</strong></div>
         }
+        @if (r.teacherName) {
+          <div class="row"><span>{{ 'RECEIPT.TEACHER' | translate }}</span><strong>{{ r.teacherName }}</strong></div>
+        }
         @if (r.periodLabel) {
           <div class="row"><span>{{ 'RECEIPT.PERIOD' | translate }}</span><strong>{{ r.periodLabel }}</strong></div>
         }
