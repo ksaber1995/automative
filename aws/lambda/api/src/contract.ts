@@ -383,6 +383,7 @@ const CreateStudentSchema = z.object({
   // The school the student attends. Optional — a teacher tenant coaching adults
   // has none to record.
   schoolName: z.string().nullable().optional(),
+  photo: z.string().nullable().optional(),
   branchId: UUIDSchema,
   notes: z.string().nullable().optional(),
   acquisitionChannel: AcquisitionChannelSchema.nullable().optional(),
@@ -404,6 +405,7 @@ const BulkImportStudentRowSchema = z.object({
   parentPhone: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
   schoolName: z.string().nullable().optional(),
+  photo: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 
@@ -452,6 +454,7 @@ const StudentSchema = z.object({
   parentPhone: z.string().nullable(),
   address: z.string().nullable(),
   schoolName: z.string().nullable().optional(),
+  photo: z.string().nullable().optional(),
   branchId: UUIDSchema,
   isActive: z.boolean(),
   inactiveDate: z.string().nullable(),

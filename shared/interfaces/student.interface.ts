@@ -33,6 +33,8 @@ export interface Student {
   address?: string;
   /** The school the student attends. Optional; null means "not recorded". */
   schoolName?: string | null;
+  /** Optional small photo (data-URL thumbnail); sports academies show it on the roster. */
+  photo?: string | null;
   /**
    * The live classes / courses this student is on, comma-separated.
    *
@@ -67,6 +69,8 @@ export interface StudentCreateDto {
   parentPhone?: string;
   address?: string;
   schoolName?: string | null;
+  /** Optional small photo (data-URL thumbnail); sports academies show it on the roster. */
+  photo?: string | null;
   branchId: string;
   notes?: string;
   acquisitionChannel?: AcquisitionChannel;
@@ -83,6 +87,8 @@ export interface StudentImportRow {
   parentPhone?: string | null;
   address?: string | null;
   schoolName?: string | null;
+  /** Optional small photo (data-URL thumbnail); sports academies show it on the roster. */
+  photo?: string | null;
   notes?: string | null;
 }
 
@@ -102,6 +108,8 @@ export interface StudentUpdateDto {
   parentPhone?: string;
   address?: string;
   schoolName?: string | null;
+  /** Optional small photo (data-URL thumbnail); sports academies show it on the roster. */
+  photo?: string | null;
   branchId?: string;
   isActive?: boolean;
   notes?: string;

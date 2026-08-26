@@ -158,7 +158,16 @@
               <span class="text-gray-300">—</span>
             }
           </td>
-          <td>{{ student.name }}</td>
+          <td>
+            <div class="flex items-center gap-2">
+              <!-- Sports academies attach faces to the roster; anyone else's
+                   students simply have no photo and the row stays as it was. -->
+              @if (student.photo) {
+                <img [src]="student.photo" alt="" class="w-9 h-9 rounded-full object-cover border border-gray-200 shrink-0" />
+              }
+              <span>{{ student.name }}</span>
+            </div>
+          </td>
           <td>{{ ageDisplay(student.dateOfBirth) }}</td>
           <td>
             <div class="text-sm">

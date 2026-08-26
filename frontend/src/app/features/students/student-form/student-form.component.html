@@ -114,6 +114,31 @@
             }
           </div>
 
+          <!-- Optional photo — sports academies only: a coach knows a trainee
+               by face, so the roster shows one. Downscaled on-device to a
+               thumbnail before it is ever sent. -->
+          @if (showPhoto()) {
+            <div class="field">
+              <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.FORM.PHOTO' | translate }}</label>
+              <div class="flex items-center gap-3">
+                @if (photo()) {
+                  <img [src]="photo()" alt="" class="w-16 h-16 rounded-full object-cover border border-gray-200" />
+                  <button pButton type="button" icon="pi pi-times" severity="danger" class="p-button-text p-button-rounded"
+                    [pTooltip]="'STUDENTS.FORM.PHOTO_REMOVE' | translate" (click)="removePhoto()"></button>
+                } @else {
+                  <div class="w-16 h-16 rounded-full bg-gray-100 border border-dashed border-gray-300 flex items-center justify-center text-gray-400">
+                    <i class="pi pi-user text-xl"></i>
+                  </div>
+                }
+                <label class="p-button p-button-sm p-button-outlined p-component cursor-pointer">
+                  <i class="pi pi-camera mr-2"></i>{{ 'STUDENTS.FORM.PHOTO_PICK' | translate }}
+                  <input type="file" accept="image/*" class="hidden" (change)="onPhotoPicked($event)" />
+                </label>
+              </div>
+              <small class="text-gray-400 block mt-1">{{ 'STUDENTS.FORM.PHOTO_HINT' | translate }}</small>
+            </div>
+          }
+
           <!-- Date of Birth -->
           <div class="field">
             <label for="dateOfBirth" class="block text-sm font-medium mb-2">

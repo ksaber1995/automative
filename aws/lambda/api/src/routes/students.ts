@@ -19,15 +19,30 @@ function generateQrToken(): string {
 let schoolColumnReady: Promise<void> | null = null;
 export function ensureStudentSchoolColumn(): Promise<void> {
   if (!schoolColumnReady) {
-    schoolColumnReady = query(
-      `ALTER TABLE students ADD COLUMN IF NOT EXISTS school_name VARCHAR(200)`
-    ).then(() => undefined).catch((e) => {
+    schoolColumnReady = (async () => {
+      await query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS school_name VARCHAR(200)`);
+      // An optional small photo (sports academies asked for faces on the
+      // roster). A data-URL in the row, like the booking payment photo — the
+      // client downscales to a thumbnail before upload and PHOTO_MAX_CHARS
+      // keeps the list payload sane whatever the client sends.
+      await query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS photo TEXT`);
+    })().catch((e) => {
       // Let the next call retry rather than caching a failure for the container's life.
       schoolColumnReady = null;
       throw e;
     });
   }
   return schoolColumnReady;
+}
+
+/** ~80k chars of base64 ≈ a 60KB image — plenty for a roster thumbnail. */
+const PHOTO_MAX_CHARS = 80_000;
+
+/** A photo the row may keep: a data-URL image under the cap, or null. */
+function validPhoto(input: any): string | null {
+  if (typeof input !== 'string' || !input) return null;
+  if (!input.startsWith('data:image/') || input.length > PHOTO_MAX_CHARS) return null;
+  return input;
 }
 
 // ── Duplicate detection ──────────────────────────────────────────────────────
@@ -121,6 +136,7 @@ function mapStudentFromDB(row: any) {
     parentPhone: row.parent_phone,
     address: row.address,
     schoolName: row.school_name ?? null,
+    photo: row.photo ?? null,
     branchId: row.branch_id,
     isActive: row.is_active,
     inactiveDate: row.inactive_date,
@@ -324,6 +340,7 @@ export const studentsRoutes = {
         parent_phone: body.parentPhone || null,
         address: body.address || null,
         school_name: body.schoolName || null,
+        photo: validPhoto(body.photo),
         branch_id: body.branchId,
         notes: body.notes || null,
         acquisition_channel: body.acquisitionChannel || null,
@@ -537,6 +554,8 @@ export const studentsRoutes = {
       if (body.parentPhone !== undefined) updateData.parent_phone = body.parentPhone;
       if (body.address !== undefined) updateData.address = body.address;
       if (body.schoolName !== undefined) updateData.school_name = body.schoolName || null;
+      // undefined = untouched; null or an oversize/non-image value clears it.
+      if (body.photo !== undefined) updateData.photo = validPhoto(body.photo);
       if (body.branchId !== undefined) {
         if (!canAccessBranch(context, body.branchId)) {
           return apiError(403, 'ERRORS.STUDENTS.ACCESS_DENIED_TARGET_BRANCH', 'Access denied to target branch');

@@ -10,11 +10,13 @@ import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
 import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
+import { TooltipModule } from 'primeng/tooltip';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { StudentService, SimilarStudent } from '../services/student.service';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { BranchStateService } from '../../../core/services/branch-state.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { ACQUISITION_CHANNELS } from '@shared/interfaces/student.interface';
 import { toLocalYmd } from '../../../core/utils/date.util';
 
@@ -30,6 +32,7 @@ import { toLocalYmd } from '../../../core/utils/date.util';
     TextareaModule,
     SelectModule,
     DatePickerModule,
+    TooltipModule,
     TranslateModule,
     RouterModule
   ],
@@ -45,12 +48,54 @@ export class StudentFormComponent implements OnInit, OnDestroy {
   private notificationService = inject(NotificationService);
   private translate = inject(TranslateService);
   protected branchState = inject(BranchStateService);
+  private authService = inject(AuthService);
 
   studentForm: FormGroup;
   loading = signal(false);
   isEditMode = signal(false);
   studentId: string | null = null;
   branches = signal<LookupOption[]>([]);
+
+  // ── Optional photo (sports academies: faces on the roster) ─────────────────
+  /** Shown for the SPORTS vertical, where a trainee's face is how coaches know them. */
+  showPhoto = (): boolean => this.authService.vertical() === 'SPORTS';
+  /** The thumbnail to save — a small data-URL, or null to clear. */
+  photo = signal<string | null>(null);
+
+  /**
+   * Downscale before it ever leaves the device: the roster shows a thumbnail,
+   * so a 4MB camera shot is resized to a 256px JPEG (~10KB) on a canvas. The
+   * API refuses anything that is not a small image anyway.
+   */
+  async onPhotoPicked(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || !file.type.startsWith('image/')) return;
+    try {
+      const url = URL.createObjectURL(file);
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = reject;
+        i.src = url;
+      });
+      const MAX = 256;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      this.photo.set(canvas.toDataURL('image/jpeg', 0.8));
+    } catch {
+      this.notificationService.error(this.translate.instant('STUDENTS.FORM.PHOTO_FAILED'));
+    }
+  }
+
+  removePhoto() {
+    this.photo.set(null);
+  }
 
   acquisitionChannelOptions = ACQUISITION_CHANNELS.map(value => ({
     value,
@@ -198,6 +243,7 @@ export class StudentFormComponent implements OnInit, OnDestroy {
           ...student,
           dateOfBirth: student.dateOfBirth ? new Date(student.dateOfBirth) : null
         });
+        this.photo.set(student.photo ?? null);
         this.loading.set(false);
       },
       error: () => {
@@ -217,7 +263,10 @@ export class StudentFormComponent implements OnInit, OnDestroy {
     const formValue = this.studentForm.value;
     const studentData = {
       ...formValue,
-      dateOfBirth: toLocalYmd(formValue.dateOfBirth)
+      dateOfBirth: toLocalYmd(formValue.dateOfBirth),
+      // Only the sports form shows the picker; sending it elsewhere would
+      // silently clear a photo the user never saw.
+      ...(this.showPhoto() ? { photo: this.photo() } : {}),
     };
 
     if (this.isEditMode() && this.studentId) {
