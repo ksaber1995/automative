@@ -277,6 +277,37 @@ export class LayoutComponent implements OnInit, OnDestroy {
       }});
     }
 
+    // Financial — money screens sit above CRM: collecting is the daily job,
+    // chasing leads is not.
+    const financial: NavLeaf[] = [
+      // The daily collection screens — what students owe and pay — so they lead the
+      // group rather than sitting under the ledgers.
+      { labelKey: 'NAV.MONTHLY_SUBSCRIPTIONS', icon: 'pi pi-calendar', routerLink: ['/monthly-subscriptions'], visible: auth.canRead('academy') },
+      { labelKey: 'NAV.SESSION_PAYMENTS', icon: 'pi pi-wallet', routerLink: ['/session-payments'], visible: auth.canRead('enrollments') },
+      { labelKey: 'NAV.CASH', icon: 'pi pi-wallet', routerLink: ['/cash'], visible: auth.canRead('cash') && auth.canUseCash() },
+      { labelKey: 'NAV.REVENUES', icon: 'pi pi-dollar', routerLink: ['/revenues'], visible: auth.canRead('revenues') },
+      // Every academy gets Expenses, Basic included: rent, bills and equipment
+      // are what running one costs, not an Advanced extra. The API never gated
+      // it either — only this line did, so a Basic academy had the page working
+      // and no way to reach it.
+      { labelKey: 'NAV.EXPENSES', icon: 'pi pi-money-bill', routerLink: ['/expenses'], visible: auth.canRead('expenses') },
+      // Hidden for teachers alongside Employees — a salary is paid to an
+      // employee, and a teacher tenant has none. Expenses above stays visible:
+      // rent and bills apply to a solo teacher too.
+      { labelKey: 'NAV.SALARIES', icon: 'pi pi-users', routerLink: ['/salaries'], visible: auth.canWrite('expenses') && !auth.isTeacher() },
+      { labelKey: 'NAV.REFUNDS', icon: 'pi pi-replay', routerLink: ['/refunds'], visible: auth.canRead('refunds') },
+      { labelKey: 'NAV.DUES', icon: 'pi pi-credit-card', routerLink: ['/dues'], visible: auth.canRead('enrollments') },
+      { labelKey: 'NAV.BOOKINGS', icon: 'pi pi-calendar-plus', routerLink: ['/bookings'], visible: auth.canRead('enrollments') },
+      // Hidden from the sidebar — receipts are reached from a student's page or
+      // from a due, not browsed as a list. The /receipts route still works.
+      { labelKey: 'NAV.RECEIPTS', icon: 'pi pi-receipt', routerLink: ['/receipts'], visible: false },
+    ].filter(c => c.visible);
+    if (financial.length) {
+      entries.push({ kind: 'group', group: {
+        groupKey: 'financial', labelKey: 'NAV.GROUPS.FINANCIAL', icon: 'pi pi-money-bill', children: financial,
+      }});
+    }
+
     // Client Management (CRM) — its own top-level group; each tab is a route.
     const clientMgmt: NavLeaf[] = [
       { labelKey: 'NAV.CRM_LEADS', icon: 'pi pi-filter', routerLink: ['/crm'], visible: auth.canUseCrm() },
@@ -305,36 +336,6 @@ export class LayoutComponent implements OnInit, OnDestroy {
     if (whatsapp.length) {
       entries.push({ kind: 'group', group: {
         groupKey: 'whatsapp', labelKey: 'NAV.GROUPS.WHATSAPP', icon: 'pi pi-whatsapp', children: whatsapp,
-      }});
-    }
-
-    // Financial
-    const financial: NavLeaf[] = [
-      // The daily collection screens — what students owe and pay — so they lead the
-      // group rather than sitting under the ledgers.
-      { labelKey: 'NAV.MONTHLY_SUBSCRIPTIONS', icon: 'pi pi-calendar', routerLink: ['/monthly-subscriptions'], visible: auth.canRead('academy') },
-      { labelKey: 'NAV.SESSION_PAYMENTS', icon: 'pi pi-wallet', routerLink: ['/session-payments'], visible: auth.canRead('enrollments') },
-      { labelKey: 'NAV.CASH', icon: 'pi pi-wallet', routerLink: ['/cash'], visible: auth.canRead('cash') && auth.canUseCash() },
-      { labelKey: 'NAV.REVENUES', icon: 'pi pi-dollar', routerLink: ['/revenues'], visible: auth.canRead('revenues') },
-      // Every academy gets Expenses, Basic included: rent, bills and equipment
-      // are what running one costs, not an Advanced extra. The API never gated
-      // it either — only this line did, so a Basic academy had the page working
-      // and no way to reach it.
-      { labelKey: 'NAV.EXPENSES', icon: 'pi pi-money-bill', routerLink: ['/expenses'], visible: auth.canRead('expenses') },
-      // Hidden for teachers alongside Employees — a salary is paid to an
-      // employee, and a teacher tenant has none. Expenses above stays visible:
-      // rent and bills apply to a solo teacher too.
-      { labelKey: 'NAV.SALARIES', icon: 'pi pi-users', routerLink: ['/salaries'], visible: auth.canWrite('expenses') && !auth.isTeacher() },
-      { labelKey: 'NAV.REFUNDS', icon: 'pi pi-replay', routerLink: ['/refunds'], visible: auth.canRead('refunds') },
-      { labelKey: 'NAV.DUES', icon: 'pi pi-credit-card', routerLink: ['/dues'], visible: auth.canRead('enrollments') },
-      { labelKey: 'NAV.BOOKINGS', icon: 'pi pi-calendar-plus', routerLink: ['/bookings'], visible: auth.canRead('enrollments') },
-      // Hidden from the sidebar — receipts are reached from a student's page or
-      // from a due, not browsed as a list. The /receipts route still works.
-      { labelKey: 'NAV.RECEIPTS', icon: 'pi pi-receipt', routerLink: ['/receipts'], visible: false },
-    ].filter(c => c.visible);
-    if (financial.length) {
-      entries.push({ kind: 'group', group: {
-        groupKey: 'financial', labelKey: 'NAV.GROUPS.FINANCIAL', icon: 'pi pi-money-bill', children: financial,
       }});
     }
 
