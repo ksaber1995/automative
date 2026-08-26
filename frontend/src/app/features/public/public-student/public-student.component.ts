@@ -78,7 +78,11 @@ export class PublicStudentComponent implements OnInit {
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') throw new Error('denied');
       const reg = await navigator.serviceWorker.register('/assets/push-sw.js');
-      await navigator.serviceWorker.ready;
+      // NOT navigator.serviceWorker.ready: that waits for a worker CONTROLLING
+      // this page, and this worker's scope is /assets/ — it never controls
+      // /p/s/…, so .ready would hang forever. Push needs the registration
+      // active, not the page controlled.
+      await this.swActivated(reg);
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: this.vapidKeyBytes(publicKey),
@@ -97,6 +101,22 @@ export class PublicStudentComponent implements OnInit {
     } finally {
       this.pushBusy.set(false);
     }
+  }
+
+  /** Resolves once the registration has an activated worker; bounded so the button can never spin forever. */
+  private swActivated(reg: ServiceWorkerRegistration): Promise<void> {
+    if (reg.active) return Promise.resolve();
+    const sw = reg.installing || reg.waiting;
+    if (!sw) return Promise.reject(new Error('no worker'));
+    return new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('sw activation timeout')), 15000);
+      const check = () => {
+        if (sw.state === 'activated') { clearTimeout(timer); resolve(); }
+        else if (sw.state === 'redundant') { clearTimeout(timer); reject(new Error('sw redundant')); }
+      };
+      sw.addEventListener('statechange', check);
+      check();
+    });
   }
 
   /** base64url → the byte view the Push API wants. */
