@@ -4,6 +4,7 @@ import { apiError, mapThrownError } from '../utils/api-error';
 import { insertProductSaleWithClient, saleDateNotInFuture } from './product-sales';
 import { ensurePerSessionSchema } from './session-payments';
 import { ensureMonthlyInstallmentLedger, ensurePaymentRecorderColumns, recordMonthlyInstallment, recordPackageInstallment } from '../db/payment-ledger';
+import { ensureEnrollmentMonthOverrides } from './monthly-subscriptions';
 import { issueReceipt } from '../db/receipts';
 
 function mapEnrollmentFromDB(row: any) {
@@ -112,6 +113,14 @@ async function createMonthlySubscriptionEnrollment(context: any, body: any, cour
   const discountAmount = body.discountAmount || 0;
   // Discounted monthly fee — what every monthly bill charges.
   const monthlyFee = body.finalPrice != null ? body.finalPrice : originalPrice;
+  // A prorated (or otherwise special) first month, typed at the desk for someone
+  // joining mid-month. Only the start month bills at it; kept as a per-enrollment
+  // month override so restatements and projections agree with the bill.
+  const rawFirstMonth = body.firstMonthPrice;
+  const firstMonthFee: number | null =
+    rawFirstMonth != null && Number.isFinite(Number(rawFirstMonth)) && Number(rawFirstMonth) >= 0
+      ? Math.round(Number(rawFirstMonth) * 100) / 100
+      : null;
   const payFirstMonth = !!body.payFirstMonth;
   const notes = body.notes || null;
   const buyProducts = Array.isArray(body.products) ? body.products.filter((p: any) => p && p.productId && (p.quantity ?? 1) > 0) : [];
@@ -119,6 +128,7 @@ async function createMonthlySubscriptionEnrollment(context: any, body: any, cour
   // The first-month collection below writes an installment row — get the ledger in
   // place before opening the transaction (DDL and money in one txn is asking for it).
   await ensureMonthlyInstallmentLedger();
+  if (firstMonthFee !== null) await ensureEnrollmentMonthOverrides();
 
   // Use a transaction when products are involved (atomic enrollment + product sales).
   const client = buyProducts.length > 0 ? await getClient() : null;
@@ -201,6 +211,23 @@ async function createMonthlySubscriptionEnrollment(context: any, body: any, cour
       endM = startM;
     }
 
+    const qFn = client || { query: (s: string, p: any[]) => query(s, p).then(r => ({ rows: r })) };
+
+    // Record the start month's special price as a per-enrollment override, so a
+    // later restatement / re-materialisation of that month lands on the same
+    // figure instead of quietly reverting to the standard fee. Equal-to-fee
+    // values are noise, not an override.
+    if (firstMonthFee !== null && firstMonthFee !== monthlyFee) {
+      await (qFn as any).query(
+        `INSERT INTO enrollment_monthly_price_overrides
+           (company_id, enrollment_id, billing_year, billing_month, override_price)
+         VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (enrollment_id, billing_year, billing_month)
+         DO UPDATE SET override_price = EXCLUDED.override_price, updated_at = NOW()`,
+        [context.companyId, enrollment.id, startY, startM, firstMonthFee]
+      );
+    }
+
     let y = startY;
     let m = startM;
     let firstBillId: string | null = null;
@@ -209,7 +236,8 @@ async function createMonthlySubscriptionEnrollment(context: any, body: any, cour
       // Due date is the first day of the billing month (y = year, m = 1-based month).
       // Built as a plain string so it is never shifted a day by a UTC conversion.
       const dueStr = `${y}-${String(m).padStart(2, '0')}-01`;
-      const qFn = client || { query: (s: string, p: any[]) => query(s, p).then(r => ({ rows: r })) };
+      const isStartMonth = y === startY && m === startM;
+      const amountDue = isStartMonth && firstMonthFee !== null ? firstMonthFee : monthlyFee;
       const billRes = await (qFn as any).query(
         `INSERT INTO monthly_subscription_payments
            (enrollment_id, company_id, student_id, course_id, branch_id,
@@ -217,10 +245,10 @@ async function createMonthlySubscriptionEnrollment(context: any, body: any, cour
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,'PENDING',$9)
          ON CONFLICT (enrollment_id, billing_year, billing_month) DO NOTHING
          RETURNING id`,
-        [enrollment.id, context.companyId, body.studentId, body.courseId, body.branchId, y, m, monthlyFee, dueStr]
+        [enrollment.id, context.companyId, body.studentId, body.courseId, body.branchId, y, m, amountDue, dueStr]
       );
       const billRow = billRes?.rows?.[0] || null;
-      if (y === startY && m === startM) firstBillId = billRow?.id || null;
+      if (isStartMonth) firstBillId = billRow?.id || null;
       m++;
       if (m > 12) { m = 1; y++; }
       guard++;
@@ -232,13 +260,14 @@ async function createMonthlySubscriptionEnrollment(context: any, body: any, cour
     // shows up on the monthly dashboard exactly like any other half-paid month. It
     // is clamped to the fee: paying "more than the month" would otherwise book a
     // credit that nothing in the system knows how to give back.
+    const firstBillFee = firstMonthFee !== null ? firstMonthFee : monthlyFee;
     const downPayment = Number((body as any).firstMonthDownPayment ?? 0);
     const collect = payFirstMonth
-      ? monthlyFee
-      : (Number.isFinite(downPayment) && downPayment > 0 ? Math.min(downPayment, monthlyFee) : 0);
+      ? firstBillFee
+      : (Number.isFinite(downPayment) && downPayment > 0 ? Math.min(downPayment, firstBillFee) : 0);
 
-    if (collect > 0 && monthlyFee > 0 && firstBillId) {
-      const status = collect >= monthlyFee ? 'PAID' : 'PARTIAL';
+    if (collect > 0 && firstBillFee > 0 && firstBillId) {
+      const status = collect >= firstBillFee ? 'PAID' : 'PARTIAL';
       const note = status === 'PAID' ? 'First month paid at enrollment' : 'Part of the first month paid at enrollment';
       // paid_date is WHEN the money was collected — that is now, at enrollment
       // creation, NOT body.enrollmentDate. For a class that starts in a future

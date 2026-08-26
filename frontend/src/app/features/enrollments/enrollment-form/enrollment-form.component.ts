@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed, Signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, effect, Signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
@@ -123,6 +123,8 @@ export class EnrollmentFormComponent implements OnInit {
   // Monthly price override info for display hint
   monthlyOverridePrice = signal<number | null>(null);
   monthlyOverrideMonth = signal<string>(''); // e.g. "June 2026"
+  /** Special price for the START month only — typed for a mid-month join. Null = normal fee. */
+  firstMonthPriceSig = signal<number | null>(null);
   // Per-session enrollment: pay each session, or prepay a package in advance.
   sessionBillingModeSig = signal<'PER_SESSION' | 'PACKAGE'>('PER_SESSION');
   // When prepaying a package: pay it fully now, part now (down payment), or later.
@@ -196,9 +198,12 @@ export class EnrollmentFormComponent implements OnInit {
   feeDueNow = computed(() => {
     const fee = this.finalPriceSig();
     if (this.isMonthly()) {
+      // "Pay first month now" collects the FIRST month — which may carry its own
+      // mid-month price rather than the standard fee.
+      const firstFee = this.firstMonthPriceSig() ?? fee;
       const opt = this.monthlyPayOptionSig();
-      return opt === 'PAY_NOW' ? fee
-        : opt === 'PAY_PARTIAL' ? this.monthlyDownPaymentSig()
+      return opt === 'PAY_NOW' ? firstFee
+        : opt === 'PAY_PARTIAL' ? Math.min(this.monthlyDownPaymentSig(), firstFee)
         : 0;
     }
     if (this.isPerSession()) {
@@ -216,7 +221,11 @@ export class EnrollmentFormComponent implements OnInit {
   feeDeferred = computed(() => {
     // Pay-as-attended has no fixed balance to defer — there is no total yet.
     if (this.isPerSession() && this.sessionBillingModeSig() !== 'PACKAGE') return 0;
-    return Math.max(0, this.finalPriceSig() - this.feeDueNow());
+    // For monthly, what's owing today is the first month's own price.
+    const base = this.isMonthly()
+      ? (this.firstMonthPriceSig() ?? this.finalPriceSig())
+      : this.finalPriceSig();
+    return Math.max(0, base - this.feeDueNow());
   });
 
   /** Cash actually taken at enrollment: books (always) + whatever fee is due now. */
@@ -308,6 +317,65 @@ export class EnrollmentFormComponent implements OnInit {
     this.classEnrolledCount() + 1 - (this.selectedClass()?.maxStudents || 0)
   );
 
+  /** The picked enrollment date, tracked off the control like classIdSig. */
+  private enrollDateSig!: Signal<Date | null>;
+
+  /**
+   * What the first month is worth for a mid-month join: the monthly fee scaled
+   * by the class days left in that month over the class days the month holds
+   * (counting from the class start, so a class that itself starts mid-month
+   * isn't "prorated" against days it never ran). Falls back to plain calendar
+   * days when the class has no schedule. Null when the student joins from the
+   * month's first class day — a full month owes the full fee.
+   */
+  firstMonthSuggestion = computed(() => {
+    if (!this.isMonthly()) return null;
+    const cls = this.selectedClass();
+    const d = this.enrollDateSig();
+    const fee = this.finalPriceSig();
+    if (!cls || !(d instanceof Date) || !(fee > 0)) return null;
+    const joinDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const monthStart = new Date(d.getFullYear(), d.getMonth(), 1);
+    const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    const classStart = new Date(cls.startDate);
+    classStart.setHours(0, 0, 0, 0);
+    const from = classStart > monthStart ? classStart : monthStart;
+    if (from > monthEnd) return null;
+    const days = this.classWeekdays(cls);
+    const countClassDays = (a: Date, b: Date) => {
+      let n = 0;
+      const cur = new Date(a);
+      while (cur <= b) {
+        if (days.size === 0 || days.has(cur.getDay())) n++;
+        cur.setDate(cur.getDate() + 1);
+      }
+      return n;
+    };
+    const total = countClassDays(from, monthEnd);
+    const remaining = countClassDays(joinDay > from ? joinDay : from, monthEnd);
+    if (total <= 0 || remaining >= total) return null;
+    return Math.round(((fee * remaining) / total) * 100) / 100;
+  });
+
+  /** The mid-month box only appears when there is actually a partial month to price. */
+  showFirstMonth = computed(() => !this.isEditMode() && this.firstMonthSuggestion() !== null);
+
+  /** "MONDAY,WEDNESDAY" (or dayTimes) → JS getDay() numbers. Empty = unknown schedule. */
+  private classWeekdays(cls: Class): Set<number> {
+    const map: Record<string, number> = {
+      SUNDAY: 0, MONDAY: 1, TUESDAY: 2, WEDNESDAY: 3, THURSDAY: 4, FRIDAY: 5, SATURDAY: 6,
+    };
+    const names = cls.dayTimes?.length
+      ? cls.dayTimes.map(t => t.day)
+      : (cls.daysOfWeek || '').split(',');
+    const out = new Set<number>();
+    for (const n of names) {
+      const num = map[(n || '').trim().toUpperCase()];
+      if (num !== undefined) out.add(num);
+    }
+    return out;
+  }
+
   constructor() {
     this.enrollmentForm = this.fb.group({
       studentId: ['', [Validators.required]],
@@ -325,12 +393,25 @@ export class EnrollmentFormComponent implements OnInit {
       downPayment: [0],
       monthlyPayOption: ['PAY_LATER'],
       monthlyDownPayment: [0],
+      firstMonthPrice: [null as number | null],
       sessionBillingMode: ['PER_SESSION'],
       sessionPackagePayMode: ['FULL'],
       sessionPackageDownPayment: [0],
       notes: ['']
     });
     this.classIdSig = toSignal(this.enrollmentForm.get('classId')!.valueChanges, { initialValue: '' });
+    this.enrollDateSig = toSignal(this.enrollmentForm.get('enrollmentDate')!.valueChanges, {
+      initialValue: this.enrollmentForm.get('enrollmentDate')!.value as Date | null,
+    });
+    // A typed first-month price is about ONE specific partial month. When the
+    // date/class/course change makes the join a full month again, the special
+    // price no longer describes anything — drop it rather than billing it.
+    effect(() => {
+      if (this.firstMonthSuggestion() === null && this.firstMonthPriceSig() !== null) {
+        this.firstMonthPriceSig.set(null);
+        this.enrollmentForm.patchValue({ firstMonthPrice: null }, { emitEvent: false });
+      }
+    });
   }
 
   ngOnInit() {
@@ -679,6 +760,20 @@ export class EnrollmentFormComponent implements OnInit {
     });
   }
 
+  /** Teacher typed (or cleared) a special first-month price. */
+  onFirstMonthPriceInput() {
+    const v = this.enrollmentForm.get('firstMonthPrice')?.value;
+    this.firstMonthPriceSig.set(typeof v === 'number' && v >= 0 ? v : null);
+  }
+
+  /** One tap puts the prorated figure into the field. */
+  applyFirstMonthSuggestion() {
+    const s = this.firstMonthSuggestion();
+    if (s === null) return;
+    this.firstMonthPriceSig.set(s);
+    this.enrollmentForm.patchValue({ firstMonthPrice: s }, { emitEvent: false });
+  }
+
   onStudentChange() {
     const studentId = this.enrollmentForm.get('studentId')?.value;
     this.loadEnrolledCourseIds(studentId);
@@ -837,6 +932,10 @@ export class EnrollmentFormComponent implements OnInit {
       payFirstMonth: monthly ? this.monthlyPayOptionSig() === 'PAY_NOW' : undefined,
       firstMonthDownPayment: (monthly && this.monthlyPayOptionSig() === 'PAY_PARTIAL')
         ? this.monthlyDownPaymentSig()
+        : undefined,
+      // Mid-month join: only the start month bills at this figure.
+      firstMonthPrice: (monthly && this.firstMonthPriceSig() !== null)
+        ? this.firstMonthPriceSig()!
         : undefined,
       // Per-session: pay each session (default) or prepay a package in advance.
       sessionBillingMode: perSession ? this.sessionBillingModeSig() : undefined,

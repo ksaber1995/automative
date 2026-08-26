@@ -1575,6 +1575,10 @@ const CreateEnrollmentSchema = z.object({
   // Part of the first month, collected at enrollment. Mirrors the package's
   // PARTIAL down payment: the first bill is left PARTIAL with the rest owing.
   firstMonthDownPayment: z.number().optional(),
+  // What the FIRST month costs this student — a prorated figure for someone
+  // joining mid-month. Stored as a per-enrollment month override so only the
+  // start month is billed at it; every later month bills the normal fee.
+  firstMonthPrice: z.number().min(0).optional(),
   // Per-session enrollment fields (ignored unless the course is PER_SESSION):
   sessionBillingMode: z.enum(['PER_SESSION', 'PACKAGE']).optional(),
   buyPackage: z.boolean().optional(),

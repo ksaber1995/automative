@@ -131,6 +131,11 @@ export interface EnrollmentCreateDto {
   // `payFirstMonth` records the start month's payment up-front.
   paymentType?: 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION';
   payFirstMonth?: boolean;
+  // Part of the first month collected at enrollment (leaves the bill PARTIAL).
+  firstMonthDownPayment?: number;
+  // Special price for the START month only (e.g. prorated for a mid-month
+  // join); stored as a per-enrollment month override on the backend.
+  firstMonthPrice?: number;
   // Per-session fields (ignored unless the course is PER_SESSION).
   sessionBillingMode?: 'PER_SESSION' | 'PACKAGE';
   buyPackage?: boolean;
