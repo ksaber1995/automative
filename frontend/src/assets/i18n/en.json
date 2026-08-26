@@ -1212,6 +1212,12 @@
       "REFUNDED": "Refunded",
       "LEFT_UNPAID": "Left with dues"
     },
+    "MONTH_PRICE": "Set this month's price for this student",
+    "MONTH_PRICE_TITLE": "Price for this month",
+    "MONTH_PRICE_HINT": "Only this student, only this month — e.g. a prorated first month for someone who joined mid-month. Other months keep the normal fee.",
+    "MONTH_PRICE_SAVE": "Save price",
+    "MONTH_PRICE_RESET": "Back to normal fee",
+    "MONTH_PRICE_SAVED": "Month price saved",
     "RESUME": "Resume",
     "HOLD": "Hold",
     "NO_HELD": "No subscriptions on hold",

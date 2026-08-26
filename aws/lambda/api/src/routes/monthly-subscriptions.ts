@@ -279,6 +279,39 @@ async function recalcBillsForMasterMonth(
  * from a LOCAL Date and serialising with toISOString() would, on any server east
  * of UTC, land a day early.
  */
+/**
+ * Per-STUDENT month prices: what one enrollment pays for one month, absolute.
+ * A student who joined mid-month pays a prorated first month; the course-wide
+ * override scales everyone, this names one student's figure exactly. Read by
+ * every place a bill amount is computed (materialisation, single-bill collect,
+ * future-month projection), so past, current and future months all honour it.
+ */
+let enrollmentMonthOverridesPromise: Promise<void> | null = null;
+export async function ensureEnrollmentMonthOverrides(): Promise<void> {
+  if (!enrollmentMonthOverridesPromise) {
+    enrollmentMonthOverridesPromise = (async () => {
+      try {
+        await query(`CREATE TABLE IF NOT EXISTS enrollment_monthly_price_overrides (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          company_id UUID NOT NULL,
+          enrollment_id UUID NOT NULL,
+          billing_year INTEGER NOT NULL,
+          billing_month INTEGER NOT NULL,
+          override_price NUMERIC(10,2) NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW(),
+          UNIQUE (enrollment_id, billing_year, billing_month)
+        )`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_empo_company ON enrollment_monthly_price_overrides(company_id)`);
+      } catch (e) {
+        enrollmentMonthOverridesPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return enrollmentMonthOverridesPromise;
+}
+
 export async function ensureBillsForMonth(
   companyId: string,
   billingYear: number,
@@ -286,6 +319,7 @@ export async function ensureBillsForMonth(
 ): Promise<number> {
   if (!Number.isInteger(billingYear) || !Number.isInteger(billingMonth)) return 0;
   if (billingMonth < 1 || billingMonth > 12) return 0;
+  await ensureEnrollmentMonthOverrides();
 
   const rows = await query(
     `WITH period AS (
@@ -298,11 +332,14 @@ export async function ensureBillsForMonth(
      SELECT
        e.id, e.company_id, e.student_id, e.course_id, e.branch_id,
        $2::int, $3::int,
-       CASE
+       -- A per-student month price outranks everything: it IS the figure staff
+       -- typed for this enrollment and month. Otherwise the course-wide month
+       -- override scales the fee; otherwise the fee itself.
+       COALESCE(eo.override_price, CASE
          WHEN ov.override_price IS NOT NULL AND c.price > 0
            THEN ROUND(ov.override_price * (COALESCE(e.final_price, c.price) / c.price), 2)
          ELSE COALESCE(e.final_price, c.price)
-       END,
+       END),
        0, 'PENDING', period.first_day
      FROM enrollments e
      JOIN courses c ON c.id = e.course_id
@@ -311,6 +348,10 @@ export async function ensureBillsForMonth(
        ON ov.course_id = e.course_id
       AND ov.billing_year = $2::int
       AND ov.billing_month = $3::int
+     LEFT JOIN enrollment_monthly_price_overrides eo
+       ON eo.enrollment_id = e.id
+      AND eo.billing_year = $2::int
+      AND eo.billing_month = $3::int
      WHERE e.company_id = $1
        AND e.status = 'ACTIVE'
        -- never bill someone who has left. Their enrolment is still ACTIVE —
@@ -461,6 +502,7 @@ async function projectBillsForRange(
   courseId: string | undefined,
 ): Promise<any[]> {
   if (!Number.isFinite(fromKey) || !Number.isFinite(toKey) || toKey < fromKey) return [];
+  await ensureEnrollmentMonthOverrides();   // the projection joins the table
   const params: any[] = [context.companyId, fromKey, toKey];
   const conds: string[] = [];
   if (branchId) {
@@ -489,11 +531,11 @@ async function projectBillsForRange(
        ('proj-' || e.id || '-' || p.billing_year || '-' || p.billing_month) AS id,
        e.id AS enrollment_id, e.company_id, e.student_id, e.course_id, e.branch_id,
        p.billing_year, p.billing_month,
-       CASE
+       COALESCE(eo.override_price, CASE
          WHEN ov.override_price IS NOT NULL AND c.price > 0
            THEN ROUND(ov.override_price * (COALESCE(e.final_price, c.price) / c.price), 2)
          ELSE COALESCE(e.final_price, c.price)
-       END AS amount_due,
+       END) AS amount_due,
        0 AS amount_paid, 'PENDING' AS payment_status,
        p.first_day AS due_date, NULL AS paid_date, NULL AS notes,
        0 AS refunded_amount, NULL AS refund_note, NULL AS refunded_at,
@@ -514,6 +556,10 @@ async function projectBillsForRange(
        ON ov.course_id = e.course_id
       AND ov.billing_year = p.billing_year
       AND ov.billing_month = p.billing_month
+     LEFT JOIN enrollment_monthly_price_overrides eo
+       ON eo.enrollment_id = e.id
+      AND eo.billing_year = p.billing_year
+      AND eo.billing_month = p.billing_month
      LEFT JOIN monthly_subscription_payments existing
        ON existing.enrollment_id = e.id
       AND existing.billing_year = p.billing_year
@@ -1059,6 +1105,7 @@ export const monthlySubscriptionsRoutes = {
     try {
       const context = await extractTenantContext(headers.authorization);
       await ensureMonthlyInstallmentLedger();
+      await ensureEnrollmentMonthOverrides();   // the bill insert joins the table
       if (!checkGranularPermission(context, 'enrollments', 'write')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
       }
@@ -1100,17 +1147,19 @@ export const monthlySubscriptionsRoutes = {
             billing_year, billing_month, amount_due, amount_paid, payment_status, due_date)
          SELECT e.id, e.company_id, e.student_id, e.course_id, e.branch_id,
            $2::int, $3::int,
-           CASE
+           COALESCE(eo.override_price, CASE
              WHEN ov.override_price IS NOT NULL AND c.price > 0
                THEN ROUND(ov.override_price * (COALESCE(e.final_price, c.price) / c.price), 2)
              ELSE COALESCE(e.final_price, c.price)
-           END,
+           END),
            0, 'PENDING', period.first_day
          FROM enrollments e
          JOIN courses c ON c.id = e.course_id
          CROSS JOIN period
          LEFT JOIN course_monthly_price_overrides ov
            ON ov.course_id = e.course_id AND ov.billing_year = $2::int AND ov.billing_month = $3::int
+         LEFT JOIN enrollment_monthly_price_overrides eo
+           ON eo.enrollment_id = e.id AND eo.billing_year = $2::int AND eo.billing_month = $3::int
          WHERE e.id = $1 AND e.company_id = $4
            AND e.status = 'ACTIVE'
            AND c.payment_type = 'MONTHLY_SUBSCRIPTION'
@@ -1820,6 +1869,109 @@ export const monthlySubscriptionsRoutes = {
     } catch (error) {
       console.error('List price overrides error:', error);
       return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.OVERRIDE_FAILED', 'Failed to list price overrides');
+    }
+  },
+
+  /**
+   * POST /api/monthly-subscriptions/student-month-price
+   *
+   * The price ONE student pays for ONE month — a prorated first month for
+   * someone who joined mid-month, a discounted last one. Absolute, unlike the
+   * course-wide override which scales everyone. Stored as an override so a
+   * FUTURE month never needs a materialised bill: the projection reads it, and
+   * the bill is born with this figure whenever it does materialise. A bill
+   * that already exists is restated in place, keeping whatever was paid and
+   * re-deriving its status. `price: null` clears the override and puts an
+   * existing bill back on the standard fee.
+   */
+  setStudentMonthPrice: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      await ensureEnrollmentMonthOverrides();
+      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const { enrollmentId, billingYear, billingMonth, price } = body;
+      if (!Number.isInteger(billingYear) || !Number.isInteger(billingMonth) || billingMonth < 1 || billingMonth > 12) {
+        return apiError(400, 'ERRORS.MONTHLY_SUBSCRIPTIONS.BAD_PERIOD', 'Invalid billing month');
+      }
+      const newPrice = price === null || price === undefined ? null : Math.round(parseFloat(price) * 100) / 100;
+      if (newPrice !== null && !(newPrice >= 0)) {
+        return apiError(400, 'ERRORS.MONTHLY_SUBSCRIPTIONS.BAD_AMOUNT', 'Price must be zero or more');
+      }
+
+      const enr = await queryOne<any>(
+        `SELECT e.id, e.branch_id, e.final_price, e.course_id, c.price AS course_price, c.payment_type
+           FROM enrollments e JOIN courses c ON c.id = e.course_id
+          WHERE e.id = $1 AND e.company_id = $2`,
+        [enrollmentId, context.companyId]
+      );
+      if (!enr) return apiError(404, 'ERRORS.MONTHLY_SUBSCRIPTIONS.NOT_FOUND', 'Enrollment not found');
+      if (!canAccessBranch(context, enr.branch_id)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+      if (enr.payment_type !== 'MONTHLY_SUBSCRIPTION') {
+        return apiError(400, 'ERRORS.MONTHLY_SUBSCRIPTIONS.NOT_MONTHLY', 'Not a monthly subscription');
+      }
+
+      if (newPrice === null) {
+        await query(
+          `DELETE FROM enrollment_monthly_price_overrides
+            WHERE enrollment_id = $1 AND billing_year = $2 AND billing_month = $3 AND company_id = $4`,
+          [enrollmentId, billingYear, billingMonth, context.companyId]
+        );
+      } else {
+        await query(
+          `INSERT INTO enrollment_monthly_price_overrides
+             (company_id, enrollment_id, billing_year, billing_month, override_price)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (enrollment_id, billing_year, billing_month)
+           DO UPDATE SET override_price = EXCLUDED.override_price, updated_at = NOW()`,
+          [context.companyId, enrollmentId, billingYear, billingMonth, newPrice]
+        );
+      }
+
+      // Restate the bill that already exists (nothing to do when the month has
+      // not materialised — it will be born with the right figure). Clearing
+      // recomputes the standard amount the same way ensureBillsForMonth would.
+      // REFUNDED bills are terminal and stay untouched.
+      const updated = await query(
+        `UPDATE monthly_subscription_payments msp
+            SET amount_due = COALESCE($5::numeric, CASE
+                  WHEN ov.override_price IS NOT NULL AND c.price > 0
+                    THEN ROUND(ov.override_price * (COALESCE(e.final_price, c.price) / c.price), 2)
+                  ELSE COALESCE(e.final_price, c.price)
+                END),
+                payment_status = CASE
+                  WHEN COALESCE($5::numeric, CASE
+                        WHEN ov.override_price IS NOT NULL AND c.price > 0
+                          THEN ROUND(ov.override_price * (COALESCE(e.final_price, c.price) / c.price), 2)
+                        ELSE COALESCE(e.final_price, c.price)
+                      END) <= msp.amount_paid THEN 'PAID'
+                  WHEN msp.amount_paid > 0 THEN 'PARTIAL'
+                  ELSE 'PENDING'
+                END,
+                paid_date = CASE
+                  WHEN COALESCE($5::numeric, 999999999) <= msp.amount_paid THEN COALESCE(msp.paid_date, CURRENT_DATE)
+                  ELSE msp.paid_date
+                END,
+                updated_at = NOW()
+           FROM enrollments e
+           JOIN courses c ON c.id = e.course_id
+           LEFT JOIN course_monthly_price_overrides ov
+             ON ov.course_id = e.course_id AND ov.billing_year = $2 AND ov.billing_month = $3
+          WHERE e.id = msp.enrollment_id
+            AND msp.enrollment_id = $1 AND msp.billing_year = $2 AND msp.billing_month = $3
+            AND msp.company_id = $4 AND msp.payment_status <> 'REFUNDED'
+          RETURNING msp.id`,
+        [enrollmentId, billingYear, billingMonth, context.companyId, newPrice]
+      );
+
+      return { status: 200 as const, body: { updatedBill: (updated as any[]).length > 0 } };
+    } catch (error) {
+      console.error('Set student month price error:', error);
+      return mapThrownError(error, 'ERRORS.MONTHLY_SUBSCRIPTIONS.OVERRIDE_FAILED', 'Failed to set the month price');
     }
   },
 };

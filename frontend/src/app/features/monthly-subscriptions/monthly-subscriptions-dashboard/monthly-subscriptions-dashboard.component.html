@@ -461,6 +461,19 @@
               @if (p.enrollmentStatus === 'DROPPED') {
                 <p-tag [value]="'MONTHLY_SUBSCRIPTIONS.CANCELLED' | translate" severity="secondary"></p-tag>
               }
+              <!-- One student, one month, one price — a prorated first month, a
+                   discounted last one. Bundle bills have no enrollment to hang
+                   the override on; refunded bills are terminal. -->
+              @if (p.enrollmentId && p.paymentStatus !== 'REFUNDED') {
+                <p-button
+                  icon="pi pi-pencil"
+                  [text]="true"
+                  [rounded]="true"
+                  severity="secondary"
+                  [pTooltip]="'MONTHLY_SUBSCRIPTIONS.MONTH_PRICE' | translate"
+                  (onClick)="openMonthPriceDialog(p)"
+                ></p-button>
+              }
             </div>
           </td>
         </tr>
@@ -905,6 +918,51 @@
         (onClick)="saveOverride()"
       ></p-button>
     </div>
+  </ng-template>
+</p-dialog>
+
+<!-- One student's price for one month — absolute, unlike the course-wide
+     override that scales everyone. -->
+<p-dialog
+  [visible]="showMonthPrice()"
+  (visibleChange)="$event ? null : closeMonthPriceDialog()"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: '26rem', maxWidth: '95vw' }"
+  [header]="'MONTHLY_SUBSCRIPTIONS.MONTH_PRICE_TITLE' | translate"
+>
+  @if (monthPriceTarget(); as t) {
+    <div class="space-y-3">
+      <p class="text-sm text-gray-600">
+        {{ t.studentName }} · {{ t.courseName }} · {{ periodLabel(t) }}
+      </p>
+      <p class="text-xs text-gray-500">{{ 'MONTHLY_SUBSCRIPTIONS.MONTH_PRICE_HINT' | translate }}</p>
+      <p-inputnumber
+        [ngModel]="monthPriceValue()"
+        (ngModelChange)="monthPriceValue.set($event)"
+        [min]="0"
+        mode="decimal"
+        [maxFractionDigits]="2"
+        styleClass="w-full"
+        inputStyleClass="w-full"
+      ></p-inputnumber>
+    </div>
+  }
+  <ng-template pTemplate="footer">
+    <p-button
+      [label]="'MONTHLY_SUBSCRIPTIONS.MONTH_PRICE_RESET' | translate"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="savingMonthPrice()"
+      (onClick)="saveMonthPrice(null)"
+    ></p-button>
+    <p-button
+      [label]="'MONTHLY_SUBSCRIPTIONS.MONTH_PRICE_SAVE' | translate"
+      icon="pi pi-check"
+      [loading]="savingMonthPrice()"
+      [disabled]="monthPriceValue() === null"
+      (onClick)="saveMonthPrice(monthPriceValue())"
+    ></p-button>
   </ng-template>
 </p-dialog>
 

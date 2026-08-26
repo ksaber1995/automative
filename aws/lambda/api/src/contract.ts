@@ -8788,6 +8788,27 @@ export const contract = c.router({
         403: ApiErrorSchema,
       },
     },
+    // A price for ONE student's ONE month — a prorated first month for someone
+    // who joined mid-month, a discounted last one. Absolute, not scaled: staff
+    // types exactly what this student pays for that month. Works for future
+    // months too (the projection reads it) without materialising a future bill.
+    setStudentMonthPrice: {
+      method: 'POST' as const,
+      path: '/api/monthly-subscriptions/student-month-price',
+      body: z.object({
+        enrollmentId: UUIDSchema,
+        billingYear: z.number().int(),
+        billingMonth: z.number().int().min(1).max(12),
+        /** null clears the override — the month goes back to the normal fee. */
+        price: z.number().min(0).nullable(),
+      }),
+      responses: {
+        200: z.object({ updatedBill: z.boolean() }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
   },
 
   // ============================================================

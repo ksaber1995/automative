@@ -92,6 +92,11 @@ export class MonthlySubscriptionsService {
     return this.http.post<any>(`${this.base}/collect`, dto);
   }
 
+  /** One student's price for one month; price null puts it back on the standard fee. */
+  setStudentMonthPrice(dto: { enrollmentId: string; billingYear: number; billingMonth: number; price: number | null }): Observable<{ updatedBill: boolean }> {
+    return this.http.post<{ updatedBill: boolean }>(`${this.base}/student-month-price`, dto);
+  }
+
   voidPayment(id: string, reason?: string): Observable<any> {
     return this.http.post<any>(`${this.base}/${id}/void`, { reason });
   }

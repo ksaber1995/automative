@@ -1050,6 +1050,46 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   }
 
   /** "March 2026" style label for a payment row's billing period. */
+  // ── One student's price for one month ───────────────────────────────────────
+  showMonthPrice = signal(false);
+  monthPriceTarget = signal<MonthlyPaymentWithDetails | null>(null);
+  monthPriceValue = signal<number | null>(null);
+  savingMonthPrice = signal(false);
+
+  openMonthPriceDialog(p: MonthlyPaymentWithDetails) {
+    this.monthPriceTarget.set(p);
+    this.monthPriceValue.set(p.amountDue ?? null);
+    this.showMonthPrice.set(true);
+  }
+
+  closeMonthPriceDialog() {
+    if (this.savingMonthPrice()) return;
+    this.showMonthPrice.set(false);
+    this.monthPriceTarget.set(null);
+  }
+
+  /** price null = clear the override, back to the standard fee. */
+  saveMonthPrice(price: number | null) {
+    const t = this.monthPriceTarget();
+    if (!t?.enrollmentId) return;
+    this.savingMonthPrice.set(true);
+    this.svc.setStudentMonthPrice({
+      enrollmentId: t.enrollmentId,
+      billingYear: t.billingYear,
+      billingMonth: t.billingMonth,
+      price,
+    }).pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        this.savingMonthPrice.set(false);
+        this.showMonthPrice.set(false);
+        this.monthPriceTarget.set(null);
+        this.notify.success(this.translate.instant('MONTHLY_SUBSCRIPTIONS.MONTH_PRICE_SAVED'));
+        this.loadData();
+      },
+      error: () => this.savingMonthPrice.set(false),   // interceptor toasted it
+    });
+  }
+
   periodLabel(p: { billingMonth: number; billingYear: number }): string {
     return `${this.getMonthName(p.billingMonth)} ${p.billingYear}`;
   }

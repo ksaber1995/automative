@@ -305,6 +305,7 @@ const router = {
     getPriceOverride: monthlySubscriptionsRoutes.getPriceOverride,
     deletePriceOverride: monthlySubscriptionsRoutes.deletePriceOverride,
     listPriceOverrides: monthlySubscriptionsRoutes.listPriceOverrides,
+    setStudentMonthPrice: monthlySubscriptionsRoutes.setStudentMonthPrice,
   },
   sessionPayments: {
     list: sessionPaymentsRoutes.list,
