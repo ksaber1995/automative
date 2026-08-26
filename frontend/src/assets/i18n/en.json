@@ -6485,6 +6485,8 @@
       "MASTER": "Bundle payment"
     },
     "PAY_AND_PRINT": "Pay & print",
+    "PAY_AND_PDF": "Pay & PDF",
+    "DIGITAL_RECEIPT": "Digital receipt (PDF)",
     "LIST": {
       "TITLE": "Receipts",
       "SUBTITLE": "Every receipt issued — find one and print it again",

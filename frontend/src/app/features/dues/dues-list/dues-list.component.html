@@ -167,7 +167,8 @@
                 (onClick)="openPaymentDialog(due)"
               ></p-button>
               <!-- Reprints the last slip behind this due (they are usually
-                   part-paid, so there is normally one). -->
+                   part-paid, so there is normally one) — on paper or as the
+                   digital PDF to send instead. -->
               <p-button
                 icon="pi pi-print"
                 [rounded]="true"
@@ -175,7 +176,16 @@
                 severity="secondary"
                 [loading]="printingFor() === due.id"
                 [pTooltip]="'DUES.LIST.PRINT_RECEIPT' | translate"
-                (onClick)="printReceipt(due)"
+                (onClick)="printReceipt(due, 'print')"
+              ></p-button>
+              <p-button
+                icon="pi pi-file-pdf"
+                [rounded]="true"
+                [text]="true"
+                severity="secondary"
+                [loading]="printingFor() === due.id"
+                [pTooltip]="'RECEIPT.DIGITAL_RECEIPT' | translate"
+                (onClick)="printReceipt(due, 'download')"
               ></p-button>
               <p-button
                 icon="pi pi-user"
@@ -276,11 +286,17 @@
 
   <ng-template pTemplate="footer">
     <button pButton [label]="'DUES.LIST.CANCEL' | translate" class="p-button-text" (click)="showPaymentDialog = false"></button>
+    <button pButton [label]="'RECEIPT.PAY_AND_PDF' | translate" icon="pi pi-file-pdf"
+      class="p-button-outlined p-button-secondary"
+      [loading]="actionLoading()"
+      [disabled]="!paymentAmount || paymentAmount <= 0"
+      (click)="submitPayment('download')">
+    </button>
     <button pButton [label]="'RECEIPT.PAY_AND_PRINT' | translate" icon="pi pi-print"
       class="p-button-outlined p-button-secondary"
       [loading]="actionLoading()"
       [disabled]="!paymentAmount || paymentAmount <= 0"
-      (click)="submitPayment(true)">
+      (click)="submitPayment('print')">
     </button>
     <button pButton [label]="'DUES.LIST.RECORD_PAYMENT' | translate" icon="pi pi-check"
       [loading]="actionLoading()"

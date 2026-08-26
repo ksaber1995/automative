@@ -73,10 +73,13 @@ export class ReceiptComponent implements OnInit {
 
   /** Set by ?print=1 — the app opens it this way straight after taking money. */
   autoPrint = false;
+  /** Set by ?download=1 — the digital copy instead of paper: save the PDF on arrival. */
+  autoDownload = false;
 
   ngOnInit(): void {
     const token = this.route.snapshot.paramMap.get('token') || '';
     this.autoPrint = this.route.snapshot.queryParamMap.get('print') === '1';
+    this.autoDownload = this.route.snapshot.queryParamMap.get('download') === '1';
     if (!token) { this.loading.set(false); this.error.set(true); return; }
 
     this.api.get<PaymentReceipt>(`public/receipts/${token}`).subscribe({
@@ -87,6 +90,7 @@ export class ReceiptComponent implements OnInit {
         // Give the QR image a paint before the print dialog freezes the page,
         // or the slip prints with an empty square where the code should be.
         if (this.autoPrint) setTimeout(() => window.print(), 350);
+        else if (this.autoDownload) setTimeout(() => this.download(), 350);
       },
       error: () => { this.loading.set(false); this.error.set(true); },
     });

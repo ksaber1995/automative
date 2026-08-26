@@ -161,13 +161,13 @@ export class SessionPayDialogComponent {
    * Confirm: pay this session, or buy the package (covers this charge too).
    * Printing is OPT-IN — most collections are never printed.
    */
-  pay(print = false): void {
+  pay(receiptMode: false | 'print' | 'download' = false): void {
     if (this.mode() === 'PACKAGE') {
-      this.buyPackage(print);
+      this.buyPackage(receiptMode);
       return;
     }
     if (this.mode() === 'SETTLE') {
-      this.settleBundle(print);
+      this.settleBundle(receiptMode);
       return;
     }
     const c = this.current();
@@ -182,14 +182,14 @@ export class SessionPayDialogComponent {
         this.submitting.set(false);
         this.notify.success(this.translate.instant('SESSION_PAYMENTS.PAY_SUCCESS'));
         this.settled.emit();
-        if (print) this.receiptService.openPrint(res?.receipt);
+        if (receiptMode) this.receiptService.open(res?.receipt, receiptMode);
         this.advance();
       },
       error: () => { this.submitting.set(false); },
     });
   }
 
-  buyPackage(print = false): void {
+  buyPackage(receiptMode: false | 'print' | 'download' = false): void {
     const c = this.current();
     if (!c) return;
     this.submitting.set(true);
@@ -202,7 +202,7 @@ export class SessionPayDialogComponent {
         this.submitting.set(false);
         this.notify.success(this.translate.instant('SESSION_PAYMENTS.PACKAGE_SUCCESS'));
         this.settled.emit();
-        if (print) this.receiptService.openPrint(res?.receipt);
+        if (receiptMode) this.receiptService.open(res?.receipt, receiptMode);
         this.advance();
       },
       error: () => { this.submitting.set(false); },
@@ -218,7 +218,7 @@ export class SessionPayDialogComponent {
    * session. payPackage credits the bundle, which settles every session it
    * covers, including this one.
    */
-  settleBundle(print = false): void {
+  settleBundle(receiptMode: false | 'print' | 'download' = false): void {
     const c = this.current();
     if (!c || !c.packageId || this.amount() == null) return;
     this.submitting.set(true);
@@ -231,7 +231,7 @@ export class SessionPayDialogComponent {
         this.submitting.set(false);
         this.notify.success(this.translate.instant('SESSION_PAYMENTS.PAY_SUCCESS'));
         this.settled.emit();
-        if (print) this.receiptService.openPrint(res?.receipt);
+        if (receiptMode) this.receiptService.open(res?.receipt, receiptMode);
         this.advance();
       },
       error: () => { this.submitting.set(false); },

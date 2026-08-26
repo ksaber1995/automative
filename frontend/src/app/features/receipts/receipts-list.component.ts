@@ -62,6 +62,11 @@ export class ReceiptsListComponent implements OnInit {
     this.receiptService.openPrint(r);
   }
 
+  /** The digital copy — same receipt, saved as a PDF to send instead of paper. */
+  download(r: PaymentReceipt) {
+    this.receiptService.openDownload(r);
+  }
+
   /** Open the receipt without going to the printer — what the QR resolves to. */
   view(r: PaymentReceipt) {
     window.open(`/r/${r.publicToken}`, '_blank');

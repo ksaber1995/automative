@@ -225,7 +225,10 @@
                 @if ((row.amountPaid || 0) > 0) {
                   <p-button icon="pi pi-print" severity="secondary" [outlined]="true" size="small"
                     [loading]="printingId() === row.id"
-                    [pTooltip]="'RECEIPT.PRINT' | translate" (onClick)="printReceipt(row)"></p-button>
+                    [pTooltip]="'RECEIPT.PRINT' | translate" (onClick)="printReceipt(row, 'print')"></p-button>
+                  <p-button icon="pi pi-file-pdf" severity="secondary" [outlined]="true" size="small"
+                    [loading]="printingId() === row.id"
+                    [pTooltip]="'RECEIPT.DIGITAL_RECEIPT' | translate" (onClick)="printReceipt(row, 'download')"></p-button>
                 }
                 @if (row.paymentStatus === 'PAID' && canRefund()) {
                   <p-button icon="pi pi-times" severity="secondary" size="small" [pTooltip]="'SESSION_PAYMENTS.VOID_BTN' | translate" (onClick)="openVoid(row)"></p-button>
@@ -356,7 +359,10 @@
                   @if ((row.p.amountPaid || 0) > 0) {
                     <p-button icon="pi pi-print" severity="secondary" [outlined]="true" size="small"
                       [loading]="printingId() === row.p.id"
-                      [pTooltip]="'RECEIPT.PRINT' | translate" (onClick)="printPackageReceipt(row.p)"></p-button>
+                      [pTooltip]="'RECEIPT.PRINT' | translate" (onClick)="printPackageReceipt(row.p, 'print')"></p-button>
+                    <p-button icon="pi pi-file-pdf" severity="secondary" [outlined]="true" size="small"
+                      [loading]="printingId() === row.p.id"
+                      [pTooltip]="'RECEIPT.DIGITAL_RECEIPT' | translate" (onClick)="printPackageReceipt(row.p, 'download')"></p-button>
                   }
                   @if (row.p.status !== 'REFUNDED' && (row.p.amountPaid || 0) - (row.p.refundedAmount || 0) > 0 && canRefund()) {
                     <p-button icon="pi pi-replay" severity="danger" size="small" [outlined]="true" [pTooltip]="'SESSION_PAYMENTS.REFUND_BTN' | translate" (onClick)="openPackageRefund(row.p)"></p-button>

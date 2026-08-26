@@ -61,9 +61,12 @@
           </td>
           <td>
             <div class="flex gap-2">
-              <!-- Reprints the SAME receipt — same number, same QR. -->
+              <!-- Reprints the SAME receipt — same number, same QR — on paper
+                   or as the digital PDF to send instead. -->
               <p-button icon="pi pi-print" [rounded]="true" [text]="true"
                 [pTooltip]="'RECEIPT.LIST.PRINT' | translate" (onClick)="print(r)"></p-button>
+              <p-button icon="pi pi-file-pdf" [rounded]="true" [text]="true" severity="secondary"
+                [pTooltip]="'RECEIPT.DIGITAL_RECEIPT' | translate" (onClick)="download(r)"></p-button>
               <p-button icon="pi pi-external-link" [rounded]="true" [text]="true" severity="secondary"
                 [pTooltip]="'RECEIPT.LIST.VIEW' | translate" (onClick)="view(r)"></p-button>
             </div>

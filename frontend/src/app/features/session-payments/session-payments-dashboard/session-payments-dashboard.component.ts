@@ -600,15 +600,15 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
    * It reprints the receipt that was already issued; it never creates one, so a
    * payment collected before receipts existed reports that instead.
    */
-  printReceipt(row: SessionPaymentWithDetails): void {
-    this.printFor('SESSION', row.id);
+  printReceipt(row: SessionPaymentWithDetails, mode: 'print' | 'download' = 'print'): void {
+    this.printFor('SESSION', row.id, mode);
   }
 
-  printPackageReceipt(p: SessionPackageWithDetails): void {
-    this.printFor('PACKAGE', p.id);
+  printPackageReceipt(p: SessionPackageWithDetails, mode: 'print' | 'download' = 'print'): void {
+    this.printFor('PACKAGE', p.id, mode);
   }
 
-  private printFor(sourceType: ReceiptSourceType, sourceId: string): void {
+  private printFor(sourceType: ReceiptSourceType, sourceId: string, mode: 'print' | 'download' = 'print'): void {
     if (this.printingId()) return;
     this.printingId.set(sourceId);
     this.receiptService.bySource(sourceType, sourceId).subscribe({
@@ -619,7 +619,7 @@ export class SessionPaymentsDashboardComponent implements OnInit, OnDestroy {
           this.notify.info(this.translate.instant('RECEIPT.NONE_FOR_PAYMENT'));
           return;
         }
-        this.receiptService.openPrint(receipt);
+        this.receiptService.open(receipt, mode);
       },
       error: () => this.printingId.set(null),
     });

@@ -80,8 +80,10 @@ import { dueItemLabel } from './student-dues.util';
         <!-- Its own key, not the un-check dialog's "Keep present": dismissing a
              collection is skipping the payment, and says nothing about attendance. -->
         <p-button [label]="'SESSION_ATTENDANCE.COLLECT_SKIP' | translate" [text]="true" severity="secondary" (onClick)="close()"></p-button>
+        <p-button [label]="'RECEIPT.PAY_AND_PDF' | translate" icon="pi pi-file-pdf" [outlined]="true"
+          [disabled]="!amount || submitting()" (onClick)="submit('download')"></p-button>
         <p-button [label]="'SESSION_ATTENDANCE.COLLECT_PRINT' | translate" icon="pi pi-print" [outlined]="true"
-          [disabled]="!amount || submitting()" (onClick)="submit(true)"></p-button>
+          [disabled]="!amount || submitting()" (onClick)="submit('print')"></p-button>
         <p-button [label]="'SESSION_ATTENDANCE.COLLECT_CONFIRM' | translate" icon="pi pi-check"
           [loading]="submitting()" [disabled]="!amount" (onClick)="submit()"></p-button>
       </ng-template>
@@ -128,7 +130,7 @@ export class DuesCollectDialogComponent {
     this.item.set(null);
   }
 
-  submit(print = false): void {
+  submit(receiptMode: false | 'print' | 'download' = false): void {
     const it = this.item();
     const amount = this.amount;
     if (!it || !amount || amount <= 0 || this.submitting()) return;
@@ -164,7 +166,7 @@ export class DuesCollectDialogComponent {
         this.close();
         this.notify.success(this.translate.instant('SESSION_ATTENDANCE.DUES_PAID'));
         this.collected.emit();
-        if (print) this.receiptService.openPrint(res?.receipt);
+        if (receiptMode) this.receiptService.open(res?.receipt, receiptMode);
       },
       error: () => {
         // Interceptor toasted the translated error.

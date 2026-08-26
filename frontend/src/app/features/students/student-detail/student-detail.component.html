@@ -1738,7 +1738,9 @@
             </td>
             <td>
               <p-button icon="pi pi-print" [rounded]="true" [text]="true"
-                [pTooltip]="'RECEIPT.LIST.PRINT' | translate" (onClick)="printReceipt(r)"></p-button>
+                [pTooltip]="'RECEIPT.LIST.PRINT' | translate" (onClick)="printReceipt(r, 'print')"></p-button>
+              <p-button icon="pi pi-file-pdf" [rounded]="true" [text]="true"
+                [pTooltip]="'RECEIPT.DIGITAL_RECEIPT' | translate" (onClick)="printReceipt(r, 'download')"></p-button>
             </td>
           </tr>
         </ng-template>
@@ -1902,10 +1904,13 @@
   </div>
   <ng-template pTemplate="footer">
     <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showPaymentDialog = false"></p-button>
-    <!-- Printing is the deliberate action; most collections are never printed. -->
+    <!-- A receipt is the deliberate action — paper or the digital PDF to send. -->
+    <p-button [label]="'RECEIPT.PAY_AND_PDF' | translate" icon="pi pi-file-pdf" severity="secondary" [outlined]="true"
+      [loading]="actionLoading()" [disabled]="!dialogPaymentAmount || !dialogPaymentDate"
+      (onClick)="submitPayment('download')"></p-button>
     <p-button [label]="'RECEIPT.PAY_AND_PRINT' | translate" icon="pi pi-print" severity="secondary" [outlined]="true"
       [loading]="actionLoading()" [disabled]="!dialogPaymentAmount || !dialogPaymentDate"
-      (onClick)="submitPayment(true)"></p-button>
+      (onClick)="submitPayment('print')"></p-button>
     <p-button [label]="'STUDENTS.DETAIL.RECORD_PAYMENT' | translate" icon="pi pi-check" [loading]="actionLoading()"
       [disabled]="!dialogPaymentAmount || !dialogPaymentDate"
       (onClick)="submitPayment()"></p-button>
@@ -1975,9 +1980,12 @@
   </div>
   <ng-template pTemplate="footer">
     <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true" (onClick)="showMonthlyPayDialog = false"></p-button>
+    <p-button [label]="'RECEIPT.PAY_AND_PDF' | translate" icon="pi pi-file-pdf" severity="secondary" [outlined]="true"
+      [loading]="actionLoading()" [disabled]="!monthlyDialogAmount || !monthlyDialogDate"
+      (onClick)="submitMonthlyPayment('download')"></p-button>
     <p-button [label]="'RECEIPT.PAY_AND_PRINT' | translate" icon="pi pi-print" severity="secondary" [outlined]="true"
       [loading]="actionLoading()" [disabled]="!monthlyDialogAmount || !monthlyDialogDate"
-      (onClick)="submitMonthlyPayment(true)"></p-button>
+      (onClick)="submitMonthlyPayment('print')"></p-button>
     <p-button [label]="'STUDENTS.DETAIL.RECORD_PAYMENT' | translate" icon="pi pi-check" [loading]="actionLoading()"
       [disabled]="!monthlyDialogAmount || !monthlyDialogDate"
       (onClick)="submitMonthlyPayment()"></p-button>

@@ -94,11 +94,16 @@
     <!-- Three buttons do not fit a phone in one row; the footer itself never wraps. -->
     <div class="flex flex-wrap justify-end gap-2">
       <p-button [label]="'SESSION_PAYMENTS.SKIP_LEAVE_DUE' | translate" severity="secondary" [outlined]="true" (onClick)="skip()" [disabled]="submitting()"></p-button>
-      <!-- Printing is the deliberate action; most collections are never printed. -->
+      <!-- A receipt is the deliberate action — paper or the digital PDF to
+           send; most collections take neither. -->
+      <p-button
+        [label]="'RECEIPT.PAY_AND_PDF' | translate"
+        icon="pi pi-file-pdf" severity="secondary" [outlined]="true"
+        (onClick)="pay('download')" [loading]="submitting()"></p-button>
       <p-button
         [label]="'RECEIPT.PAY_AND_PRINT' | translate"
         icon="pi pi-print" severity="secondary" [outlined]="true"
-        (onClick)="pay(true)" [loading]="submitting()"></p-button>
+        (onClick)="pay('print')" [loading]="submitting()"></p-button>
       <p-button
         [label]="(mode() === 'PACKAGE' ? 'SESSION_PAYMENTS.PAY_PACKAGE_SUBMIT'
                   : mode() === 'SETTLE' ? 'SESSION_PAYMENTS.SETTLE_BUNDLE_SUBMIT'

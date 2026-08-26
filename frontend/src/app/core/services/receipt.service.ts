@@ -30,17 +30,27 @@ export class ReceiptService {
   }
 
   /**
-   * Open a receipt and go straight to the printer.
+   * Open a receipt and go straight to the printer — or straight to the PDF.
    *
    * A new tab rather than an in-page dialog: `window.print()` prints the WHOLE
    * document, so printing from a dialog would put the dashboard behind it on the
    * paper. The receipt page owns the print stylesheet and nothing else is on it.
    *
-   * Same URL the QR encodes, so the slip and the scan always agree.
+   * Same URL the QR encodes, so the slip and the scan always agree. 'download'
+   * lands on the same page but auto-saves the PDF copy instead of opening the
+   * print dialog — the digital slip to send over WhatsApp instead of paper.
    */
-  openPrint(receipt: ReceiptStub | null | undefined): void {
+  open(receipt: ReceiptStub | null | undefined, mode: 'print' | 'download'): void {
     if (!receipt?.publicToken) return;
-    window.open(`/r/${receipt.publicToken}?print=1`, '_blank');
+    window.open(`/r/${receipt.publicToken}?${mode === 'download' ? 'download=1' : 'print=1'}`, '_blank');
+  }
+
+  openPrint(receipt: ReceiptStub | null | undefined): void {
+    this.open(receipt, 'print');
+  }
+
+  openDownload(receipt: ReceiptStub | null | undefined): void {
+    this.open(receipt, 'download');
   }
 
   /** The shareable link for a receipt (no auto-print) — what the QR resolves to. */

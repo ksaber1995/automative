@@ -205,8 +205,8 @@ export class DuesListComponent implements OnInit {
     this.showPaymentDialog = true;
   }
 
-  /** Printing is OPT-IN — see the two dialog buttons. */
-  submitPayment(print = false) {
+  /** A receipt is OPT-IN — printed or as the digital PDF; see the dialog buttons. */
+  submitPayment(receiptMode: false | 'print' | 'download' = false) {
     const due = this.selectedDue();
     if (!due || !this.paymentAmount || !this.paymentDate) return;
 
@@ -230,8 +230,8 @@ export class DuesListComponent implements OnInit {
         this.showPaymentDialog = false;
         this.actionLoading.set(false);
         this.load();
-        // Straight to the printer while the payer is still at the desk.
-        if (print) this.receiptService.openPrint(res?.receipt);
+        // Straight to the printer (or the PDF) while the payer is still at the desk.
+        if (receiptMode) this.receiptService.open(res?.receipt, receiptMode);
       },
       error: () => {
         // Interceptor toasted the translated error.
@@ -253,7 +253,7 @@ export class DuesListComponent implements OnInit {
    * enrolment), so it falls back to that student's most recent receipt of the
    * same kind, which at a front desk is the one being asked for.
    */
-  printReceipt(due: DueEnrollment) {
+  printReceipt(due: DueEnrollment, mode: 'print' | 'download' = 'print') {
     const wanted = due.type === 'MASTER_ENROLLMENT' ? 'MASTER'
       : due.type === 'MONTHLY' ? 'MONTHLY'
       : due.type === 'SESSION' ? 'SESSION'
@@ -269,7 +269,7 @@ export class DuesListComponent implements OnInit {
           this.notificationService.error(this.translate.instant('DUES.LIST.NO_RECEIPT'));
           return;
         }
-        this.receiptService.openPrint(hit);
+        this.receiptService.open(hit, mode);
       },
       error: () => this.printingFor.set(null),
     });

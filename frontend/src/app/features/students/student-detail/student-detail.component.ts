@@ -769,7 +769,7 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
   }
 
   /** Reprint: the SAME receipt — same number, same QR, never a new one. */
-  printReceipt(r: PaymentReceipt) { this.receiptService.openPrint(r); }
+  printReceipt(r: PaymentReceipt, mode: 'print' | 'download' = 'print') { this.receiptService.open(r, mode); }
 
   receiptStatusKey(r: PaymentReceipt): string {
     if (r.voidedAt) return 'RECEIPT.VOIDED';
@@ -911,7 +911,7 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
   }
 
   /** Printing is OPT-IN — see the two dialog buttons. */
-  submitMonthlyPayment(print = false) {
+  submitMonthlyPayment(receiptMode: false | 'print' | 'download' = false) {
     const payment = this.monthlyForAction();
     if (!payment || !this.monthlyDialogAmount || !this.monthlyDialogDate) return;
     this.actionLoading.set(true);
@@ -931,7 +931,7 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
         this.showMonthlyPayDialog = false;
         this.actionLoading.set(false);
         if (this.studentId) this.loadMonthlySubscriptions(this.studentId);
-        if (print) this.receiptService.openPrint(res?.receipt);
+        if (receiptMode) this.receiptService.open(res?.receipt, receiptMode);
         if (this.studentId) this.loadReceipts(this.studentId);
       },
       error: () => {
@@ -1192,7 +1192,7 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
   }
 
   /** Printing is OPT-IN — see the two dialog buttons. */
-  submitPayment(print = false) {
+  submitPayment(receiptMode: false | 'print' | 'download' = false) {
     const enrollment = this.enrollmentForAction();
     if (!enrollment || !this.dialogPaymentAmount || !this.dialogPaymentDate) return;
 
@@ -1209,7 +1209,7 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
         this.showPaymentDialog = false;
         this.actionLoading.set(false);
         this.loadEnrollments(this.studentId!);
-        if (print) this.receiptService.openPrint(res?.receipt);
+        if (receiptMode) this.receiptService.open(res?.receipt, receiptMode);
         if (this.studentId) this.loadReceipts(this.studentId);
       },
       error: () => {

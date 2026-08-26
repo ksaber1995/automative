@@ -664,7 +664,7 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
    * printed, so the plain confirm must not fling a print tab at the user
    * every single time.
    */
-  confirmPayment(print = false): void {
+  confirmPayment(receiptMode: false | 'print' | 'download' = false): void {
     const sel = this.selectedPayment();
     if (!sel || this.payAmount <= 0) return;
     // Capture before closePayDialog() clears the scan context.
@@ -695,8 +695,8 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
         this.notify.success(this.translate.instant('MONTHLY_SUBSCRIPTIONS.PAYMENT_RECORDED'));
         if (alsoMarkPresent) this.markPresentForSession(session!, token);
         this.loadData();
-        // Straight to the printer while the payer is still at the desk.
-        if (print) this.receiptService.openPrint(res?.receipt);
+        // Straight to the printer (or the PDF) while the payer is still at the desk.
+        if (receiptMode) this.receiptService.open(res?.receipt, receiptMode);
       },
       error: () => {
         this.payingId.set(null);

@@ -579,8 +579,18 @@
         [outlined]="true"
         (onClick)="closePayDialog()"
       ></p-button>
-      <!-- Two ways to finish: most collections are never printed, so plain
-           confirm is the primary action and printing is the deliberate one. -->
+      <!-- Three ways to finish: most collections take no receipt at all, so
+           plain confirm is the primary action; paper and the digital PDF (to
+           send over WhatsApp) are the deliberate ones. -->
+      <p-button
+        [label]="'RECEIPT.PAY_AND_PDF' | translate"
+        icon="pi pi-file-pdf"
+        severity="secondary"
+        [outlined]="true"
+        [loading]="payingId() !== null"
+        [disabled]="payAmount <= 0"
+        (onClick)="confirmPayment('download')"
+      ></p-button>
       <p-button
         [label]="'RECEIPT.PAY_AND_PRINT' | translate"
         icon="pi pi-print"
@@ -588,7 +598,7 @@
         [outlined]="true"
         [loading]="payingId() !== null"
         [disabled]="payAmount <= 0"
-        (onClick)="confirmPayment(true)"
+        (onClick)="confirmPayment('print')"
       ></p-button>
       <p-button
         [label]="'MONTHLY_SUBSCRIPTIONS.CONFIRM' | translate"
