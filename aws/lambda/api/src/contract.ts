@@ -6406,6 +6406,14 @@ export const contract = c.router({
             distributedAdjustments: z.number().optional(),
             cash: z.number(),
           })),
+          /** Student money attributed to each teacher's classes (net of refund
+           *  columns). Informational: products/events/expenses have no teacher,
+           *  so these do not sum to the drawer. */
+          byTeacher: z.array(z.object({
+            teacherId: UUIDSchema,
+            teacherName: z.string(),
+            total: z.number(),
+          })).optional(),
         }),
       },
     },

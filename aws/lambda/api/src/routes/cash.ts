@@ -240,6 +240,74 @@ export async function computeTotalCash(companyId: string, scoped: string[] | nul
   return baseCashOf(aggs) + adj.overall;
 }
 
+/**
+ * Student money attributed to each teacher's classes, all-time and net of the
+ * refund columns — the same running-total semantics the drawer uses.
+ *
+ * Attribution follows the rule the rest of the app settled on: the class's own
+ * instructor, else the course's. Money with no teacher to point at (products,
+ * events, bundles, unassigned classes) is simply absent — this card answers
+ * "how much did each teacher's classes bring in", not "where is every pound",
+ * so the rows deliberately do NOT sum to the drawer.
+ *
+ * Best-effort: an optional breakdown must never fail the cash page (the
+ * per-session tables may not have self-applied on a fresh install).
+ */
+async function fetchCashByTeacher(
+  companyId: string,
+  scoped: string[] | null,
+): Promise<{ teacherId: string; teacherName: string; total: number }[]> {
+  try {
+    const params: any[] = [companyId];
+    const scopeClause = scoped === null ? '' : buildBranchInClause('src.branch_id', params, scoped);
+    const rows = await query(
+      `SELECT emp.id AS teacher_id,
+              NULLIF(TRIM(CONCAT(emp.first_name, ' ', emp.last_name)), '') AS teacher_name,
+              SUM(src.amount) AS total
+       FROM (
+         SELECT e.id AS enrollment_id, e.branch_id,
+                (e.amount_paid - COALESCE(e.total_refunded, 0)) AS amount
+           FROM enrollments e
+          WHERE e.company_id = $1 AND e.amount_paid > 0
+         UNION ALL
+         SELECT m.enrollment_id, m.branch_id,
+                (m.amount_paid - COALESCE(m.refunded_amount, 0))
+           FROM monthly_subscription_payments m
+          WHERE m.company_id = $1 AND m.amount_paid > 0 AND m.enrollment_id IS NOT NULL
+         UNION ALL
+         SELECT sp.enrollment_id, sp.branch_id,
+                (sp.amount_paid - COALESCE(sp.refunded_amount, 0))
+           FROM session_payments sp
+          WHERE sp.company_id = $1 AND sp.amount_paid > 0
+         UNION ALL
+         SELECT pk.enrollment_id, pk.branch_id,
+                (pk.amount_paid - COALESCE(pk.refunded_amount, 0))
+           FROM session_packages pk
+          WHERE pk.company_id = $1 AND pk.amount_paid > 0
+       ) src
+       JOIN enrollments e2 ON e2.id = src.enrollment_id
+       LEFT JOIN classes cl ON cl.id = e2.class_id
+       JOIN courses co ON co.id = e2.course_id
+       JOIN employees emp ON emp.id = COALESCE(cl.instructor_id, co.instructor_id)
+       WHERE 1 = 1${scopeClause}
+       GROUP BY emp.id, emp.first_name, emp.last_name
+       HAVING SUM(src.amount) <> 0
+       ORDER BY total DESC`,
+      params,
+    );
+    return (rows as any[])
+      .filter((r) => r.teacher_name)
+      .map((r) => ({
+        teacherId: r.teacher_id,
+        teacherName: r.teacher_name,
+        total: Math.round(parseFloat(r.total) * 100) / 100,
+      }));
+  } catch (e) {
+    console.error('fetchCashByTeacher failed (breakdown omitted):', e);
+    return [];
+  }
+}
+
 function mapAdjustmentRow(row: any) {
   return {
     id: row.id,
@@ -406,6 +474,7 @@ export const cashRoutes = {
       });
 
       const sumBranchCash = byBranch.reduce((s: number, r: any) => s + r.cash, 0);
+      const byTeacher = await fetchCashByTeacher(context.companyId, scoped);
 
       return {
         status: 200 as const,
@@ -420,6 +489,7 @@ export const cashRoutes = {
           unallocatedNet: Math.round(unallocatedNet * 100) / 100,
           sumBranchCash: Math.round(sumBranchCash * 100) / 100,
           byBranch,
+          byTeacher,
         },
       };
     } catch (error) {

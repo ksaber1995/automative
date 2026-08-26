@@ -125,6 +125,30 @@
     </p-card>
   }
 
+  <!-- Per-teacher breakdown: what each teacher's classes brought in (all time,
+       net of refunds). Informational — products, events and unassigned classes
+       have no teacher, so these rows deliberately do not sum to the drawer. -->
+  @if ((current()?.byTeacher?.length || 0) > 0) {
+    <p-card class="mb-6">
+      <ng-template pTemplate="header">
+        <div class="p-4 font-semibold text-lg">{{ 'CASH.BY_TEACHER_TITLE' | translate }}</div>
+      </ng-template>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        @for (t of current()?.byTeacher || []; track t.teacherId) {
+          <div class="p-4 rounded-lg border bg-white">
+            <div class="text-sm text-gray-600"><i class="pi pi-user text-xs"></i> {{ t.teacherName }}</div>
+            <div class="text-2xl font-bold mt-1"
+                 [class.text-cyan-700]="t.total >= 0"
+                 [class.text-red-600]="t.total < 0">
+              {{ formatCurrency(t.total) }}
+            </div>
+          </div>
+        }
+      </div>
+      <div class="text-xs text-gray-400 mt-3">{{ 'CASH.BY_TEACHER_HINT' | translate }}</div>
+    </p-card>
+  }
+
   <!-- History Table -->
   <p-card>
     <ng-template pTemplate="header">

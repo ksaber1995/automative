@@ -12,6 +12,14 @@ export interface CurrentCashResponse {
   unallocatedNet?: number;
   sumBranchCash?: number;
   byBranch: BranchCash[];
+  /** Student money attributed per teacher — informational, never sums to the drawer. */
+  byTeacher?: TeacherCash[];
+}
+
+export interface TeacherCash {
+  teacherId: string;
+  teacherName: string;
+  total: number;
 }
 
 export interface BranchCash {

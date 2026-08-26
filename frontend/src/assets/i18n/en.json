@@ -5340,6 +5340,8 @@
     "SCOPE_BRANCH_HINT": "Affects only this branch's cash.",
     "SCOPE_COMPANY_HINT": "Distributed equally across all active branches.",
     "BY_BRANCH_TITLE": "Cash by Branch",
+    "BY_TEACHER_TITLE": "Collections by Teacher",
+    "BY_TEACHER_HINT": "Student payments attributed to each teacher's classes, net of refunds. Products, events and classes without a teacher are not included, so these do not add up to the drawer total.",
     "BRANCH_ADJ": "Branch adjustments",
     "DISTRIBUTED_ADJ": "Distributed share",
     "BASE_CASH": "Base (revenue − expenses − withdrawals)",
