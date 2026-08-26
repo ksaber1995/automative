@@ -50,6 +50,9 @@
           <td class="text-sm">
             <div>{{ kindKey(r) | translate }}</div>
             @if (r.courseName) { <div class="text-xs text-gray-500">{{ r.courseName }}</div> }
+            @if (r.teacherName) {
+              <div class="text-xs text-gray-500"><i class="pi pi-user text-[10px]"></i> {{ r.teacherName }}</div>
+            }
             @if (r.periodLabel) { <div class="text-xs text-gray-400">{{ r.periodLabel }}</div> }
           </td>
           <td class="font-semibold">{{ r.amount | amount }}</td>
