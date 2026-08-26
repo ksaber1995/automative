@@ -351,13 +351,15 @@
             <div class="flex-1">
               <p class="font-medium text-amber-800">{{ 'ENROLLMENT_FORM.FIRST_MONTH_TITLE' | translate }}</p>
               <p class="text-sm text-amber-700 mb-2">{{ 'ENROLLMENT_FORM.FIRST_MONTH_HINT' | translate: { fee: (finalPriceSig() | amount) } }}</p>
-              <div class="flex flex-wrap items-center gap-2">
+              <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
                 <p-inputnumber formControlName="firstMonthPrice" [min]="0" [maxFractionDigits]="2"
                   [placeholder]="(finalPriceSig() | amount) || ''"
-                  (onInput)="onFirstMonthPriceInput()" [style]="{ width: '160px' }" />
-                <button pButton type="button" class="p-button-outlined p-button-sm" icon="pi pi-sparkles"
+                  (onInput)="onFirstMonthPriceInput()"
+                  [style]="{ width: '100%', maxWidth: '180px' }" [inputStyle]="{ width: '100%' }" />
+                <p-button type="button" [outlined]="true" size="small" icon="pi pi-sparkles"
+                  styleClass="whitespace-nowrap self-start"
                   [label]="'ENROLLMENT_FORM.FIRST_MONTH_SUGGESTED' | translate: { amount: (firstMonthSuggestion() | amount) }"
-                  (click)="applyFirstMonthSuggestion()"></button>
+                  (onClick)="applyFirstMonthSuggestion()" />
                 @if (firstMonthPriceSig() !== null) {
                   <small class="text-amber-700">{{ 'ENROLLMENT_FORM.FIRST_MONTH_SET' | translate: { amount: (firstMonthPriceSig() | amount) } }}</small>
                 }
