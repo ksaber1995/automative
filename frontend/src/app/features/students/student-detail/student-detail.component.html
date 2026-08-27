@@ -355,21 +355,66 @@
                 <p class="text-sm text-gray-500">{{ 'STUDENTS.DETAIL.PORTAL_NONE' | translate }}</p>
               }
             </div>
-            @if (cred.hasCredentials && canRevokePortal()) {
-              <p-button
-                [label]="'STUDENTS.DETAIL.PORTAL_REVOKE' | translate"
-                icon="pi pi-ban"
-                severity="danger"
-                [outlined]="true"
-                size="small"
-                [loading]="revokingPortal()"
-                (onClick)="confirmRevokePortal()"
-              ></p-button>
-            }
+            <div class="flex items-center gap-2 flex-wrap">
+              @if (canEditPortal()) {
+                <p-button
+                  [label]="(cred.hasCredentials ? 'STUDENTS.DETAIL.PORTAL_EDIT' : 'STUDENTS.DETAIL.PORTAL_CREATE') | translate"
+                  [icon]="cred.hasCredentials ? 'pi pi-pencil' : 'pi pi-key'"
+                  severity="secondary"
+                  [outlined]="true"
+                  size="small"
+                  (onClick)="openPortalEditor()"
+                ></p-button>
+              }
+              @if (cred.hasCredentials && canRevokePortal()) {
+                <p-button
+                  [label]="'STUDENTS.DETAIL.PORTAL_REVOKE' | translate"
+                  icon="pi pi-ban"
+                  severity="danger"
+                  [outlined]="true"
+                  size="small"
+                  [loading]="revokingPortal()"
+                  (onClick)="confirmRevokePortal()"
+                ></p-button>
+              }
+            </div>
           </div>
         </div>
       }
     </p-card>
+
+    <!-- Set / edit the exam-portal credential from the desk. The password field
+         is plain text on purpose: the teacher is the one typing it, to hand it
+         to the student — a masked field would only invite typos. -->
+    <p-dialog
+      [visible]="portalEditVisible()"
+      (visibleChange)="portalEditVisible.set($event)"
+      [modal]="true"
+      [style]="{ width: '26rem', maxWidth: '95vw' }"
+      [header]="(portalCredentials()?.hasCredentials ? 'STUDENTS.DETAIL.PORTAL_EDIT_TITLE' : 'STUDENTS.DETAIL.PORTAL_CREATE_TITLE') | translate"
+    >
+      <div class="space-y-3 pt-1">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'STUDENTS.DETAIL.PORTAL_USERNAME' | translate }}</label>
+          <input pInputText class="w-full" dir="ltr"
+            [ngModel]="portalUsernameDraft()" (ngModelChange)="portalUsernameDraft.set($event)"
+            [placeholder]="'STUDENTS.DETAIL.PORTAL_USERNAME_HINT' | translate" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'STUDENTS.DETAIL.PORTAL_PASSWORD' | translate }}</label>
+          <input pInputText class="w-full" dir="ltr" autocomplete="off"
+            [ngModel]="portalPasswordDraft()" (ngModelChange)="portalPasswordDraft.set($event)"
+            [placeholder]="(portalCredentials()?.hasCredentials ? 'STUDENTS.DETAIL.PORTAL_PASSWORD_KEEP' : 'STUDENTS.DETAIL.PORTAL_PASSWORD_HINT') | translate" />
+        </div>
+      </div>
+      <ng-template pTemplate="footer">
+        <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true"
+          (onClick)="portalEditVisible.set(false)"></p-button>
+        <p-button [label]="'STUDENTS.DETAIL.PORTAL_SAVE' | translate" icon="pi pi-check"
+          [disabled]="!portalEditorValid()" [loading]="savingPortal()"
+          (onClick)="savePortalCredentials()"></p-button>
+      </ng-template>
+    </p-dialog>
 
     <!-- Master Course (Bundle) Enrollments — hidden for TEACHER companies -->
     @if (!isTeacher()) {

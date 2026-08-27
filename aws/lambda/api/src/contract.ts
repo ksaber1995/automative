@@ -3663,8 +3663,24 @@ export const contract = c.router({
         403: ApiErrorSchema, 404: ApiErrorSchema, 500: ApiErrorSchema,
       },
     },
+    // Set or edit the credential from the staff side: create username+password,
+    // rename the username, or reset the password. Omitted fields keep their
+    // value; a password set here stamps reset_at like a card-scan reset.
+    setStudentCredentials: {
+      method: 'PUT',
+      path: '/api/exams/students/:studentId/credentials',
+      pathParams: z.object({ studentId: UUIDSchema }),
+      body: z.object({
+        username: z.string().min(3).max(60).optional(),
+        password: z.string().min(8).max(200).optional(),
+      }),
+      responses: {
+        200: StudentCredentialInfoSchema,
+        400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema, 409: ApiErrorSchema,
+      },
+    },
     // Revoke = delete the credential; the student claims afresh by scanning
-    // their card. Staff can only revoke, never read or set a password.
+    // their card.
     revokeStudentCredentials: {
       method: 'DELETE',
       path: '/api/exams/students/:studentId/credentials',

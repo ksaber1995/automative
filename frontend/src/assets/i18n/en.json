@@ -134,6 +134,16 @@
       "BRANCH_ACCESS": "Access denied to this branch",
       "BRANCH_ACCESS_TARGET": "Access denied to the target branch"
     },
+    "STUDENT_AUTH": {
+      "BAD_USERNAME": "Pick a username of 3-60 letters, digits, dots or dashes — or the phone number",
+      "WEAK_PASSWORD": "The password needs at least 8 characters",
+      "USERNAME_TAKEN": "That username is already taken — pick another",
+      "CREATE_NEEDS_BOTH": "A new credential needs both a username and a password",
+      "NOTHING_TO_CHANGE": "Nothing to change",
+      "SET_FAILED": "Failed to save the credentials",
+      "READ_FAILED": "Failed to load the credentials",
+      "REVOKE_FAILED": "Failed to revoke the credentials"
+    },
     "REFUNDS": {
       "NOT_FOUND": "Refund not found",
       "DELETE_FAILED": "Failed to delete refund"
@@ -4365,6 +4375,16 @@
       "PORTAL_NEVER": "never",
       "PORTAL_RESET": "Password last reset by card scan",
       "PORTAL_REVOKE": "Revoke access",
+      "PORTAL_EDIT": "Edit credentials",
+      "PORTAL_CREATE": "Set credentials",
+      "PORTAL_EDIT_TITLE": "Edit exam portal credentials",
+      "PORTAL_CREATE_TITLE": "Set exam portal credentials",
+      "PORTAL_USERNAME_HINT": "Username or phone number",
+      "PORTAL_PASSWORD": "Password",
+      "PORTAL_PASSWORD_HINT": "At least 8 characters",
+      "PORTAL_PASSWORD_KEEP": "Leave empty to keep the current password",
+      "PORTAL_SAVE": "Save",
+      "PORTAL_SAVED": "Portal credentials saved",
       "PORTAL_REVOKE_TITLE": "Revoke portal access?",
       "PORTAL_REVOKE_MSG": "{{name}} will be signed out of the exam portal and their username and password deleted. They can set up again by scanning their card. Do this when a card is lost or the account looks taken over.",
       "PORTAL_REVOKED": "Portal access revoked — the student can claim their card again",

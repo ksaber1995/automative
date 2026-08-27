@@ -177,6 +177,7 @@ const router = {
     attempts: examsRoutes.attempts,
     resetAttempt: examsRoutes.resetAttempt,
     studentCredentials: examsRoutes.studentCredentials,
+    setStudentCredentials: examsRoutes.setStudentCredentials,
     revokeStudentCredentials: examsRoutes.revokeStudentCredentials,
     getById: examsRoutes.getById,
     update: examsRoutes.update,

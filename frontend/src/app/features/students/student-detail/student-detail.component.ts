@@ -572,6 +572,55 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
     });
   }
 
+  // ── Set / edit the portal credential from the desk ─────────────────────────
+  /** Creating or editing a credential is an academic-records write. */
+  canEditPortal = (): boolean => this.authService.canWrite('academy');
+  portalEditVisible = signal(false);
+  portalUsernameDraft = signal('');
+  portalPasswordDraft = signal('');
+  savingPortal = signal(false);
+
+  openPortalEditor() {
+    this.portalUsernameDraft.set(this.portalCredentials()?.username ?? '');
+    this.portalPasswordDraft.set('');
+    this.portalEditVisible.set(true);
+  }
+
+  /** Create needs both fields; on edit an empty field keeps its current value. */
+  portalEditorValid(): boolean {
+    const creating = !this.portalCredentials()?.hasCredentials;
+    const username = this.portalUsernameDraft().trim();
+    const password = this.portalPasswordDraft();
+    if (creating) return username.length >= 3 && password.length >= 8;
+    if (password && password.length < 8) return false;
+    const usernameChanged = username && username !== (this.portalCredentials()?.username ?? '');
+    return !!usernameChanged || password.length >= 8;
+  }
+
+  savePortalCredentials() {
+    if (!this.studentId || !this.portalEditorValid()) return;
+    const dto: { username?: string; password?: string } = {};
+    const username = this.portalUsernameDraft().trim();
+    const password = this.portalPasswordDraft();
+    if (username && username !== (this.portalCredentials()?.username ?? '')) dto.username = username;
+    if (password) dto.password = password;
+    if (!this.portalCredentials()?.hasCredentials) {
+      dto.username = username;
+      dto.password = password;
+    }
+    this.savingPortal.set(true);
+    this.examService.setStudentCredentials(this.studentId, dto).subscribe({
+      next: (info) => {
+        this.savingPortal.set(false);
+        this.portalEditVisible.set(false);
+        this.portalCredentials.set(info);
+        this.notificationService.success(this.translate.instant('STUDENTS.DETAIL.PORTAL_SAVED'));
+      },
+      // The interceptor toasted the translated error (taken username, weak password…).
+      error: () => this.savingPortal.set(false),
+    });
+  }
+
   ngOnInit() {
     // Subscribe to the route param (not snapshot) so that scanning another
     // student while already on a detail page — which navigates to the same

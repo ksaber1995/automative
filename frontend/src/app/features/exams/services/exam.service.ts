@@ -125,6 +125,14 @@ export class ExamService {
     return this.api.get<StudentCredentialInfo>(`exams/students/${studentId}/credentials`);
   }
 
+  /**
+   * Set or edit the credential from the desk: create username+password, rename
+   * the username, or reset the password. Omitted fields keep their value.
+   */
+  setStudentCredentials(studentId: string, dto: { username?: string; password?: string }): Observable<StudentCredentialInfo> {
+    return this.api.put<StudentCredentialInfo>(`exams/students/${studentId}/credentials`, dto);
+  }
+
   /** Revoke: the student is signed out on their next call and claims afresh. */
   revokeStudentCredentials(studentId: string): Observable<{ success: boolean }> {
     return this.api.delete<{ success: boolean }>(`exams/students/${studentId}/credentials`);

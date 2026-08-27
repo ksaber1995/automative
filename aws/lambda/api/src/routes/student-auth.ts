@@ -82,8 +82,10 @@ export function canonicalIdentifier(input: string): string {
   return digits;
 }
 
-/** Letters/digits/._- only — a username is typed on a phone keyboard. */
-const USERNAME_SHAPE = /^[a-z0-9._-]{3,60}$/;
+/** Letters/digits/._- only — a username is typed on a phone keyboard.
+ *  Exported for the staff-side credential editor, so both entrances to
+ *  student_auth accept exactly the same names. */
+export const USERNAME_SHAPE = /^[a-z0-9._-]{3,60}$/;
 
 // ─── Claim tickets ──────────────────────────────────────────────────────────
 
@@ -128,7 +130,7 @@ const LOGIN_REFUSED = () =>
 /** Time a bcrypt compare takes, spent on purpose — see admin-portal.ts login. */
 const DUMMY_HASH = '$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidinva';
 
-const MIN_PASSWORD_LENGTH = 8;
+export const MIN_PASSWORD_LENGTH = 8;
 const LOCKOUT_AFTER = 10;
 const LOCKOUT_MINUTES = 15;
 

@@ -13,7 +13,8 @@ import { sendExamResultsSms } from '../services/sms/triggers';
 import { sendExamResultNotifications } from './telegram';
 import { ensureHomeworkGradingColumn, assertOnlineExams, isOnlineExamsEnabled } from './companies';
 import { ensureLessonSchema, lessonPoolSize, lessonsInCourse } from './lessons';
-import { ensureStudentAuthSchema } from './student-auth';
+import { ensureStudentAuthSchema, canonicalIdentifier, USERNAME_SHAPE, MIN_PASSWORD_LENGTH } from './student-auth';
+import bcrypt from 'bcryptjs';
 import { gradeAttempt } from '../db/exam-grading';
 import { pushExamResult } from '../utils/push';
 
@@ -1004,6 +1005,112 @@ export const examsRoutes = {
     } catch (error: any) {
       console.error('Revoke student credentials error:', error);
       return mapThrownError(error, 'ERRORS.STUDENT_AUTH.REVOKE_FAILED', 'Failed to revoke credentials', 400);
+    }
+  },
+
+  /**
+   * PUT /api/exams/students/:studentId/credentials — the teacher sets or edits
+   * a student's portal credential directly: create username+password for a
+   * student with no card claim, rename a username, or reset a password at the
+   * desk. Requested by the owner, superseding the earlier revoke-only stance;
+   * a teacher-set password stamps reset_at, so it stays visible on the record
+   * exactly like a card-scan reset.
+   */
+  setStudentCredentials: async ({ params, body, headers }: {
+    params: { studentId: string };
+    body: { username?: string; password?: string };
+    headers: AuthHeaders;
+  }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const denied = await assertOnlineExams(context.companyId);
+      if (denied) return denied;
+
+      const student = await queryOne<any>(
+        'SELECT id, company_id FROM students WHERE id = $1 AND company_id = $2 AND COALESCE(is_active, true)',
+        [params.studentId, context.companyId],
+      );
+      if (!student) return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Student not found');
+
+      await ensureStudentAuthSchema();
+      const existing = await queryOne<any>(
+        'SELECT id, username FROM student_auth WHERE student_id = $1',
+        [params.studentId],
+      );
+
+      // Normalise exactly like the portal's own claim, so a phone number typed
+      // at the desk resolves to the same account it would from the card flow.
+      const rawUsername = (body?.username ?? '').trim();
+      const username = rawUsername ? canonicalIdentifier(rawUsername) : null;
+      const password = body?.password ?? '';
+
+      if (username && !USERNAME_SHAPE.test(username)) {
+        return apiError(400, 'ERRORS.STUDENT_AUTH.BAD_USERNAME', 'Pick a username of 3-60 letters, digits, dots or dashes — or the phone number');
+      }
+      if (password && password.length < MIN_PASSWORD_LENGTH) {
+        return apiError(400, 'ERRORS.STUDENT_AUTH.WEAK_PASSWORD', `Use at least ${MIN_PASSWORD_LENGTH} characters`);
+      }
+      if (!existing && (!username || !password)) {
+        return apiError(400, 'ERRORS.STUDENT_AUTH.CREATE_NEEDS_BOTH', 'A new credential needs both a username and a password');
+      }
+      if (existing && !username && !password) {
+        return apiError(400, 'ERRORS.STUDENT_AUTH.NOTHING_TO_CHANGE', 'Nothing to change');
+      }
+
+      if (username && username !== (existing?.username ?? '').toLowerCase()) {
+        const taken = await queryOne<any>(
+          'SELECT student_id FROM student_auth WHERE LOWER(username) = $1 AND student_id <> $2',
+          [username, params.studentId],
+        );
+        if (taken) return apiError(409, 'ERRORS.STUDENT_AUTH.USERNAME_TAKEN', 'That name is taken — pick another');
+      }
+
+      if (!existing) {
+        await query(
+          `INSERT INTO student_auth (student_id, company_id, username, password_hash)
+           VALUES ($1, $2, $3, $4)`,
+          [params.studentId, context.companyId, username, await bcrypt.hash(password, 10)],
+        );
+      } else {
+        // A teacher-set password is a reset: stamp reset_at and clear the
+        // lockout, exactly as the card flow does.
+        await query(
+          `UPDATE student_auth
+              SET username = COALESCE($1, username),
+                  password_hash = COALESCE($2, password_hash),
+                  reset_at = CASE WHEN $2 IS NOT NULL THEN NOW() ELSE reset_at END,
+                  failed_attempts = CASE WHEN $2 IS NOT NULL THEN 0 ELSE failed_attempts END,
+                  locked_until = CASE WHEN $2 IS NOT NULL THEN NULL ELSE locked_until END,
+                  updated_at = NOW()
+            WHERE id = $3`,
+          [username, password ? await bcrypt.hash(password, 10) : null, existing.id],
+        );
+      }
+
+      const row = await queryOne<any>(
+        `SELECT username, claimed_at, reset_at, last_login_at
+           FROM student_auth WHERE student_id = $1`,
+        [params.studentId],
+      );
+      return {
+        status: 200 as const,
+        body: {
+          hasCredentials: !!row,
+          username: row?.username ?? null,
+          claimedAt: row?.claimed_at ? new Date(row.claimed_at).toISOString() : null,
+          resetAt: row?.reset_at ? new Date(row.reset_at).toISOString() : null,
+          lastLoginAt: row?.last_login_at ? new Date(row.last_login_at).toISOString() : null,
+        },
+      };
+    } catch (error: any) {
+      if (error?.code === '23505') {
+        return apiError(409, 'ERRORS.STUDENT_AUTH.USERNAME_TAKEN', 'That name is taken — pick another');
+      }
+      console.error('Set student credentials error:', error);
+      return mapThrownError(error, 'ERRORS.STUDENT_AUTH.SET_FAILED', 'Failed to save credentials', 400);
     }
   },
 
