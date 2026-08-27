@@ -286,6 +286,18 @@ export class StudentListComponent implements OnInit {
     return this.enrollmentCounts()[studentId] || { active: 0, completed: 0 };
   }
 
+  /**
+   * The course's name when the student is enrolled in exactly ONE course —
+   * a name says more than "1 active". Null whenever there are zero or several,
+   * and the counts speak instead.
+   */
+  singleCourseName(studentId: string): string | null {
+    const set = this.studentCourseMap().get(studentId);
+    if (!set || set.size !== 1) return null;
+    const courseId = set.values().next().value;
+    return this.allCourses().find((c) => c.id === courseId)?.label ?? null;
+  }
+
   // --- Export the list ------------------------------------------------------
   // Exports exactly what the filters are showing, not the whole database: the
   // tab, branch, course, class and search box have already been used to answer

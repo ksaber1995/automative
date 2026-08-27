@@ -138,7 +138,6 @@
         <tr>
           <th pSortableColumn="studentCode">{{ 'STUDENTS.LIST.COL_CODE' | translate }} <p-sortIcon field="studentCode"></p-sortIcon></th>
           <th pSortableColumn="name">{{ 'STUDENTS.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
-          <th pSortableColumn="dateOfBirth">{{ 'STUDENTS.LIST.COL_AGE' | translate }}</th>
           <th pSortableColumn="parentPhone">{{ 'STUDENTS.LIST.COL_CONTACT' | translate }} <p-sortIcon field="parentPhone"></p-sortIcon></th>
           <th pSortableColumn="schoolName">{{ 'STUDENTS.LIST.COL_SCHOOL' | translate }} <p-sortIcon field="schoolName"></p-sortIcon></th>
           @if (!authService.isTeacher()) {
@@ -168,7 +167,6 @@
               <span>{{ student.name }}</span>
             </div>
           </td>
-          <td>{{ ageDisplay(student.dateOfBirth) }}</td>
           <td>
             <div class="text-sm">
               <div>{{ student.parentPhone }}</div>
@@ -185,17 +183,29 @@
             <td>{{ getBranchName(student.branchId) }}</td>
           }
           <td>
-            <div class="flex justify-center gap-2">
-              <p-tag
-                [value]="'STUDENTS.LIST.ACTIVE_ENROLLMENTS' | translate: { count: getCounts(student.id).active }"
-                severity="info"
-                [pTooltip]="'STUDENTS.LIST.ACTIVE_ENROLLMENTS_TOOLTIP' | translate"
-              ></p-tag>
-              <p-tag
-                [value]="'STUDENTS.LIST.COMPLETED_ENROLLMENTS' | translate: { count: getCounts(student.id).completed }"
-                severity="success"
-                [pTooltip]="'STUDENTS.LIST.COMPLETED_ENROLLMENTS_TOOLTIP' | translate"
-              ></p-tag>
+            <div class="flex justify-center gap-2 flex-wrap">
+              <!-- One course tells more as a name than as "1 active". -->
+              @if (singleCourseName(student.id); as courseName) {
+                <p-tag
+                  [value]="courseName"
+                  severity="info"
+                  [pTooltip]="'STUDENTS.LIST.ACTIVE_ENROLLMENTS_TOOLTIP' | translate"
+                ></p-tag>
+              } @else {
+                <p-tag
+                  [value]="'STUDENTS.LIST.ACTIVE_ENROLLMENTS' | translate: { count: getCounts(student.id).active }"
+                  severity="info"
+                  [pTooltip]="'STUDENTS.LIST.ACTIVE_ENROLLMENTS_TOOLTIP' | translate"
+                ></p-tag>
+              }
+              <!-- A solo teacher's classes have no "done" lifecycle worth a badge. -->
+              @if (!authService.isTeacher()) {
+                <p-tag
+                  [value]="'STUDENTS.LIST.COMPLETED_ENROLLMENTS' | translate: { count: getCounts(student.id).completed }"
+                  severity="success"
+                  [pTooltip]="'STUDENTS.LIST.COMPLETED_ENROLLMENTS_TOOLTIP' | translate"
+                ></p-tag>
+              }
             </div>
           </td>
           <td>
