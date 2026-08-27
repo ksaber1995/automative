@@ -148,6 +148,9 @@ export interface PublicStudentProfile {
     name: string;
     branchName: string;
     academyName: string;
+    /** For returning a found card — whichever of the two the academy recorded. */
+    phone?: string | null;
+    parentPhone?: string | null;
   };
   courses: PublicStudentCourse[];
   attendance: {

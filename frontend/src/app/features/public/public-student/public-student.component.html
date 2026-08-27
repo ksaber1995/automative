@@ -47,6 +47,34 @@
         <p class="text-gray-500 mt-1"><i class="pi pi-map-marker text-xs"></i> {{ p.student.branchName }}</p>
       </div>
 
+      <!-- Whoever scanned a LOST card is holding it right now — give them the
+           number(s) to call so it finds its way back. Tap-to-call on a phone. -->
+      @if (p.student.phone || p.student.parentPhone) {
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+          <div class="text-sm font-medium text-amber-800">
+            <i class="pi pi-phone me-1"></i>{{ 'PUBLIC_PROFILE.FOUND_CARD_TITLE' | translate }}
+          </div>
+          <div class="flex items-center gap-4 mt-2 flex-wrap">
+            @if (p.student.phone) {
+              <a [href]="'tel:' + p.student.phone"
+                class="inline-flex items-center gap-1.5 text-sm font-semibold text-amber-900 hover:text-amber-700">
+                <i class="pi pi-mobile"></i>
+                <span>{{ 'PUBLIC_PROFILE.FOUND_CARD_STUDENT' | translate }}</span>
+                <span dir="ltr" class="font-mono">{{ p.student.phone }}</span>
+              </a>
+            }
+            @if (p.student.parentPhone && p.student.parentPhone !== p.student.phone) {
+              <a [href]="'tel:' + p.student.parentPhone"
+                class="inline-flex items-center gap-1.5 text-sm font-semibold text-amber-900 hover:text-amber-700">
+                <i class="pi pi-user"></i>
+                <span>{{ 'PUBLIC_PROFILE.FOUND_CARD_PARENT' | translate }}</span>
+                <span dir="ltr" class="font-mono">{{ p.student.parentPhone }}</span>
+              </a>
+            }
+          </div>
+        </div>
+      }
+
       <!-- Push notifications: one tap here and the phone hears about every
            check-in, absence, payment and mark on its own. -->
       @if (pushSupported()) {

@@ -4367,6 +4367,9 @@ export const contract = c.router({
             name: z.string(),
             branchName: z.string(),
             academyName: z.string(),
+            // For returning a found card: the number(s) to call.
+            phone: z.string().nullable().optional(),
+            parentPhone: z.string().nullable().optional(),
           }),
           courses: z.array(z.object({
             courseName: z.string(),

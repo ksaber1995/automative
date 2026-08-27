@@ -155,7 +155,7 @@ export const publicStudentsRoutes = {
 
       await ensureQrCardSchema();   // the lookup below reads qr_cards
       const student = await queryOne<any>(
-        `SELECT s.id, s.name, s.company_id, s.branch_id,
+        `SELECT s.id, s.name, s.company_id, s.branch_id, s.phone, s.parent_phone,
                 b.name AS branch_name, co.name AS academy_name, co.type AS company_type
          FROM students s
          JOIN branches b ON b.id = s.branch_id
@@ -601,6 +601,10 @@ export const publicStudentsRoutes = {
             name: student.name,
             branchName: student.branch_name,
             academyName: student.academy_name,
+            // Shown on the public page so a FOUND card can be returned: whoever
+            // scans it sees a number to call. Whichever of the two exists.
+            phone: student.phone ?? null,
+            parentPhone: student.parent_phone ?? null,
           },
           courses: courses.map((row) => ({
             courseName: row.course_name,
