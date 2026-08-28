@@ -285,6 +285,9 @@ const SafeUserSchema = z.object({
   lastName: z.string(),
   role: UserRoleSchema,
   companyId: UUIDSchema,
+  // The tenant's display name — the debug login's banner names whose data
+  // the session is inside.
+  companyName: z.string().nullable().optional(),
   companyType: z.enum(['ACADEMY', 'TEACHER', 'SCHOOL']).optional(),
   plan: z.enum(['SIMPLE', 'ADVANCED']).optional(), // Feature plan; ADVANCED unlocks CRM
   vertical: z.enum(['GENERAL', 'SPORTS']).optional(), // Vocabulary only; drives the i18n overlay

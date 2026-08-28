@@ -455,6 +455,19 @@ export class LayoutComponent implements OnInit, OnDestroy {
     return localStorage.getItem('company_name') || this.translate.instant('COMPANY_PROFILE.DEFAULT_NAME');
   }
 
+  /** The vendor's debug login is signed in — every page shows whose tenant this is. */
+  isDebugUser(): boolean {
+    return this.authService.isDebugUser();
+  }
+
+  /** Whose data the debug session is inside, by the most reliable source available. */
+  debugTenantName(): string {
+    return this.currentUser()?.companyName
+      || localStorage.getItem('company_name')
+      || this.currentUser()?.companyId
+      || '?';
+  }
+
   getAvatarColor(role: string): string {
     const map: Record<string, string> = {
       GLOBAL_ADMIN: '#7C3AED', ADMIN: '#7C3AED',

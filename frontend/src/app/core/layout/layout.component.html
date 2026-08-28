@@ -136,9 +136,25 @@
     }
   </aside>
 
+  <!-- Debug-login banner: the vendor's master account is parked inside a REAL
+       tenant — name it on every page, so nobody edits a customer's data
+       thinking they are on a test account. -->
+  @if (isDebugUser()) {
+    <div class="fixed top-16 left-0 right-0 z-30 bg-red-600 text-white px-6 py-2 flex items-center gap-2"
+      [class.ml-64]="pushedBySidebar() && !languageService.isRtl()"
+      [class.mr-64]="pushedBySidebar() && languageService.isRtl()">
+      <i class="pi pi-exclamation-triangle"></i>
+      <span class="text-sm font-semibold">
+        {{ 'NAV.DEBUG_TENANT_WARNING' | translate: { tenant: debugTenantName() } }}
+      </span>
+    </div>
+  }
+
   <!-- Expiry Warning Banner -->
   @if (subscriptionService.showExpiryWarning()) {
-    <div class="fixed top-16 left-0 right-0 z-30 bg-amber-50 border-b border-amber-300 px-6 py-2 flex items-center justify-between"
+    <div class="fixed left-0 right-0 z-30 bg-amber-50 border-b border-amber-300 px-6 py-2 flex items-center justify-between"
+      [class.top-16]="!isDebugUser()"
+      [class.top-24]="isDebugUser()"
       [class.ml-64]="pushedBySidebar() && !languageService.isRtl()"
       [class.mr-64]="pushedBySidebar() && languageService.isRtl()">
       <div class="flex items-center gap-2 text-amber-800">
@@ -153,8 +169,9 @@
   <!-- Main Content -->
   <main
     class="transition-all duration-300"
-    [class.pt-16]="!subscriptionService.showExpiryWarning()"
-    [class.pt-24]="subscriptionService.showExpiryWarning()"
+    [class.pt-16]="!subscriptionService.showExpiryWarning() && !isDebugUser()"
+    [class.pt-24]="(subscriptionService.showExpiryWarning() ? 1 : 0) + (isDebugUser() ? 1 : 0) === 1"
+    [class.pt-32]="subscriptionService.showExpiryWarning() && isDebugUser()"
     [class.ml-64]="pushedBySidebar() && !languageService.isRtl()"
     [class.ml-0]="!pushedBySidebar() && !languageService.isRtl()"
     [class.mr-64]="pushedBySidebar() && languageService.isRtl()"

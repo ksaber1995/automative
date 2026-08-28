@@ -355,6 +355,7 @@
     "EXAMS": "Evaluations & Drills",
     "EDUCATIONAL_BOOKS": "Equipment",
     "FIND_STUDENT": "Find Trainee",
+    "DEBUG_TENANT_WARNING": "Debug login (master@master.com) — you are inside the tenant: {{tenant}}",
     "QR_STUDENT_NOT_FOUND": "Trainee not found for this QR code.",
     "QR_LOOKING_UP": "Looking up trainee...",
     "QR_SCAN_INSTRUCTION": "Point your camera at a trainee's QR code to find them.",

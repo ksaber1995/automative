@@ -116,6 +116,10 @@ async function buildSafeUser(user: any, branchIds: string[]) {
     lastName: user.last_name,
     role: user.role,
     companyId: user.company_id,
+    // Which tenant this session is INSIDE — the debug login's warning banner
+    // names it, so the vendor never edits a customer's data thinking it's a
+    // test tenant.
+    companyName: user.company_name ?? null,
     companyType: user.company_type ?? 'ACADEMY',
     plan: user.company_plan ?? 'SIMPLE',
     /**
@@ -733,7 +737,7 @@ export const authRoutes = {
       await ensureVerticalColumn();
       await ensureOnlineExamsColumn();
       const user = await queryOne<any>(
-        `SELECT u.*, c.type as company_type, c.plan as company_plan,
+        `SELECT u.*, c.name as company_name, c.type as company_type, c.plan as company_plan,
                 c.vertical as company_vertical,
                 c.qr_cards_enabled as company_qr_cards,
                 c.online_exams_enabled as company_online_exams,
@@ -743,7 +747,7 @@ export const authRoutes = {
          JOIN companies c ON u.company_id = c.id
          LEFT JOIN user_branches ub ON ub.user_id = u.id
          WHERE u.id = $1
-         GROUP BY u.id, c.type, c.plan, c.vertical, c.qr_cards_enabled, c.online_exams_enabled, c.is_active`,
+         GROUP BY u.id, c.name, c.type, c.plan, c.vertical, c.qr_cards_enabled, c.online_exams_enabled, c.is_active`,
         [decoded.id]
       );
       if (!user) {
@@ -794,7 +798,7 @@ export const authRoutes = {
       await ensureVerticalColumn();
       await ensureOnlineExamsColumn();
       const user = await queryOne<any>(
-        `SELECT u.*, c.type as company_type, c.plan as company_plan,
+        `SELECT u.*, c.name as company_name, c.type as company_type, c.plan as company_plan,
                 c.vertical as company_vertical,
                 c.qr_cards_enabled as company_qr_cards,
                 c.online_exams_enabled as company_online_exams,
@@ -803,7 +807,7 @@ export const authRoutes = {
          JOIN companies c ON u.company_id = c.id
          LEFT JOIN user_branches ub ON ub.user_id = u.id
          WHERE u.id = $1
-         GROUP BY u.id, c.type, c.plan, c.vertical, c.qr_cards_enabled, c.online_exams_enabled`,
+         GROUP BY u.id, c.name, c.type, c.plan, c.vertical, c.qr_cards_enabled, c.online_exams_enabled`,
         [decoded.id]
       );
 

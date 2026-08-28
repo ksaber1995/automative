@@ -322,6 +322,7 @@
     "EXAMS": "التقييمات والتمارين",
     "EDUCATIONAL_BOOKS": "المعدات",
     "FIND_STUDENT": "بحث عن متدرب",
+    "DEBUG_TENANT_WARNING": "دخول المطوّر (master@master.com) — أنت داخل حساب: {{tenant}}",
     "QR_STUDENT_NOT_FOUND": "لم يتم العثور على متدرب لهذا الرمز.",
     "QR_LOOKING_UP": "جاري البحث عن المتدرب...",
     "QR_SCAN_INSTRUCTION": "وجّه الكاميرا على رمز QR الخاص بالمتدرب للبحث عنه.",

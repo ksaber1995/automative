@@ -34,6 +34,8 @@ export interface SafeUser {
   firstName: string;
   lastName: string;
   role: UserRole;
+  /** The owning company's display name — what the debug banner shows. */
+  companyName?: string | null;
   // Owning company's registration type. SCHOOL exists in the schema ahead of
   // its signup flow shipping — see RegisterDto.type below.
   companyType?: 'ACADEMY' | 'TEACHER' | 'SCHOOL';

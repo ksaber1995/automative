@@ -1605,6 +1605,7 @@
     "EDUCATIONAL_BOOKS": "الكتب التعليمية",
     "MESSAGING": "المراسلات",
     "FIND_STUDENT": "بحث عن طالب",
+    "DEBUG_TENANT_WARNING": "دخول المطوّر (master@master.com) — أنت داخل حساب: {{tenant}}",
     "QR_CAMERA_FAILED": "لم نتمكن من تشغيل الكاميرا. يرجى التحقق من الأذونات.",
     "QR_STUDENT_NOT_FOUND": "لم يتم العثور على طالب لهذا الرمز.",
     "QR_SCAN_INCOMPLETE": "لم تُقرأ البطاقة كاملة. من فضلك أعد المسح.",

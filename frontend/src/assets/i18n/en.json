@@ -1605,6 +1605,7 @@
     "EDUCATIONAL_BOOKS": "Educational Books",
     "MESSAGING": "Messaging",
     "FIND_STUDENT": "Find Student",
+    "DEBUG_TENANT_WARNING": "Debug login (master@master.com) — you are inside the tenant: {{tenant}}",
     "QR_CAMERA_FAILED": "Could not start the camera. Please check permissions.",
     "QR_STUDENT_NOT_FOUND": "Student not found for this QR code.",
     "QR_SCAN_INCOMPLETE": "That scan came through incomplete. Please scan the card again.",
