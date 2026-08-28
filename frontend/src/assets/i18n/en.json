@@ -1101,6 +1101,15 @@
     "PER_SESSION_DONE_OWING": "Now paying session by session — {{count}} unpaid session(s) are on the Charges tab"
   },
   "MONTHLY_SUBSCRIPTIONS": {
+    "SCAN_NO_DUE_TITLE": "No dues",
+    "SCAN_NEXT_MONTH_HINT": "has no dues. Collect next month in advance?",
+    "SCAN_NEXT_MONTH_TAG": "Next month",
+    "REPORT_BUTTON": "Download report",
+    "REPORT_EMPTY": "No monthly bills to report yet.",
+    "REPORT_COL_STUDENT": "Student",
+    "REPORT_COL_PARENT": "Parent",
+    "REPORT_COL_COURSE": "Course",
+    "REPORT_SHEET": "Monthly payments",
     "TITLE": "Monthly Subscriptions",
     "SUBTITLE": "Manage monthly billing for subscription-based courses",
     "YEAR": "Year",

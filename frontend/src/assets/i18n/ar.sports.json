@@ -264,6 +264,15 @@
     "PER_SESSION_DONE_OWING": "أصبح الدفع تدريب بتدريب — {{count}} تدريب غير مدفوعة في تبويب الرسوم"
   },
   "MONTHLY_SUBSCRIPTIONS": {
+    "SCAN_NO_DUE_TITLE": "لا توجد مستحقات",
+    "SCAN_NEXT_MONTH_HINT": "لا توجد عليه مستحقات. هل تريد تحصيل الشهر القادم مقدمًا؟",
+    "SCAN_NEXT_MONTH_TAG": "الشهر القادم",
+    "REPORT_BUTTON": "تحميل تقرير",
+    "REPORT_EMPTY": "لا توجد اشتراكات شهرية بعد.",
+    "REPORT_COL_STUDENT": "العضو",
+    "REPORT_COL_PARENT": "ولي الأمر",
+    "REPORT_COL_COURSE": "البرنامج",
+    "REPORT_SHEET": "المدفوعات الشهرية",
     "SUBTITLE": "إدارة الفواتير الشهرية للاشتراكات ذات الدفع الشهري",
     "TOTAL_STUDENTS": "إجمالي المتدربين",
     "PROJECTED_HINT": "هذا الشهر لم يبدأ بعد — لا توجد فاتورة له. تحصيل دفعة ينشئ الفاتورة لهذا المتدرب فقط.",

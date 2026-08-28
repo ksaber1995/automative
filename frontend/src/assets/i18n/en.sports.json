@@ -294,6 +294,15 @@
     "PER_SESSION_DONE_OWING": "Now paying training by training — {{count}} unpaid training(s) are on the Charges tab"
   },
   "MONTHLY_SUBSCRIPTIONS": {
+    "SCAN_NO_DUE_TITLE": "No dues",
+    "SCAN_NEXT_MONTH_HINT": "has no dues. Collect next month in advance?",
+    "SCAN_NEXT_MONTH_TAG": "Next month",
+    "REPORT_BUTTON": "Download report",
+    "REPORT_EMPTY": "No monthly bills to report yet.",
+    "REPORT_COL_STUDENT": "Member",
+    "REPORT_COL_PARENT": "Parent",
+    "REPORT_COL_COURSE": "Program",
+    "REPORT_SHEET": "Monthly payments",
     "SUBTITLE": "Manage monthly billing for subscriptions on a monthly plan",
     "TOTAL_STUDENTS": "Total Trainees",
     "PROJECTED_HINT": "This month hasn't started — no bill exists yet. Collecting a payment creates it for this trainee only.",

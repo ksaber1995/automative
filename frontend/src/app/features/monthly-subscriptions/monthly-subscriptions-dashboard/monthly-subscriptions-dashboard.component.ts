@@ -42,6 +42,7 @@ import { formatStudentCode, shouldShowStudentCode } from '../../../core/utils/st
 import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 
 import { MonthlyPaymentWithDetails, MonthlyPaymentSummary, CourseMonthlyPriceOverride, HeldSubscription, RefundMonthlyPaymentDto } from '@shared/interfaces/monthly-subscription.interface';
+import * as XLSX from 'xlsx';
 import { Course } from '@shared/interfaces/course.interface';
 
 @Component({
@@ -477,11 +478,11 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
         // Stop the camera and swap the scanner dialog for the month picker.
         this.closeScanner();
         if (res.dueMonths.length === 0) {
-          this.notify.info(
-            this.translate.instant('MONTHLY_SUBSCRIPTIONS.SCAN_NO_DUE', { name: this.scannedStudentName() })
-          );
+          // Paid up — the desk's next question is "collect next month, then?"
+          this.offerNextMonth(res.studentId);
           return;
         }
+        this.nextMonthOffer.set(false);
         this.showMonthPicker.set(true);
       },
       error: () => {
@@ -494,6 +495,56 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   closeMonthPicker(): void {
     this.showMonthPicker.set(false);
     this.dueMonths.set([]);
+    this.nextMonthOffer.set(false);
+  }
+
+  /** The month picker is showing next-month advance offers, not owed months. */
+  nextMonthOffer = signal(false);
+
+  /**
+   * A scanned/typed student with NO dues: instead of a dead-end toast, offer to
+   * collect the month AFTER their latest billed one, per enrollment. The offer
+   * rows are projected (no bill exists yet) — the pay dialog already routes
+   * those through `collect`, which materialises the bill and pays it in one go.
+   */
+  private offerNextMonth(studentId: string): void {
+    const noDueToast = () => this.notify.info(
+      this.translate.instant('MONTHLY_SUBSCRIPTIONS.SCAN_NO_DUE', { name: this.scannedStudentName() })
+    );
+    this.svc.listByStudent(studentId).pipe(takeUntil(this.destroy$)).subscribe({
+      next: (bills) => {
+        // Latest REAL bill per enrollment — the month after it is what to offer.
+        const latest = new Map<string, MonthlyPaymentWithDetails>();
+        for (const b of bills) {
+          if (b.projected) continue;
+          const cur = latest.get(b.enrollmentId);
+          if (!cur || b.billingYear * 12 + b.billingMonth > cur.billingYear * 12 + cur.billingMonth) {
+            latest.set(b.enrollmentId, b);
+          }
+        }
+        if (!latest.size) { noDueToast(); return; }
+        const offers = [...latest.values()].map((b) => {
+          const nextKey = b.billingYear * 12 + b.billingMonth + 1;
+          const billingYear = Math.floor((nextKey - 1) / 12);
+          const billingMonth = ((nextKey - 1) % 12) + 1;
+          return {
+            ...b,
+            id: `proj-${b.enrollmentId}-${billingYear}-${billingMonth}`,
+            billingYear,
+            billingMonth,
+            // The fee the last month billed is the best guess for the next one.
+            amountDue: b.amountDue,
+            amountPaid: 0,
+            paymentStatus: 'PENDING',
+            projected: true,
+          } as MonthlyPaymentWithDetails;
+        });
+        this.dueMonths.set(offers);
+        this.nextMonthOffer.set(true);
+        this.showMonthPicker.set(true);
+      },
+      error: noDueToast,
+    });
   }
 
   /** A due month was picked — hand off to the existing Record Payment dialog. */
@@ -501,6 +552,110 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     this.closeMonthPicker();
     // fromScan: keep the scanned-student context so the attendance option shows.
     this.openPayDialog(payment, true);
+  }
+
+  // ── The paper collection sheet ────────────────────────────────────────────
+  exportingReport = signal(false);
+
+  /**
+   * One Excel sheet the desk can print: a row per student (per course, when a
+   * student takes several), a column per month up to the current one, and in
+   * each cell ✓ paid / ◐ paid-of-due for a part payment / ✗ not paid. Covers
+   * the last 12 months and trims leading empty ones, honouring the branch and
+   * course filters; future months are nobody's debt yet, so they stay off it.
+   */
+  downloadReport(): void {
+    if (this.exportingReport()) return;
+    const now = new Date();
+    const toKey = now.getFullYear() * 12 + (now.getMonth() + 1);
+    const fromKey = toKey - 11;
+    const { branchId, courseId } = this.filterForm.value;
+
+    this.exportingReport.set(true);
+    this.svc.list({
+      fromYear: Math.floor((fromKey - 1) / 12),
+      fromMonth: ((fromKey - 1) % 12) + 1,
+      toYear: now.getFullYear(),
+      toMonth: now.getMonth() + 1,
+      branchId: branchId || undefined,
+      courseId: courseId || undefined,
+    }).pipe(takeUntil(this.destroy$)).subscribe({
+      next: (payments) => {
+        this.exportingReport.set(false);
+        const bills = payments.filter((p) => !p.projected);
+        if (!bills.length) {
+          this.notify.info(this.translate.instant('MONTHLY_SUBSCRIPTIONS.REPORT_EMPTY'));
+          return;
+        }
+        this.buildReportSheet(bills, toKey);
+      },
+      error: () => this.exportingReport.set(false),
+    });
+  }
+
+  private buildReportSheet(bills: MonthlyPaymentWithDetails[], toKey: number): void {
+    const t = (k: string) => this.translate.instant(k);
+    const keyOf = (b: MonthlyPaymentWithDetails) => b.billingYear * 12 + b.billingMonth;
+
+    // Months: from the earliest bill actually on the books through this month.
+    const minKey = Math.min(...bills.map(keyOf));
+    const months: number[] = [];
+    for (let k = minKey; k <= toKey; k++) months.push(k);
+    const monthLabel = (k: number) => `${((k - 1) % 12) + 1}/${Math.floor((k - 1) / 12)}`;
+
+    // One row per enrollment: a student in two courses pays two subscriptions.
+    const rows = new Map<string, {
+      studentName: string; parentName: string; courseName: string;
+      cells: Map<number, MonthlyPaymentWithDetails>;
+    }>();
+    for (const b of bills) {
+      let row = rows.get(b.enrollmentId);
+      if (!row) {
+        row = {
+          studentName: b.studentName,
+          parentName: b.parentName || '',
+          courseName: b.courseName,
+          cells: new Map(),
+        };
+        rows.set(b.enrollmentId, row);
+      }
+      row.cells.set(keyOf(b), b);
+    }
+
+    const mark = (b?: MonthlyPaymentWithDetails): string => {
+      if (!b) return '';
+      if (b.paymentStatus === 'PAID') return '✓';
+      if (b.paymentStatus === 'PARTIAL') return `◐ ${b.amountPaid}/${b.amountDue}`;
+      if (b.paymentStatus === 'REFUNDED') return '↩';
+      return '✗';
+    };
+
+    const headers = [
+      t('MONTHLY_SUBSCRIPTIONS.REPORT_COL_STUDENT'),
+      t('MONTHLY_SUBSCRIPTIONS.REPORT_COL_PARENT'),
+      t('MONTHLY_SUBSCRIPTIONS.REPORT_COL_COURSE'),
+      ...months.map(monthLabel),
+    ];
+    const body = [...rows.values()]
+      .sort((a, z) => a.courseName.localeCompare(z.courseName) || a.studentName.localeCompare(z.studentName))
+      .map((r) => [r.studentName, r.parentName, r.courseName, ...months.map((k) => mark(r.cells.get(k)))]);
+
+    const sheet = XLSX.utils.aoa_to_sheet([headers, ...body]);
+    sheet['!cols'] = headers.map((h, i) => {
+      const longest = Math.max(h.length, ...body.map((r) => String(r[i] ?? '').length));
+      return { wch: Math.min(Math.max(longest + 2, i >= 3 ? 8 : 14), 40) };
+    });
+    if (body.length) {
+      sheet['!autofilter'] = {
+        ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: body.length, c: headers.length - 1 } }),
+      };
+    }
+
+    const book = XLSX.utils.book_new();
+    if (this.isRtl) book.Workbook = { Views: [{ RTL: true }] };
+    const sheetName = String(t('MONTHLY_SUBSCRIPTIONS.REPORT_SHEET')).replace(/[[\]:*?/\\]/g, '').slice(0, 31) || 'Monthly';
+    XLSX.utils.book_append_sheet(book, sheet, sheetName);
+    XLSX.writeFile(book, `monthly-report-${monthLabel(minKey).replace('/', '-')}_${monthLabel(toKey).replace('/', '-')}.xlsx`);
   }
 
   /** Inclusive (from..to) month range for the active filter mode. */

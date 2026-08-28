@@ -6,6 +6,16 @@
       <p class="text-gray-500 mt-1">{{ 'MONTHLY_SUBSCRIPTIONS.SUBTITLE' | translate }}</p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
+      <!-- The paper collection sheet: one row per student, one column per month,
+           ✓ / partial / ✗ — printable straight from Excel. -->
+      <p-button
+        [label]="'MONTHLY_SUBSCRIPTIONS.REPORT_BUTTON' | translate"
+        icon="pi pi-file-excel"
+        severity="success"
+        [outlined]="true"
+        [loading]="exportingReport()"
+        (onClick)="downloadReport()"
+      ></p-button>
       <p-button
         [label]="'MONTHLY_SUBSCRIPTIONS.UPDATE_MONTH_BUTTON' | translate"
         icon="pi pi-dollar"
@@ -759,12 +769,12 @@
   [modal]="true"
   [draggable]="false"
   [style]="{ width: '460px' }" [breakpoints]="{ '640px': '95vw' }"
-  [header]="'MONTHLY_SUBSCRIPTIONS.SCAN_PICK_MONTH' | translate"
+  [header]="(nextMonthOffer() ? 'MONTHLY_SUBSCRIPTIONS.SCAN_NO_DUE_TITLE' : 'MONTHLY_SUBSCRIPTIONS.SCAN_PICK_MONTH') | translate"
 >
   <div class="flex flex-col gap-3 pt-2">
     <div class="text-sm text-gray-700">
       <i class="pi pi-user mr-1"></i><strong>{{ scannedStudentName() }}</strong>
-      <span class="text-gray-500"> &mdash; {{ 'MONTHLY_SUBSCRIPTIONS.SCAN_PICK_MONTH_HINT' | translate }}</span>
+      <span class="text-gray-500"> &mdash; {{ (nextMonthOffer() ? 'MONTHLY_SUBSCRIPTIONS.SCAN_NEXT_MONTH_HINT' : 'MONTHLY_SUBSCRIPTIONS.SCAN_PICK_MONTH_HINT') | translate }}</span>
     </div>
 
     <div class="flex flex-col gap-2 max-h-80 overflow-y-auto">
@@ -779,11 +789,15 @@
             <div class="text-xs text-gray-500 truncate">{{ m.courseName }}</div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
-            <p-tag
-              [value]="'MONTHLY_SUBSCRIPTIONS.STATUS.' + m.paymentStatus | translate"
-              [severity]="getStatusSeverity(m.paymentStatus)"
-            ></p-tag>
-            <span class="font-semibold" [class.text-red-600]="m.amountDue - m.amountPaid > 0">
+            @if (m.projected) {
+              <p-tag [value]="'MONTHLY_SUBSCRIPTIONS.SCAN_NEXT_MONTH_TAG' | translate" severity="info"></p-tag>
+            } @else {
+              <p-tag
+                [value]="'MONTHLY_SUBSCRIPTIONS.STATUS.' + m.paymentStatus | translate"
+                [severity]="getStatusSeverity(m.paymentStatus)"
+              ></p-tag>
+            }
+            <span class="font-semibold" [class.text-red-600]="!m.projected && m.amountDue - m.amountPaid > 0">
               {{ (m.amountDue - m.amountPaid) | amount }}
             </span>
           </div>

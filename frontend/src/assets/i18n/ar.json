@@ -1101,6 +1101,15 @@
     "PER_SESSION_DONE_OWING": "أصبح الدفع حصة بحصة — {{count}} حصة غير مدفوعة في تبويب الرسوم"
   },
   "MONTHLY_SUBSCRIPTIONS": {
+    "SCAN_NO_DUE_TITLE": "لا توجد مستحقات",
+    "SCAN_NEXT_MONTH_HINT": "لا توجد عليه مستحقات. هل تريد تحصيل الشهر القادم مقدمًا؟",
+    "SCAN_NEXT_MONTH_TAG": "الشهر القادم",
+    "REPORT_BUTTON": "تحميل تقرير",
+    "REPORT_EMPTY": "لا توجد فواتير شهرية بعد.",
+    "REPORT_COL_STUDENT": "الطالب",
+    "REPORT_COL_PARENT": "ولي الأمر",
+    "REPORT_COL_COURSE": "الكورس",
+    "REPORT_SHEET": "المدفوعات الشهرية",
     "TITLE": "الاشتراكات الشهرية",
     "SUBTITLE": "إدارة الفواتير الشهرية للكورسات ذات الاشتراك الشهري",
     "YEAR": "السنة",
