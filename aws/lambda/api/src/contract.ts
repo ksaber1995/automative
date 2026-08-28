@@ -2151,6 +2151,10 @@ const EducationalBooksCourseDetailSchema = z.object({
     buyers: z.array(z.object({
       studentId: UUIDSchema,
       studentName: z.string().nullable(),
+      studentCode: z.union([z.number(), z.string()]).nullable().optional(),
+      // The class behind the buyer's enrollment — the print report's class filter.
+      classId: UUIDSchema.nullable().optional(),
+      className: z.string().nullable().optional(),
       saleId: UUIDSchema,
       quantity: z.number(),
       totalAmount: z.number(),
@@ -2161,6 +2165,9 @@ const EducationalBooksCourseDetailSchema = z.object({
     nonBuyers: z.array(z.object({
       studentId: UUIDSchema,
       studentName: z.string().nullable(),
+      studentCode: z.union([z.number(), z.string()]).nullable().optional(),
+      classId: UUIDSchema.nullable().optional(),
+      className: z.string().nullable().optional(),
       enrollmentId: UUIDSchema.nullable(),
     })),
   })),

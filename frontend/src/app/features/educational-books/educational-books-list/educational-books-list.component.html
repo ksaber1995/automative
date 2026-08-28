@@ -1,9 +1,19 @@
 <div class="container mx-auto p-4">
   <p-card>
     <ng-template pTemplate="header">
-      <div class="p-4">
-        <h2 class="text-2xl font-bold">{{ 'EDUCATIONAL_BOOKS.TITLE' | translate }}</h2>
-        <p class="text-sm text-gray-600 mt-1">{{ 'EDUCATIONAL_BOOKS.SUBTITLE' | translate }}</p>
+      <div class="p-4 flex justify-between items-center gap-3 flex-wrap">
+        <div>
+          <h2 class="text-2xl font-bold">{{ 'EDUCATIONAL_BOOKS.TITLE' | translate }}</h2>
+          <p class="text-sm text-gray-600 mt-1">{{ 'EDUCATIONAL_BOOKS.SUBTITLE' | translate }}</p>
+        </div>
+        <p-button
+          [label]="'EDUCATIONAL_BOOKS.REPORT_BUTTON' | translate"
+          icon="pi pi-print"
+          severity="success"
+          [outlined]="true"
+          size="small"
+          (onClick)="openPrintDialog()"
+        ></p-button>
       </div>
     </ng-template>
 
@@ -106,3 +116,55 @@
     }
   </p-card>
 </div>
+
+<!-- Scope picker for the printed buyers report: one course (optionally one
+     class of it), or every course the list is currently showing. -->
+<p-dialog
+  [visible]="printDialogVisible()"
+  (visibleChange)="printDialogVisible.set($event)"
+  [modal]="true"
+  [style]="{ width: '26rem', maxWidth: '95vw' }"
+  [header]="'EDUCATIONAL_BOOKS.REPORT_TITLE' | translate"
+>
+  <div class="space-y-3 pt-1">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'EDUCATIONAL_BOOKS.COURSE' | translate }}</label>
+      <p-select
+        [options]="printCourseOptions()"
+        [ngModel]="printCourseId()"
+        (ngModelChange)="onPrintCourseChange($event)"
+        optionLabel="label"
+        optionValue="value"
+        [showClear]="true"
+        [filter]="true"
+        filterBy="label"
+        appendTo="body"
+        [placeholder]="'EDUCATIONAL_BOOKS.ALL_COURSES' | translate"
+        [style]="{ width: '100%' }"
+      ></p-select>
+    </div>
+    @if (printCourseId()) {
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'EDUCATIONAL_BOOKS.REPORT_COL_CLASS' | translate }}</label>
+        <p-select
+          [options]="printClassOptions()"
+          [ngModel]="printClassId()"
+          (ngModelChange)="printClassId.set($event)"
+          optionLabel="label"
+          optionValue="value"
+          [showClear]="true"
+          appendTo="body"
+          [placeholder]="'EDUCATIONAL_BOOKS.REPORT_ALL_CLASSES' | translate"
+          [style]="{ width: '100%' }"
+        ></p-select>
+      </div>
+    }
+    <p class="text-xs text-gray-500">{{ 'EDUCATIONAL_BOOKS.REPORT_HINT' | translate }}</p>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button [label]="'EDUCATIONAL_BOOKS.REPORT_CANCEL' | translate" severity="secondary" [outlined]="true"
+      (onClick)="printDialogVisible.set(false)"></p-button>
+    <p-button [label]="'EDUCATIONAL_BOOKS.REPORT_BUTTON' | translate" icon="pi pi-print"
+      [loading]="printing()" (onClick)="confirmPrint()"></p-button>
+  </ng-template>
+</p-dialog>

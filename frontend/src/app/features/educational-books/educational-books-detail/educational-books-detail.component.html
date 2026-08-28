@@ -20,6 +20,25 @@
           </div>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
+          <!-- Who paid, on paper: optional class narrowing, then print / save-as-PDF. -->
+          <p-select
+            [options]="printClassOptions()"
+            [ngModel]="printClassId()"
+            (ngModelChange)="printClassId.set($event)"
+            optionLabel="label"
+            optionValue="value"
+            [showClear]="true"
+            appendTo="body"
+            [placeholder]="'EDUCATIONAL_BOOKS.REPORT_ALL_CLASSES' | translate"
+            [style]="{ width: '170px' }"
+          ></p-select>
+          <p-button
+            [label]="'EDUCATIONAL_BOOKS.REPORT_BUTTON' | translate"
+            icon="pi pi-print"
+            severity="success"
+            [outlined]="true"
+            (onClick)="printReport()">
+          </p-button>
           <span class="p-input-icon-left">
             <input
               type="text"

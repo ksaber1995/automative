@@ -33,6 +33,8 @@ import {
 } from '@shared/interfaces/course-product.interface';
 import { DiscountType } from '@shared/enums/product.enum';
 import { PaymentMethod } from '@shared/enums/enrollment-status.enum';
+import { printBooksReport } from '../books-report.util';
+import { LanguageService } from '../../../core/services/language.service';
 
 /** A product the scanned student hasn't bought yet (one option in the picker). */
 interface ScanSellOption {
@@ -67,10 +69,43 @@ export class EducationalBooksDetailComponent implements OnInit, OnDestroy {
 
   DiscountType = DiscountType;
 
+  private languageService = inject(LanguageService);
+
   courseId = '';
   courseDetail = signal<EducationalBooksCourseDetail | null>(null);
   branches = signal<LookupOption[]>([]);
   loading = signal(false);
+
+  // ── The printed buyers report, optionally narrowed to one class ────────────
+  printClassId = signal<string | null>(null);
+
+  /** Classes seen anywhere on this course's roster, for the report filter. */
+  printClassOptions = computed(() => {
+    const detail = this.courseDetail();
+    if (!detail) return [];
+    const byId = new Map<string, string>();
+    for (const p of detail.products) {
+      for (const s of [...p.buyers, ...p.nonBuyers]) {
+        if (s.classId && s.className) byId.set(s.classId, s.className);
+      }
+    }
+    return [...byId.entries()]
+      .map(([value, label]) => ({ label, value }))
+      .sort((a, z) => a.label.localeCompare(z.label));
+  });
+
+  printReport(): void {
+    const detail = this.courseDetail();
+    if (!detail) return;
+    const classId = this.printClassId();
+    printBooksReport({
+      details: [detail],
+      classId,
+      className: this.printClassOptions().find((o) => o.value === classId)?.label ?? null,
+      t: (k, p) => this.translate.instant(k, p),
+      rtl: this.languageService.isRtl(),
+    });
+  }
 
   // Live search over the roster by student name or short code.
   search = signal('');

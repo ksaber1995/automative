@@ -103,9 +103,11 @@ export const educationalBooksRoutes = {
       const roster = await query(
         `SELECT DISTINCT ON (e.student_id)
                 e.student_id, e.id AS enrollment_id, s.student_code,
+                e.class_id, cl.name AS class_name,
                 NULLIF(TRIM(COALESCE(s.name,'')), '') AS student_name
          FROM enrollments e
          JOIN students s ON e.student_id = s.id
+         LEFT JOIN classes cl ON cl.id = e.class_id
          WHERE e.course_id = $1 AND e.company_id = $2 AND e.status IN ${ENROLLED_STATUSES}
          ORDER BY e.student_id, e.enrollment_date DESC`,
         [params.courseId, context.companyId]
@@ -136,6 +138,8 @@ export const educationalBooksRoutes = {
               studentId: r.student_id,
               studentName: r.student_name,
               studentCode: r.student_code ?? null,
+              classId: r.class_id ?? null,
+              className: r.class_name ?? null,
               saleId: sale.id,
               quantity: parseInt(sale.quantity),
               totalAmount: parseFloat(sale.total_amount),
@@ -150,6 +154,8 @@ export const educationalBooksRoutes = {
               studentId: r.student_id,
               studentName: r.student_name,
               studentCode: r.student_code ?? null,
+              classId: r.class_id ?? null,
+              className: r.class_name ?? null,
               enrollmentId: r.enrollment_id,
             });
           }

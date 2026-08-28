@@ -51,6 +51,9 @@ export interface BookBuyer {
   studentName: string | null;
   /** Short sequential student code (for search / scan-to-sell). */
   studentCode?: number | string | null;
+  /** The class behind the buyer's enrollment — drives the report's class filter. */
+  classId?: string | null;
+  className?: string | null;
   saleId: string;
   quantity: number;
   totalAmount: number;
@@ -66,6 +69,8 @@ export interface BookNonBuyer {
   studentName: string | null;
   /** Short sequential student code (for search / scan-to-sell). */
   studentCode?: number | string | null;
+  classId?: string | null;
+  className?: string | null;
   enrollmentId: string | null;
 }
 
