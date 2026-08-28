@@ -43,6 +43,7 @@ import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 
 import { MonthlyPaymentWithDetails, MonthlyPaymentSummary, CourseMonthlyPriceOverride, HeldSubscription, RefundMonthlyPaymentDto } from '@shared/interfaces/monthly-subscription.interface';
 import * as XLSX from 'xlsx';
+import { esc, openPrintWindow, section, th } from '../../../core/utils/print-report.util';
 import { Course } from '@shared/interfaces/course.interface';
 
 @Component({
@@ -558,13 +559,14 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
   exportingReport = signal(false);
 
   /**
-   * One Excel sheet the desk can print: a row per student (per course, when a
-   * student takes several), a column per month up to the current one, and in
-   * each cell ✓ paid / ◐ paid-of-due for a part payment / ✗ not paid. Covers
-   * the last 12 months and trims leading empty ones, honouring the branch and
-   * course filters; future months are nobody's debt yet, so they stay off it.
+   * The collection sheet: a row per student (per course, when a student takes
+   * several), a column per month up to the current one, and in each cell
+   * ✓ paid / ◐ paid-of-due for a part payment / ✗ not paid. Covers the last 12
+   * months and trims leading empty ones, honouring the branch and course
+   * filters; future months are nobody's debt yet, so they stay off it.
+   * Delivered as an .xlsx, or as the print window — the save-as-PDF path.
    */
-  downloadReport(): void {
+  downloadReport(kind: 'xlsx' | 'pdf' = 'xlsx'): void {
     if (this.exportingReport()) return;
     const now = new Date();
     const toKey = now.getFullYear() * 12 + (now.getMonth() + 1);
@@ -587,13 +589,18 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
           this.notify.info(this.translate.instant('MONTHLY_SUBSCRIPTIONS.REPORT_EMPTY'));
           return;
         }
-        this.buildReportSheet(bills, toKey);
+        const grid = this.buildReportGrid(bills, toKey);
+        if (kind === 'pdf') this.printReportGrid(grid);
+        else this.writeReportSheet(grid);
       },
       error: () => this.exportingReport.set(false),
     });
   }
 
-  private buildReportSheet(bills: MonthlyPaymentWithDetails[], toKey: number): void {
+  /** The shared shape both deliveries render: headers + marked-up body rows. */
+  private buildReportGrid(bills: MonthlyPaymentWithDetails[], toKey: number): {
+    headers: string[]; body: string[][]; monthCount: number; fromLabel: string; toLabel: string;
+  } {
     const t = (k: string) => this.translate.instant(k);
     const keyOf = (b: MonthlyPaymentWithDetails) => b.billingYear * 12 + b.billingMonth;
 
@@ -640,6 +647,15 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
       .sort((a, z) => a.courseName.localeCompare(z.courseName) || a.studentName.localeCompare(z.studentName))
       .map((r) => [r.studentName, r.parentName, r.courseName, ...months.map((k) => mark(r.cells.get(k)))]);
 
+    return {
+      headers, body, monthCount: months.length,
+      fromLabel: monthLabel(minKey), toLabel: monthLabel(toKey),
+    };
+  }
+
+  private writeReportSheet(grid: { headers: string[]; body: string[][]; fromLabel: string; toLabel: string }): void {
+    const t = (k: string) => this.translate.instant(k);
+    const { headers, body } = grid;
     const sheet = XLSX.utils.aoa_to_sheet([headers, ...body]);
     sheet['!cols'] = headers.map((h, i) => {
       const longest = Math.max(h.length, ...body.map((r) => String(r[i] ?? '').length));
@@ -655,7 +671,25 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     if (this.isRtl) book.Workbook = { Views: [{ RTL: true }] };
     const sheetName = String(t('MONTHLY_SUBSCRIPTIONS.REPORT_SHEET')).replace(/[[\]:*?/\\]/g, '').slice(0, 31) || 'Monthly';
     XLSX.utils.book_append_sheet(book, sheet, sheetName);
-    XLSX.writeFile(book, `monthly-report-${monthLabel(minKey).replace('/', '-')}_${monthLabel(toKey).replace('/', '-')}.xlsx`);
+    XLSX.writeFile(book, `monthly-report-${grid.fromLabel.replace('/', '-')}_${grid.toLabel.replace('/', '-')}.xlsx`);
+  }
+
+  /** The same grid through the print window — which is also the save-as-PDF path. */
+  private printReportGrid(grid: { headers: string[]; body: string[][]; monthCount: number; fromLabel: string; toLabel: string }): void {
+    const t = (k: string) => this.translate.instant(k);
+    const head = th(grid.headers.map((h, i) => [h, i >= 3] as [string, boolean]));
+    const rows = grid.body.map((r) => `
+      <tr>${r.map((c, i) => `<td class="${i >= 3 ? 'num' : ''}">${esc(c)}</td>`).join('')}</tr>`).join('');
+    openPrintWindow({
+      title: t('MONTHLY_SUBSCRIPTIONS.REPORT_SHEET'),
+      rtl: this.isRtl,
+      // A year of month columns needs the page on its side to stay legible.
+      landscape: grid.monthCount > 5,
+      body: `
+        <h1>${esc(t('MONTHLY_SUBSCRIPTIONS.REPORT_SHEET'))}</h1>
+        <div class="meta">${esc(grid.fromLabel)} – ${esc(grid.toLabel)} · ${grid.body.length}</div>
+        ${section('', head, rows, t('MONTHLY_SUBSCRIPTIONS.REPORT_EMPTY'))}`,
+    });
   }
 
   /** Inclusive (from..to) month range for the active filter mode. */

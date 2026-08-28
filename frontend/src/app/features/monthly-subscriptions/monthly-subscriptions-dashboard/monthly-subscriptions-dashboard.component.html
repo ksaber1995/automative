@@ -7,14 +7,23 @@
     </div>
     <div class="flex flex-wrap items-center gap-2">
       <!-- The paper collection sheet: one row per student, one column per month,
-           ✓ / partial / ✗ — printable straight from Excel. -->
+           ✓ / partial / ✗ — as an Excel file, or as PDF via the print window. -->
       <p-button
         [label]="'MONTHLY_SUBSCRIPTIONS.REPORT_BUTTON' | translate"
         icon="pi pi-file-excel"
         severity="success"
         [outlined]="true"
         [loading]="exportingReport()"
-        (onClick)="downloadReport()"
+        (onClick)="downloadReport('xlsx')"
+      ></p-button>
+      <p-button
+        label="PDF"
+        icon="pi pi-file-pdf"
+        severity="danger"
+        [outlined]="true"
+        [loading]="exportingReport()"
+        [pTooltip]="'MONTHLY_SUBSCRIPTIONS.REPORT_PDF_HINT' | translate"
+        (onClick)="downloadReport('pdf')"
       ></p-button>
       <p-button
         [label]="'MONTHLY_SUBSCRIPTIONS.UPDATE_MONTH_BUTTON' | translate"

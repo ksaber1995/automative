@@ -268,6 +268,7 @@
     "SCAN_NEXT_MONTH_HINT": "لا توجد عليه مستحقات. هل تريد تحصيل الشهر القادم مقدمًا؟",
     "SCAN_NEXT_MONTH_TAG": "الشهر القادم",
     "REPORT_BUTTON": "تحميل تقرير",
+    "REPORT_PDF_HINT": "يفتح التقرير في نافذة طباعة — اطبعه أو احفظه PDF.",
     "REPORT_EMPTY": "لا توجد اشتراكات شهرية بعد.",
     "REPORT_COL_STUDENT": "العضو",
     "REPORT_COL_PARENT": "ولي الأمر",

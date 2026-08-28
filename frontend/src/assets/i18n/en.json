@@ -1105,6 +1105,7 @@
     "SCAN_NEXT_MONTH_HINT": "has no dues. Collect next month in advance?",
     "SCAN_NEXT_MONTH_TAG": "Next month",
     "REPORT_BUTTON": "Download report",
+    "REPORT_PDF_HINT": "Opens the report in a print window — print it or save as PDF.",
     "REPORT_EMPTY": "No monthly bills to report yet.",
     "REPORT_COL_STUDENT": "Student",
     "REPORT_COL_PARENT": "Parent",
