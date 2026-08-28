@@ -43,7 +43,7 @@ import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 
 import { MonthlyPaymentWithDetails, MonthlyPaymentSummary, CourseMonthlyPriceOverride, HeldSubscription, RefundMonthlyPaymentDto } from '@shared/interfaces/monthly-subscription.interface';
 import * as XLSX from 'xlsx';
-import { esc, openPrintWindow, section, th } from '../../../core/utils/print-report.util';
+import { downloadTablePdf } from '../../../core/utils/pdf-table.util';
 import { Course } from '@shared/interfaces/course.interface';
 
 @Component({
@@ -582,16 +582,20 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
       branchId: branchId || undefined,
       courseId: courseId || undefined,
     }).pipe(takeUntil(this.destroy$)).subscribe({
-      next: (payments) => {
-        this.exportingReport.set(false);
+      next: async (payments) => {
         const bills = payments.filter((p) => !p.projected);
         if (!bills.length) {
+          this.exportingReport.set(false);
           this.notify.info(this.translate.instant('MONTHLY_SUBSCRIPTIONS.REPORT_EMPTY'));
           return;
         }
         const grid = this.buildReportGrid(bills, toKey);
-        if (kind === 'pdf') this.printReportGrid(grid);
-        else this.writeReportSheet(grid);
+        try {
+          if (kind === 'pdf') await this.saveReportPdf(grid);
+          else this.writeReportSheet(grid);
+        } finally {
+          this.exportingReport.set(false);
+        }
       },
       error: () => this.exportingReport.set(false),
     });
@@ -674,21 +678,19 @@ export class MonthlySubscriptionsDashboardComponent implements OnInit, OnDestroy
     XLSX.writeFile(book, `monthly-report-${grid.fromLabel.replace('/', '-')}_${grid.toLabel.replace('/', '-')}.xlsx`);
   }
 
-  /** The same grid through the print window — which is also the save-as-PDF path. */
-  private printReportGrid(grid: { headers: string[]; body: string[][]; monthCount: number; fromLabel: string; toLabel: string }): void {
+  /** The same grid as a real downloadable .pdf file. */
+  private saveReportPdf(grid: { headers: string[]; body: string[][]; fromLabel: string; toLabel: string }): Promise<void> {
     const t = (k: string) => this.translate.instant(k);
-    const head = th(grid.headers.map((h, i) => [h, i >= 3] as [string, boolean]));
-    const rows = grid.body.map((r) => `
-      <tr>${r.map((c, i) => `<td class="${i >= 3 ? 'num' : ''}">${esc(c)}</td>`).join('')}</tr>`).join('');
-    openPrintWindow({
+    return downloadTablePdf({
+      headers: grid.headers,
+      body: grid.body,
+      // Month cells hold digits (◐ 50/100) that the bidi algorithm would
+      // reorder next to Arabic — force them LTR.
+      ltrColumns: grid.headers.map((_, i) => i).filter((i) => i >= 3),
       title: t('MONTHLY_SUBSCRIPTIONS.REPORT_SHEET'),
+      subtitle: `${grid.fromLabel} – ${grid.toLabel} · ${grid.body.length}`,
+      filename: `monthly-report-${grid.fromLabel.replace('/', '-')}_${grid.toLabel.replace('/', '-')}.pdf`,
       rtl: this.isRtl,
-      // A year of month columns needs the page on its side to stay legible.
-      landscape: grid.monthCount > 5,
-      body: `
-        <h1>${esc(t('MONTHLY_SUBSCRIPTIONS.REPORT_SHEET'))}</h1>
-        <div class="meta">${esc(grid.fromLabel)} – ${esc(grid.toLabel)} · ${grid.body.length}</div>
-        ${section('', head, rows, t('MONTHLY_SUBSCRIPTIONS.REPORT_EMPTY'))}`,
     });
   }
 
