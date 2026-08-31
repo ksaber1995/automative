@@ -445,9 +445,23 @@ function monthKeyOf(ymd: string): number {
   return y * 12 + m;
 }
 
+/**
+ * YYYY-MM-DD of a DATE column value. node-pg hands DATE columns over as JS
+ * Dates, whose String() is "Mon Aug 10 2026 …" — sliced, that fed Postgres the
+ * literal "Mon Aug 10". Local components, not toISOString(): the driver parses
+ * the date at local midnight, and UTC conversion would shift it a day east of
+ * Greenwich.
+ */
+function ymdOf(value: any): string {
+  if (value instanceof Date) {
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  }
+  return String(value).slice(0, 10);
+}
+
 /** What changing this enrollment's join date to `newDate` would touch. */
 async function joinDateImpactOf(companyId: string, enrollment: any, newDate: string) {
-  const oldDate = String(enrollment.enrollment_date).slice(0, 10);
+  const oldDate = ymdOf(enrollment.enrollment_date);
   const paymentType = enrollment.payment_type || 'ONE_TIME';
   const oldKey = monthKeyOf(oldDate);
   const newKey = monthKeyOf(newDate);
@@ -997,7 +1011,7 @@ export const enrollmentsRoutes = {
         const startKey = monthKeyOf(newDate);
         const now = new Date();
         const curKey = now.getFullYear() * 12 + (now.getMonth() + 1);
-        const endKey = Math.max(Math.min(curKey, monthKeyOf(String(enrollment.enrollment_date).slice(0, 10)) - 1), startKey);
+        const endKey = Math.max(Math.min(curKey, monthKeyOf(ymdOf(enrollment.enrollment_date)) - 1), startKey);
         for (let k = startKey; k <= endKey; k++) {
           const y = Math.floor((k - 1) / 12);
           const m = ((k - 1) % 12) + 1;
@@ -1053,7 +1067,7 @@ export const enrollmentsRoutes = {
            ON CONFLICT (session_id, student_id) DO NOTHING
            RETURNING id`,
           [enrollment.student_id, enrollment.class_id, context.companyId,
-           newDate, String(enrollment.enrollment_date).slice(0, 10)]
+           newDate, ymdOf(enrollment.enrollment_date)]
         );
         markedPresent = (marked as any[]).length;
       }
