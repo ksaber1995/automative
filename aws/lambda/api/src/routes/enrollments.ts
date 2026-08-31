@@ -736,6 +736,7 @@ export const enrollmentsRoutes = {
       // total for a one-time course, the monthly fee for a subscription, the
       // per-session fee for pay-as-you-go — so one number covers all three.
       let repriceMonthly = false;
+      let repriceSessions = false;
       if (body.finalPrice !== undefined) {
         const newPrice = Number(body.finalPrice);
         if (!Number.isFinite(newPrice) || newPrice < 0) {
@@ -752,15 +753,36 @@ export const enrollmentsRoutes = {
           updateData.payment_status = computePaymentStatus(newPrice, parseFloat(existing.amount_paid || 0));
         } else if (paymentType === 'MONTHLY_SUBSCRIPTION') {
           repriceMonthly = true;
+        } else if (paymentType === 'PER_SESSION') {
+          // Charges already raised are figures the student was told they owe —
+          // rewriting them is the caller's explicit choice (the price dialog's
+          // "also update unpaid dues" checkbox), never a side effect. Covered,
+          // waived and settled charges keep their figures either way.
+          repriceSessions = body.applyToUnpaidSessions === true;
         }
-        // PER_SESSION charges are per session already held and billed at the fee of
-        // the day; the new fee applies to the sessions charged from here on.
       }
 
       const enrollment = await update('enrollments', params.id, updateData);
 
       if (repriceMonthly) {
         await repriceOpenMonthlyBills(context.companyId, params.id, Number(body.finalPrice));
+      }
+      if (repriceSessions) {
+        await query(
+          `UPDATE session_payments
+              SET amount_due = $3::numeric,
+                  payment_status = CASE
+                    WHEN $3::numeric > 0 AND amount_paid >= $3::numeric THEN 'PAID'
+                    ELSE payment_status
+                  END,
+                  paid_date = CASE
+                    WHEN $3::numeric > 0 AND amount_paid >= $3::numeric THEN COALESCE(paid_date, CURRENT_DATE)
+                    ELSE paid_date
+                  END,
+                  updated_at = NOW()
+            WHERE enrollment_id = $1 AND company_id = $2 AND payment_status = 'PENDING'`,
+          [params.id, context.companyId, Number(body.finalPrice)],
+        );
       }
 
       if (!enrollment) {

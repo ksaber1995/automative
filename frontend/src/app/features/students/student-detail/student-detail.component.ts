@@ -1298,9 +1298,24 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
     return enrollment ? this.editPriceKey(enrollment, 'EDIT_PRICE_TITLE') : 'STUDENTS.DETAIL.EDIT_PRICE_TITLE';
   }
 
+  /** The price dialog's "also update the unpaid session dues" choice. */
+  applyToUnpaidSessions = signal(false);
+
+  /** What a per-session fee change could also rewrite: the PENDING charges. */
+  pendingSessionDues(enrollment: Enrollment | null): { count: number; total: number } {
+    if (!enrollment || !this.isPerSession(enrollment)) return { count: 0, total: 0 };
+    const pending = this.getSessionPayments(enrollment.id).filter((p) => p.paymentStatus === 'PENDING');
+    return {
+      count: pending.length,
+      total: pending.reduce((sum, p) => sum + Math.max(0, (p.amountDue || 0) - (p.amountPaid || 0)), 0),
+    };
+  }
+
   openEditPriceDialog(enrollment: Enrollment) {
     this.editPriceEnrollment.set(enrollment);
     this.editPriceValue = enrollment.finalPrice;
+    // Rewriting owed figures is opt-in every time, never remembered.
+    this.applyToUnpaidSessions.set(false);
     this.showEditPriceDialog = true;
   }
 
@@ -1309,7 +1324,10 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
     if (!enrollment || this.editPriceValue == null || this.editPriceValue < 0) return;
 
     this.actionLoading.set(true);
-    this.enrollmentService.updateEnrollment(enrollment.id, { finalPrice: this.editPriceValue }).subscribe({
+    this.enrollmentService.updateEnrollment(enrollment.id, {
+      finalPrice: this.editPriceValue,
+      ...(this.isPerSession(enrollment) && this.applyToUnpaidSessions() ? { applyToUnpaidSessions: true } : {}),
+    }).subscribe({
       next: () => {
         this.notificationService.success(this.translate.instant('STUDENTS.DETAIL.PRICE_UPDATED'));
         this.showEditPriceDialog = false;

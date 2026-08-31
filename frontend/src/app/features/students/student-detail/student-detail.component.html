@@ -1984,6 +1984,36 @@
         <p-inputnumber [(ngModel)]="editPriceValue" [min]="0" [placeholder]="editPriceLabel(e) | translate" [style]="{ width: '100%' }" />
         <p class="text-xs text-gray-400 mt-1">{{ editPriceHint(e) | translate }}</p>
       </div>
+
+      <!-- Per-session with dues on the books: the new fee only applies to the
+           sessions charged from here on — rewriting what the student was already
+           told they owe is a choice, made here, every time. -->
+      @if (isPerSession(e) && pendingSessionDues(e); as dues) {
+        @if (dues.count > 0) {
+          <div class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+            <div class="flex gap-2">
+              <i class="pi pi-exclamation-triangle mt-0.5"></i>
+              <span>{{ 'STUDENTS.DETAIL.SESSION_DUES_HINT' | translate: { count: dues.count, total: (dues.total | amount) } }}</span>
+            </div>
+            <div class="flex items-start gap-2 mt-2">
+              <p-checkbox
+                inputId="applyToUnpaidSessions"
+                [binary]="true"
+                [ngModel]="applyToUnpaidSessions()"
+                (ngModelChange)="applyToUnpaidSessions.set($event)"
+              ></p-checkbox>
+              <label for="applyToUnpaidSessions" class="text-sm cursor-pointer">
+                {{ 'STUDENTS.DETAIL.APPLY_UNPAID_SESSIONS' | translate: { count: dues.count } }}
+              </label>
+            </div>
+            <p class="text-xs mt-1 ms-6 text-amber-700">
+              {{ (applyToUnpaidSessions()
+                    ? 'STUDENTS.DETAIL.APPLY_UNPAID_SESSIONS_ON'
+                    : 'STUDENTS.DETAIL.APPLY_UNPAID_SESSIONS_OFF') | translate }}
+            </p>
+          </div>
+        }
+      }
     </div>
   }
   <ng-template pTemplate="footer">

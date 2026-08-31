@@ -1603,7 +1603,11 @@ const CreateEnrollmentSchema = z.object({
   })).optional(),
 });
 
-const UpdateEnrollmentSchema = CreateEnrollmentSchema.partial();
+const UpdateEnrollmentSchema = CreateEnrollmentSchema.partial().extend({
+  // With a finalPrice change on a PER_SESSION enrollment: also restate the
+  // PENDING session charges already raised (the price dialog's checkbox).
+  applyToUnpaidSessions: z.boolean().optional(),
+});
 
 const EnrollmentSchema = z.object({
   id: UUIDSchema,

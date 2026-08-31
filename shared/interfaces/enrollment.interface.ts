@@ -159,6 +159,11 @@ export interface EnrollmentUpdateDto {
   notes?: string;
   /** Override the final price this student pays for the course. */
   finalPrice?: number;
+  /**
+   * With a finalPrice change on a PER_SESSION enrollment: also restate the
+   * PENDING session charges already raised at the old fee.
+   */
+  applyToUnpaidSessions?: boolean;
 }
 
 export interface PaymentInstallment {
