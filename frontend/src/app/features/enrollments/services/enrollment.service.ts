@@ -3,6 +3,21 @@ import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { AddPaymentDto, CreateRefundDto, Enrollment, EnrollmentCreateDto, EnrollmentPayment, EnrollmentUpdateDto, EnrollmentWithDetails, Refund } from '@shared/interfaces/enrollment.interface';
 
+/** What moving an enrollment's join date would touch — the dialog's numbers. */
+export interface JoinDateImpact {
+  paymentType: string;
+  oldDate: string;
+  newDate: string;
+  monthlyFee: number | null;
+  billsToAdd: number;
+  billsToWipe: number;
+  billsKeptWithMoney: number;
+  attendanceBefore: number;
+  attendanceBeforeHasMoney: boolean;
+  sessionsBecomingAbsent: number;
+  canMarkPresent: boolean;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -31,6 +46,17 @@ export class EnrollmentService {
 
   deleteEnrollment(id: string): Observable<{ message: string }> {
     return this.api.delete<{ message: string }>(`enrollments/${id}`);
+  }
+
+  /** Dry run of a join-date change — the dialog shows these numbers before saving. */
+  joinDateImpact(id: string, newDate: string): Observable<JoinDateImpact> {
+    return this.api.get<JoinDateImpact>(`enrollments/${id}/join-date-impact`, { newDate });
+  }
+
+  /** Apply the previewed join-date change; the attendance rewrites are opt-in. */
+  changeJoinDate(id: string, dto: { newDate: string; wipeAttendanceBefore?: boolean; markPresentSince?: boolean }):
+    Observable<{ billsAdded: number; billsWiped: number; attendanceWiped: number; markedPresent: number }> {
+    return this.api.post(`enrollments/${id}/join-date`, dto);
   }
 
   getPayments(enrollmentId: string): Observable<EnrollmentPayment[]> {

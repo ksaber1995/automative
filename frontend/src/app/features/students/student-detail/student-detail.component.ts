@@ -33,7 +33,7 @@ import { QrCard, QrCardService } from '../../qr-cards/qr-card.service';
 import { serialLabel } from '../../qr-cards/qr-cards.component';
 import { StudentService } from '../services/student.service';
 import { CARD_SERIAL_BASE, formatStudentCode, normalizeStudentCode, shouldShowStudentCode } from '../../../core/utils/student-code.util';
-import { EnrollmentService } from '../../enrollments/services/enrollment.service';
+import { EnrollmentService, JoinDateImpact } from '../../enrollments/services/enrollment.service';
 import { CourseService } from '../../courses/services/course.service';
 import { ClassService } from '../../courses/services/class.service';
 import { MasterEnrollmentService } from '../../master-courses/services/master-enrollment.service';
@@ -1296,6 +1296,76 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
   editPriceTitle(): string {
     const enrollment = this.editPriceEnrollment();
     return enrollment ? this.editPriceKey(enrollment, 'EDIT_PRICE_TITLE') : 'STUDENTS.DETAIL.EDIT_PRICE_TITLE';
+  }
+
+  // ─── Join-date edit: the date, its previewed consequences, and the opt-ins ──
+  showJoinDateDialog = false;
+  joinDateEnrollment = signal<Enrollment | null>(null);
+  joinDateValue: Date | null = null;
+  joinDateImpact = signal<JoinDateImpact | null>(null);
+  joinDateChecking = signal(false);
+  wipeAttendanceBefore = signal(false);
+  markPresentSince = signal(false);
+
+  openJoinDateDialog(enrollment: Enrollment) {
+    this.joinDateEnrollment.set(enrollment);
+    this.joinDateValue = enrollment.enrollmentDate ? new Date(enrollment.enrollmentDate) : new Date();
+    this.joinDateImpact.set(null);
+    this.wipeAttendanceBefore.set(false);
+    this.markPresentSince.set(false);
+    this.showJoinDateDialog = true;
+    this.previewJoinDate();
+  }
+
+  /** Refetch the consequences whenever the picked date changes. */
+  previewJoinDate() {
+    const enrollment = this.joinDateEnrollment();
+    if (!enrollment || !this.joinDateValue) { this.joinDateImpact.set(null); return; }
+    const newDate = this.ymdLocal(this.joinDateValue);
+    this.joinDateChecking.set(true);
+    this.enrollmentService.joinDateImpact(enrollment.id, newDate).subscribe({
+      next: (impact) => {
+        this.joinDateChecking.set(false);
+        this.joinDateImpact.set(impact);
+        // The opt-ins describe THIS move; a new preview starts them unticked.
+        this.wipeAttendanceBefore.set(false);
+        this.markPresentSince.set(false);
+      },
+      error: () => {
+        this.joinDateChecking.set(false);
+        this.joinDateImpact.set(null);
+      },
+    });
+  }
+
+  joinDateChanged(): boolean {
+    const impact = this.joinDateImpact();
+    return !!impact && impact.newDate !== impact.oldDate;
+  }
+
+  submitJoinDate() {
+    const enrollment = this.joinDateEnrollment();
+    const impact = this.joinDateImpact();
+    if (!enrollment || !this.joinDateValue || !impact || !this.joinDateChanged()) return;
+    this.actionLoading.set(true);
+    this.enrollmentService.changeJoinDate(enrollment.id, {
+      newDate: this.ymdLocal(this.joinDateValue),
+      ...(this.wipeAttendanceBefore() ? { wipeAttendanceBefore: true } : {}),
+      ...(this.markPresentSince() ? { markPresentSince: true } : {}),
+    }).subscribe({
+      next: () => {
+        this.notificationService.success(this.translate.instant('STUDENTS.DETAIL.JOINDATE_UPDATED'));
+        this.showJoinDateDialog = false;
+        this.actionLoading.set(false);
+        if (this.studentId) {
+          this.loadEnrollments(this.studentId);
+          // Bills and attendance may have moved with the date.
+          if (this.isMonthly(enrollment)) this.loadMonthlySubscriptions(this.studentId);
+          if (this.isPerSession(enrollment)) this.loadSessionPayments(this.studentId);
+        }
+      },
+      error: () => this.actionLoading.set(false),
+    });
   }
 
   /** The price dialog's "also update the unpaid session dues" choice. */

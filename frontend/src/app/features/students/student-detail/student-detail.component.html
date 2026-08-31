@@ -981,7 +981,16 @@
                 <div class="text-xs text-gray-500 flex items-center gap-1"><i class="pi pi-users text-[10px]"></i>{{ className }}</div>
               }
             </td>
-            <td class="text-sm">{{ formatDate(enrollment.enrollmentDate) }}</td>
+            <td class="text-sm">
+              <div class="flex items-center gap-1">
+                {{ formatDate(enrollment.enrollmentDate) }}
+                @if (canManageEnrollments()) {
+                  <p-button icon="pi pi-calendar" [text]="true" [rounded]="true" size="small" severity="secondary"
+                    (onClick)="openJoinDateDialog(enrollment)"
+                    [pTooltip]="'STUDENTS.DETAIL.JOINDATE_EDIT' | translate"></p-button>
+                }
+              </div>
+            </td>
             <td>
               <div class="text-sm flex items-center gap-1">
                 <span class="text-gray-500">{{ enrollment.originalPrice | amount }}</span>
@@ -2021,6 +2030,102 @@
     <p-button [label]="'STUDENTS.DETAIL.SAVE_PRICE' | translate" icon="pi pi-check" [loading]="actionLoading()"
       [disabled]="editPriceValue == null || editPriceValue < 0"
       (onClick)="submitEditPrice()"></p-button>
+  </ng-template>
+</p-dialog>
+
+<!-- Join-date edit: pick the day, see the consequences, choose the rewrites. -->
+<p-dialog
+  [(visible)]="showJoinDateDialog"
+  [header]="('STUDENTS.DETAIL.JOINDATE_TITLE' | translate) + ' — ' + getCourseName(joinDateEnrollment()?.courseId || '')"
+  [modal]="true"
+  [style]="{ width: '480px', maxWidth: '95vw' }"
+>
+  @if (joinDateEnrollment(); as e) {
+    <div class="grid gap-4">
+      <div>
+        <label class="block text-sm font-medium mb-2">{{ 'STUDENTS.DETAIL.JOINDATE_LABEL' | translate }}</label>
+        <p-datepicker [(ngModel)]="joinDateValue" (ngModelChange)="previewJoinDate()"
+          [showIcon]="true" dateFormat="yy-mm-dd" [style]="{ width: '100%' }" appendTo="body"></p-datepicker>
+      </div>
+
+      @if (joinDateChecking()) {
+        <p class="text-sm text-gray-500"><i class="pi pi-spinner pi-spin me-1"></i>{{ 'STUDENTS.DETAIL.JOINDATE_CHECKING' | translate }}</p>
+      } @else if (joinDateImpact(); as impact) {
+        @if (joinDateChanged()) {
+          <div class="flex flex-col gap-2">
+            <!-- Monthly billing consequences: implied by the model, stated plainly. -->
+            @if (impact.billsToAdd > 0) {
+              <div class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800 flex gap-2">
+                <i class="pi pi-exclamation-triangle mt-0.5"></i>
+                <span>{{ 'STUDENTS.DETAIL.JOINDATE_BILLS_ADD' | translate: { count: impact.billsToAdd, fee: (impact.monthlyFee || 0) | amount } }}</span>
+              </div>
+            }
+            @if (impact.billsToWipe > 0) {
+              <div class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800 flex gap-2">
+                <i class="pi pi-exclamation-triangle mt-0.5"></i>
+                <span>{{ 'STUDENTS.DETAIL.JOINDATE_BILLS_WIPE' | translate: { count: impact.billsToWipe } }}</span>
+              </div>
+            }
+            @if (impact.billsKeptWithMoney > 0) {
+              <div class="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800 flex gap-2">
+                <i class="pi pi-info-circle mt-0.5"></i>
+                <span>{{ 'STUDENTS.DETAIL.JOINDATE_BILLS_KEPT' | translate: { count: impact.billsKeptWithMoney } }}</span>
+              </div>
+            }
+
+            <!-- Attendance consequences: rewrites are opt-in, per move. -->
+            @if (impact.attendanceBefore > 0) {
+              <div class="border rounded-lg p-3 flex flex-col gap-2">
+                <div class="text-sm text-gray-700">
+                  {{ 'STUDENTS.DETAIL.JOINDATE_ATT_BEFORE' | translate: { count: impact.attendanceBefore } }}
+                </div>
+                @if (impact.attendanceBeforeHasMoney) {
+                  <p class="text-xs text-red-600 m-0">{{ 'STUDENTS.DETAIL.JOINDATE_ATT_MONEY' | translate }}</p>
+                } @else {
+                  <div class="flex items-start gap-2">
+                    <p-checkbox inputId="wipeAttendanceBefore" [binary]="true"
+                      [ngModel]="wipeAttendanceBefore()" (ngModelChange)="wipeAttendanceBefore.set($event)"></p-checkbox>
+                    <label for="wipeAttendanceBefore" class="text-sm cursor-pointer">
+                      {{ 'STUDENTS.DETAIL.JOINDATE_ATT_WIPE' | translate: { count: impact.attendanceBefore } }}
+                    </label>
+                  </div>
+                }
+              </div>
+            }
+            @if (impact.sessionsBecomingAbsent > 0) {
+              <div class="border rounded-lg p-3 flex flex-col gap-2">
+                <div class="text-sm text-gray-700">
+                  {{ 'STUDENTS.DETAIL.JOINDATE_ABSENCES' | translate: { count: impact.sessionsBecomingAbsent } }}
+                </div>
+                @if (impact.canMarkPresent) {
+                  <div class="flex items-start gap-2">
+                    <p-checkbox inputId="markPresentSince" [binary]="true"
+                      [ngModel]="markPresentSince()" (ngModelChange)="markPresentSince.set($event)"></p-checkbox>
+                    <label for="markPresentSince" class="text-sm cursor-pointer">
+                      {{ 'STUDENTS.DETAIL.JOINDATE_MARK_PRESENT' | translate: { count: impact.sessionsBecomingAbsent } }}
+                    </label>
+                  </div>
+                } @else {
+                  <p class="text-xs text-gray-500 m-0">{{ 'STUDENTS.DETAIL.JOINDATE_MARK_PRESENT_SESSION' | translate }}</p>
+                }
+              </div>
+            }
+
+            @if (impact.billsToAdd === 0 && impact.billsToWipe === 0 && impact.billsKeptWithMoney === 0
+                 && impact.attendanceBefore === 0 && impact.sessionsBecomingAbsent === 0) {
+              <p class="text-sm text-gray-500 m-0">{{ 'STUDENTS.DETAIL.JOINDATE_NO_IMPACT' | translate }}</p>
+            }
+          </div>
+        }
+      }
+    </div>
+  }
+  <ng-template pTemplate="footer">
+    <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true"
+      (onClick)="showJoinDateDialog = false"></p-button>
+    <p-button [label]="'STUDENTS.DETAIL.JOINDATE_SAVE' | translate" icon="pi pi-check"
+      [loading]="actionLoading()" [disabled]="joinDateChecking() || !joinDateChanged()"
+      (onClick)="submitJoinDate()"></p-button>
   </ng-template>
 </p-dialog>
 

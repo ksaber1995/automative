@@ -5133,6 +5133,51 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    // Dry run of a join-date change: the bills an earlier join owes / a later
+    // join orphans, and the attendance rows the move would strand or invent.
+    joinDateImpact: {
+      method: 'GET',
+      path: '/api/enrollments/:id/join-date-impact',
+      pathParams: z.object({ id: UUIDSchema }),
+      query: z.object({ newDate: z.string() }),
+      responses: {
+        200: z.object({
+          paymentType: z.string(),
+          oldDate: z.string(),
+          newDate: z.string(),
+          monthlyFee: z.number().nullable(),
+          billsToAdd: z.number(),
+          billsToWipe: z.number(),
+          billsKeptWithMoney: z.number(),
+          attendanceBefore: z.number(),
+          attendanceBeforeHasMoney: z.boolean(),
+          sessionsBecomingAbsent: z.number(),
+          canMarkPresent: z.boolean(),
+        }),
+        400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema,
+      },
+    },
+    // Apply the previewed change. Bill work follows from the model; the
+    // attendance rewrites are the two opt-in flags.
+    changeJoinDate: {
+      method: 'POST',
+      path: '/api/enrollments/:id/join-date',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({
+        newDate: z.string(),
+        wipeAttendanceBefore: z.boolean().optional(),
+        markPresentSince: z.boolean().optional(),
+      }),
+      responses: {
+        200: z.object({
+          billsAdded: z.number(),
+          billsWiped: z.number(),
+          attendanceWiped: z.number(),
+          markedPresent: z.number(),
+        }),
+        400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema,
+      },
+    },
     delete: {
       method: 'DELETE',
       path: '/api/enrollments/:id',

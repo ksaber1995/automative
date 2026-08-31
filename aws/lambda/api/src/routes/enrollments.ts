@@ -439,6 +439,93 @@ async function createPerSessionEnrollment(context: any, body: any, course: any) 
   }
 }
 
+/** 1-based month counter for a YYYY-MM-DD string — month arithmetic without Date. */
+function monthKeyOf(ymd: string): number {
+  const [y, m] = ymd.split('-').map(Number);
+  return y * 12 + m;
+}
+
+/** What changing this enrollment's join date to `newDate` would touch. */
+async function joinDateImpactOf(companyId: string, enrollment: any, newDate: string) {
+  const oldDate = String(enrollment.enrollment_date).slice(0, 10);
+  const paymentType = enrollment.payment_type || 'ONE_TIME';
+  const oldKey = monthKeyOf(oldDate);
+  const newKey = monthKeyOf(newDate);
+  const now = new Date();
+  const curKey = now.getFullYear() * 12 + (now.getMonth() + 1);
+
+  let billsToAdd = 0;
+  let billsToWipe = 0;
+  let billsKeptWithMoney = 0;
+  if (paymentType === 'MONTHLY_SUBSCRIPTION') {
+    if (newKey < oldKey) {
+      // The months the earlier join owes, minus any bill already on the books.
+      const endKey = Math.max(Math.min(curKey, oldKey - 1), newKey);
+      const existing = await query<any>(
+        `SELECT (billing_year * 12 + billing_month) AS k FROM monthly_subscription_payments
+          WHERE enrollment_id = $1 AND company_id = $2`,
+        [enrollment.id, companyId]
+      );
+      const have = new Set((existing as any[]).map((r) => Number(r.k)));
+      for (let k = newKey; k <= endKey; k++) if (!have.has(k)) billsToAdd++;
+    } else if (newKey > oldKey) {
+      const row = await queryOne<any>(
+        `SELECT COUNT(*) FILTER (WHERE payment_status = 'PENDING' AND amount_paid = 0) AS wipe,
+                COUNT(*) FILTER (WHERE amount_paid > 0) AS kept
+           FROM monthly_subscription_payments
+          WHERE enrollment_id = $1 AND company_id = $2
+            AND (billing_year * 12 + billing_month) < $3`,
+        [enrollment.id, companyId, newKey]
+      );
+      billsToWipe = Number(row?.wipe ?? 0);
+      billsKeptWithMoney = Number(row?.kept ?? 0);
+    }
+  }
+
+  // Attendance the student HAS before the new date (a later join orphans it)…
+  const before = await queryOne<any>(
+    `SELECT COUNT(*) AS n,
+            bool_or(EXISTS (
+              SELECT 1 FROM session_payments sp
+               WHERE sp.session_id = s.id AND sp.enrollment_id = $4
+                 AND (sp.amount_paid > 0 OR sp.payment_status = 'COVERED')
+            )) AS has_money
+       FROM session_attendance sa
+       JOIN sessions s ON s.id = sa.session_id
+      WHERE sa.student_id = $1 AND s.class_id = $2 AND s.company_id = $3
+        AND s.start_date::date < $5::date`,
+    [enrollment.student_id, enrollment.class_id, companyId, enrollment.id, newDate]
+  );
+  // …and the held lessons an earlier join turns into absences (no row yet).
+  const missed = newKey < oldKey || newDate < oldDate
+    ? await queryOne<any>(
+        `SELECT COUNT(*) AS n
+           FROM sessions s
+          WHERE s.class_id = $1 AND s.company_id = $2
+            AND COALESCE(s.started, true) = true AND COALESCE(s.is_free, false) = false
+            AND s.start_date::date >= $3::date AND s.start_date::date < $4::date
+            AND NOT EXISTS (SELECT 1 FROM session_attendance sa
+                             WHERE sa.session_id = s.id AND sa.student_id = $5)`,
+        [enrollment.class_id, companyId, newDate, oldDate, enrollment.student_id]
+      )
+    : { n: 0 };
+
+  return {
+    paymentType,
+    oldDate,
+    newDate,
+    monthlyFee: paymentType === 'MONTHLY_SUBSCRIPTION' ? parseFloat(enrollment.final_price || 0) : null,
+    billsToAdd,
+    billsToWipe,
+    billsKeptWithMoney,
+    attendanceBefore: Number(before?.n ?? 0),
+    attendanceBeforeHasMoney: before?.has_money === true,
+    sessionsBecomingAbsent: Number(missed?.n ?? 0),
+    /** Marking present bills money on per-session courses — offered elsewhere. */
+    canMarkPresent: paymentType !== 'PER_SESSION',
+  };
+}
+
 export const enrollmentsRoutes = {
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
@@ -796,6 +883,185 @@ export const enrollmentsRoutes = {
     } catch (error) {
       console.error('Update enrollment error:', error);
       return mapThrownError(error, 'ERRORS.ENROLLMENTS.UPDATE_FAILED', 'Failed to update enrollment', 404);
+    }
+  },
+
+  /**
+   * GET /api/enrollments/:id/join-date-impact?newDate=YYYY-MM-DD
+   *
+   * Dry run of a join-date change, so the dialog can say what it would really
+   * do instead of a generic caution:
+   *  - monthly, moved EARLIER: the months in between become owed (bills to add);
+   *  - monthly, moved LATER: unpaid bills before the new start are orphaned
+   *    (wiped), while months with money on them are kept and reported;
+   *  - moved LATER: attendance taken before the new date becomes "before join"
+   *    (wipe is offered);
+   *  - moved EARLIER: held lessons since the new date with no attendance row now
+   *    read as absences (marking present is offered, except per-session where
+   *    presence bills money and belongs to the register).
+   */
+  joinDateImpact: async ({ params, query: q, headers }: {
+    params: { id: string }; query: { newDate?: string }; headers: { authorization: string };
+  }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const enrollment = await queryOne<any>(
+        'SELECT * FROM enrollments WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!enrollment) return apiError(404, 'ERRORS.ENROLLMENTS.NOT_FOUND', 'Enrollment not found');
+      if (!canAccessBranch(context, enrollment.branch_id)) {
+        return apiError(403, 'ERRORS.ENROLLMENTS.ACCESS_DENIED_UPDATE', 'Access denied to this enrollment');
+      }
+      const newDate = String(q.newDate ?? '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+        return apiError(400, 'ERRORS.ENROLLMENTS.INVALID_DATE', 'Invalid date');
+      }
+      return { status: 200 as const, body: await joinDateImpactOf(context.companyId, enrollment, newDate) };
+    } catch (error) {
+      console.error('Join date impact error:', error);
+      return mapThrownError(error, 'ERRORS.ENROLLMENTS.UPDATE_FAILED', 'Failed to preview the change', 400);
+    }
+  },
+
+  /**
+   * POST /api/enrollments/:id/join-date  { newDate, wipeAttendanceBefore?, markPresentSince? }
+   * Apply the change the impact endpoint previewed. The bill work is implied by
+   * the model (an earlier join owes the months, a later one un-owes them); the
+   * attendance rewrites are opt-in flags, never side effects.
+   */
+  changeJoinDate: async ({ params, body, headers }: {
+    params: { id: string };
+    body: { newDate: string; wipeAttendanceBefore?: boolean; markPresentSince?: boolean };
+    headers: { authorization: string };
+  }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const enrollment = await queryOne<any>(
+        'SELECT * FROM enrollments WHERE id = $1 AND company_id = $2',
+        [params.id, context.companyId]
+      );
+      if (!enrollment) return apiError(404, 'ERRORS.ENROLLMENTS.NOT_FOUND', 'Enrollment not found');
+      if (!canAccessBranch(context, enrollment.branch_id)) {
+        return apiError(403, 'ERRORS.ENROLLMENTS.ACCESS_DENIED_UPDATE', 'Access denied to this enrollment');
+      }
+      const newDate = String(body?.newDate ?? '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+        return apiError(400, 'ERRORS.ENROLLMENTS.INVALID_DATE', 'Invalid date');
+      }
+      const impact = await joinDateImpactOf(context.companyId, enrollment, newDate);
+
+      // Wiping attendance that money already touched (a paid or package-covered
+      // per-session charge) would detach cash from what it paid for — refused,
+      // not silently skipped.
+      if (body?.wipeAttendanceBefore === true && impact.attendanceBeforeHasMoney) {
+        return apiError(400, 'ERRORS.ENROLLMENTS.JOINDATE_ATTENDANCE_MONEY',
+          'Some attendance before the new date has money on it — settle or refund those charges first');
+      }
+
+      // The date itself. class_joined_on is cleared: a hand-set join date is the
+      // new truth, and COALESCE must not keep answering with the old move date.
+      await query(
+        `UPDATE enrollments SET enrollment_date = $3::date, class_joined_on = NULL, updated_at = NOW()
+          WHERE id = $1 AND company_id = $2`,
+        [params.id, context.companyId, newDate]
+      );
+
+      let billsAdded = 0, billsWiped = 0, attendanceWiped = 0, markedPresent = 0;
+
+      if ((enrollment.payment_type || '') === 'MONTHLY_SUBSCRIPTION') {
+        // Later join: unpaid, money-less bills before the new start月 go — they were
+        // owed only because of the old date. ensureBillsForMonth will not recreate
+        // them (enrollment_date now says the student wasn't there).
+        const wiped = await query(
+          `DELETE FROM monthly_subscription_payments
+            WHERE enrollment_id = $1 AND company_id = $2
+              AND payment_status = 'PENDING' AND amount_paid = 0
+              AND (billing_year * 12 + billing_month) < $3
+            RETURNING id`,
+          [params.id, context.companyId, monthKeyOf(newDate)]
+        );
+        billsWiped = (wiped as any[]).length;
+
+        // Earlier join: the months in between are owed now. Materialise them at
+        // the enrollment fee, exactly as ensureBillsForMonth would on the next
+        // view — never past the current month (phantom future debt), except the
+        // start month itself, which the create path also bills ahead of time.
+        const fee = parseFloat(enrollment.final_price || 0);
+        const startKey = monthKeyOf(newDate);
+        const now = new Date();
+        const curKey = now.getFullYear() * 12 + (now.getMonth() + 1);
+        const endKey = Math.max(Math.min(curKey, monthKeyOf(String(enrollment.enrollment_date).slice(0, 10)) - 1), startKey);
+        for (let k = startKey; k <= endKey; k++) {
+          const y = Math.floor((k - 1) / 12);
+          const m = ((k - 1) % 12) + 1;
+          const inserted = await query(
+            `INSERT INTO monthly_subscription_payments
+               (enrollment_id, company_id, student_id, course_id, branch_id,
+                billing_year, billing_month, amount_due, amount_paid, payment_status, due_date)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,'PENDING',$9::date)
+             ON CONFLICT (enrollment_id, billing_year, billing_month) DO NOTHING
+             RETURNING id`,
+            [params.id, context.companyId, enrollment.student_id, enrollment.course_id,
+             enrollment.branch_id, y, m, fee, `${y}-${String(m).padStart(2, '0')}-01`]
+          );
+          billsAdded += (inserted as any[]).length;
+        }
+      }
+
+      if (body?.wipeAttendanceBefore === true) {
+        // The charges of the wiped lessons go with them — PENDING/WAIVED rows
+        // only; the money guard above already refused anything else.
+        await query(
+          `DELETE FROM session_payments sp
+            USING sessions s
+            WHERE s.id = sp.session_id AND sp.enrollment_id = $1 AND sp.company_id = $2
+              AND sp.amount_paid = 0 AND sp.payment_status IN ('PENDING', 'WAIVED')
+              AND s.start_date::date < $3::date`,
+          [params.id, context.companyId, newDate]
+        );
+        const wiped = await query(
+          `DELETE FROM session_attendance sa
+            USING sessions s
+            WHERE s.id = sa.session_id AND sa.student_id = $1
+              AND s.class_id = $2 AND s.company_id = $3
+              AND s.start_date::date < $4::date
+            RETURNING sa.id`,
+          [enrollment.student_id, enrollment.class_id, context.companyId, newDate]
+        );
+        attendanceWiped = (wiped as any[]).length;
+      }
+
+      // Backfilled presence is for models where presence is a fact, not a fee —
+      // a per-session PRESENT bills money and belongs to the register.
+      if (body?.markPresentSince === true && (enrollment.payment_type || '') !== 'PER_SESSION') {
+        const marked = await query(
+          `INSERT INTO session_attendance (session_id, student_id, attendance_type)
+           SELECT s.id, $1, 'NORMAL'
+             FROM sessions s
+            WHERE s.class_id = $2 AND s.company_id = $3
+              AND COALESCE(s.started, true) = true AND COALESCE(s.is_free, false) = false
+              AND s.start_date::date >= $4::date AND s.start_date::date < $5::date
+              AND NOT EXISTS (SELECT 1 FROM session_attendance sa
+                               WHERE sa.session_id = s.id AND sa.student_id = $1)
+           ON CONFLICT (session_id, student_id) DO NOTHING
+           RETURNING id`,
+          [enrollment.student_id, enrollment.class_id, context.companyId,
+           newDate, String(enrollment.enrollment_date).slice(0, 10)]
+        );
+        markedPresent = (marked as any[]).length;
+      }
+
+      return { status: 200 as const, body: { billsAdded, billsWiped, attendanceWiped, markedPresent } };
+    } catch (error) {
+      console.error('Change join date error:', error);
+      return mapThrownError(error, 'ERRORS.ENROLLMENTS.UPDATE_FAILED', 'Failed to change the join date', 400);
     }
   },
 
