@@ -189,13 +189,13 @@
                 <p-tag
                   [value]="courseName"
                   severity="info"
-                  [pTooltip]="'STUDENTS.LIST.ACTIVE_ENROLLMENTS_TOOLTIP' | translate"
+                  [pTooltip]="activeCoursesTooltip(student.id)"
                 ></p-tag>
               } @else {
                 <p-tag
                   [value]="'STUDENTS.LIST.ACTIVE_ENROLLMENTS' | translate: { count: getCounts(student.id).active }"
                   severity="info"
-                  [pTooltip]="'STUDENTS.LIST.ACTIVE_ENROLLMENTS_TOOLTIP' | translate"
+                  [pTooltip]="activeCoursesTooltip(student.id)"
                 ></p-tag>
               }
               <!-- A solo teacher's classes have no "done" lifecycle worth a badge. -->
@@ -203,7 +203,7 @@
                 <p-tag
                   [value]="'STUDENTS.LIST.COMPLETED_ENROLLMENTS' | translate: { count: getCounts(student.id).completed }"
                   severity="success"
-                  [pTooltip]="'STUDENTS.LIST.COMPLETED_ENROLLMENTS_TOOLTIP' | translate"
+                  [pTooltip]="completedCoursesTooltip(student.id)"
                 ></p-tag>
               }
             </div>

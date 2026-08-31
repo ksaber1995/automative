@@ -4283,6 +4283,7 @@
       "COMPLETED_ENROLLMENTS": "{{count}} done",
       "ACTIVE_ENROLLMENTS_TOOLTIP": "Active enrollments",
       "COMPLETED_ENROLLMENTS_TOOLTIP": "Completed enrollments",
+      "MASTER_COURSE_HINT": "{{count}} via a master course bundle",
       "QR_ALL": "All",
       "QR_ACTIVATED": "QR Activated",
       "QR_NOT_ACTIVATED": "QR Not Activated",

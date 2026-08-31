@@ -30,6 +30,8 @@ import { CompanyService } from '../../../core/services/company.service';
 import { StudentImportDialogComponent } from '../student-import/student-import-dialog.component';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
+import { MasterEnrollmentService } from '../../master-courses/services/master-enrollment.service';
+import { MasterEnrollmentProgress } from '@shared/interfaces/master-enrollment.interface';
 import { ClassService } from '../../courses/services/class.service';
 import { CourseService } from '../../courses/services/course.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -81,6 +83,7 @@ export class StudentListComponent implements OnInit {
   private studentService = inject(StudentService);
   private lookupService = inject(LookupService);
   private enrollmentService = inject(EnrollmentService);
+  private masterEnrollmentService = inject(MasterEnrollmentService);
   private classService = inject(ClassService);
   private courseService = inject(CourseService);
   private companyService = inject(CompanyService);
@@ -105,6 +108,10 @@ export class StudentListComponent implements OnInit {
   selectedClassId = signal('');
   searchTerm = signal('');
   enrollmentCounts = signal<Record<string, EnrollmentCounts>>({});
+  // How much of each student's count above came through a master-course bundle
+  // — those enrolments live in their own table and would otherwise show as 0.
+  // Kept apart so the badge can say so without a second badge.
+  masterCounts = signal<Record<string, EnrollmentCounts>>({});
   // studentId → set of courseIds the student is enrolled in (drives the course filter).
   studentCourseMap = signal<Map<string, Set<string>>>(new Map());
   // studentId → set of classIds, from the same enrollments (drives the class filter).
@@ -236,7 +243,8 @@ export class StudentListComponent implements OnInit {
   loadEnrollmentCounts() {
     let enrollments: { studentId: string; classId: string; courseId?: string }[] = [];
     let classes: Class[] = [];
-    let pending = 2;
+    let masters: MasterEnrollmentProgress[] = [];
+    let pending = 3;
     const finalize = () => {
       pending--;
       if (pending !== 0) return;
@@ -264,7 +272,24 @@ export class StudentListComponent implements OnInit {
           classMap.get(e.studentId)!.add(e.classId);
         }
       }
+      // Bundle enrolments count too — a student whose courses all come through
+      // a master course is not "0 active". Their per-class rows live in
+      // master_class_enrollments (not /api/enrollments), and the list endpoint
+      // already serves the active/completed tallies per bundle, so those are
+      // added on top and remembered separately for the badge's hint.
+      const masterMap: Record<string, EnrollmentCounts> = {};
+      for (const m of masters) {
+        if (m.status === 'CANCELLED') continue;
+        if (!m.activeCourses && !m.completedCourses) continue;
+        if (!map[m.studentId]) map[m.studentId] = { active: 0, completed: 0 };
+        if (!masterMap[m.studentId]) masterMap[m.studentId] = { active: 0, completed: 0 };
+        map[m.studentId].active += m.activeCourses;
+        map[m.studentId].completed += m.completedCourses;
+        masterMap[m.studentId].active += m.activeCourses;
+        masterMap[m.studentId].completed += m.completedCourses;
+      }
       this.enrollmentCounts.set(map);
+      this.masterCounts.set(masterMap);
       this.studentCourseMap.set(courseMap);
       this.studentClassMap.set(classMap);
       // Kept whole for the export, which needs the class behind each enrolment,
@@ -280,10 +305,33 @@ export class StudentListComponent implements OnInit {
       next: (list) => { classes = list; this.allClasses.set(list); finalize(); },
       error: () => finalize(),
     });
+    this.masterEnrollmentService.list().subscribe({
+      next: (list) => { masters = list; finalize(); },
+      error: () => finalize(),
+    });
   }
 
   getCounts(studentId: string): EnrollmentCounts {
     return this.enrollmentCounts()[studentId] || { active: 0, completed: 0 };
+  }
+
+  /**
+   * The badge tooltips. Their base text is static, but when part of the number
+   * arrived through a master-course bundle the tooltip is where that is said —
+   * the badge itself stays one plain figure.
+   */
+  activeCoursesTooltip(studentId: string): string {
+    return this.countsTooltip('ACTIVE_ENROLLMENTS_TOOLTIP', this.masterCounts()[studentId]?.active);
+  }
+
+  completedCoursesTooltip(studentId: string): string {
+    return this.countsTooltip('COMPLETED_ENROLLMENTS_TOOLTIP', this.masterCounts()[studentId]?.completed);
+  }
+
+  private countsTooltip(baseKey: string, fromMaster: number | undefined): string {
+    const base = this.translate.instant(`STUDENTS.LIST.${baseKey}`);
+    if (!fromMaster) return base;
+    return `${base} · ${this.translate.instant('STUDENTS.LIST.MASTER_COURSE_HINT', { count: fromMaster })}`;
   }
 
   /**

@@ -4407,6 +4407,7 @@
       "COMPLETED_ENROLLMENTS": "{{count}} منتهي",
       "ACTIVE_ENROLLMENTS_TOOLTIP": "التسجيلات النشطة",
       "COMPLETED_ENROLLMENTS_TOOLTIP": "التسجيلات المكتملة",
+      "MASTER_COURSE_HINT": "{{count}} من عرض الكورسات",
       "QR_ALL": "الكل",
       "QR_ACTIVATED": "QR مفعّل",
       "QR_NOT_ACTIVATED": "QR غير مفعّل",
