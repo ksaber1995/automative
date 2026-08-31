@@ -3227,6 +3227,9 @@
     "PAID": "Salary payments recorded"
   },
   "ENROLLMENT_FORM": {
+    "JOINDATE_MONTHS_BILLED": "This start date bills {{count}} months (from the join month through the current one).",
+    "JOINDATE_ABSENCES": "The class already held {{count}} session(s) since this date — the student will show ABSENT for them.",
+    "JOINDATE_MARK_PRESENT": "Mark the student PRESENT for those {{count}} session(s)",
     "EDIT_TITLE": "Edit Enrollment",
     "CREATE_TITLE": "Enroll Student in Course",
     "ENROLLMENT_TYPE": "Enrollment Type",

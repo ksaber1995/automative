@@ -554,7 +554,99 @@ async function joinDateImpactOf(companyId: string, enrollment: any, newDate: str
   };
 }
 
+/**
+ * Mark the student PRESENT for the class's held lessons from `fromDate` up to
+ * now — the opt-in that keeps a backdated join from reading as a wall of
+ * absences. Best-effort: an enrollment must never fail over attendance
+ * bookkeeping. Never called for PER_SESSION enrollments (presence bills money
+ * there and belongs to the register).
+ */
+async function backfillPresence(companyId: string, studentId: string, classId: string, fromDate: string): Promise<number> {
+  try {
+    const marked = await query(
+      `INSERT INTO session_attendance (session_id, student_id, attendance_type)
+       SELECT s.id, $1, 'NORMAL'
+         FROM sessions s
+        WHERE s.class_id = $2 AND s.company_id = $3
+          AND COALESCE(s.started, true) = true AND COALESCE(s.is_free, false) = false
+          AND s.start_date::date >= $4::date AND s.start_date <= NOW()
+          AND NOT EXISTS (SELECT 1 FROM session_attendance sa
+                           WHERE sa.session_id = s.id AND sa.student_id = $1)
+       ON CONFLICT (session_id, student_id) DO NOTHING
+       RETURNING id`,
+      [studentId, classId, companyId, fromDate]
+    );
+    return (marked as any[]).length;
+  } catch (e) {
+    console.error('Backfill presence failed (ignored):', e);
+    return 0;
+  }
+}
+
 export const enrollmentsRoutes = {
+  /**
+   * GET /api/enrollments/create-impact?classId=…&date=YYYY-MM-DD
+   * What enrolling on `date` implies, before the form saves: the held lessons a
+   * backdated join turns into absences (with the mark-present opt-in), and for
+   * a monthly course, how many months the create will bill. Static path — must
+   * register before the `/:id` reads.
+   */
+  createImpact: async ({ query: q, headers }: {
+    query: { classId?: string; date?: string };
+    headers: { authorization: string };
+  }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'enrollments', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      const date = String(q.date ?? '').slice(0, 10);
+      if (!q.classId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return apiError(400, 'ERRORS.ENROLLMENTS.INVALID_DATE', 'classId and date are required');
+      }
+      const cls = await queryOne<any>(
+        `SELECT cl.id, co.branch_id, co.payment_type
+           FROM classes cl JOIN courses co ON co.id = cl.course_id
+          WHERE cl.id = $1 AND co.company_id = $2`,
+        [q.classId, context.companyId]
+      );
+      if (!cls) return apiError(404, 'ERRORS.CLASSES.NOT_FOUND', 'Class not found');
+      if (cls.branch_id && !canAccessBranch(context, cls.branch_id)) {
+        return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+      }
+
+      const held = await queryOne<any>(
+        `SELECT COUNT(*) AS n FROM sessions s
+          WHERE s.class_id = $1 AND s.company_id = $2
+            AND COALESCE(s.started, true) = true AND COALESCE(s.is_free, false) = false
+            AND s.start_date::date >= $3::date AND s.start_date <= NOW()`,
+        [q.classId, context.companyId, date]
+      );
+
+      // The create path bills every month from the join month through the
+      // current one (a future join bills its first month only).
+      const now = new Date();
+      const curKey = now.getFullYear() * 12 + (now.getMonth() + 1);
+      const startKey = monthKeyOf(date);
+      const monthsToBill = cls.payment_type === 'MONTHLY_SUBSCRIPTION'
+        ? (startKey <= curKey ? curKey - startKey + 1 : 1)
+        : 0;
+
+      return {
+        status: 200 as const,
+        body: {
+          paymentType: cls.payment_type || 'ONE_TIME',
+          heldSessions: Number(held?.n ?? 0),
+          monthsToBill,
+          canMarkPresent: cls.payment_type !== 'PER_SESSION',
+        },
+      };
+    } catch (error) {
+      console.error('Enrollment create impact error:', error);
+      return mapThrownError(error, 'ERRORS.ENROLLMENTS.CREATE_FAILED', 'Failed to preview the enrollment', 400);
+    }
+  },
+
   create: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
@@ -597,8 +689,16 @@ export const enrollmentsRoutes = {
         [body.courseId, context.companyId]
       );
       const paymentType: string = course?.payment_type || body.paymentType || 'ONE_TIME';
+      // A backdated join may opt in to presence for the lessons already held —
+      // same rule as the join-date edit; per-session is excluded there too.
+      const wantsPresence = body.markPresentSince === true && paymentType !== 'PER_SESSION'
+        && body.classId && body.enrollmentDate;
       if (paymentType === 'MONTHLY_SUBSCRIPTION') {
-        return await createMonthlySubscriptionEnrollment(context, body, course);
+        const res = await createMonthlySubscriptionEnrollment(context, body, course);
+        if (res.status === 201 && wantsPresence) {
+          await backfillPresence(context.companyId, body.studentId, body.classId, String(body.enrollmentDate).slice(0, 10));
+        }
+        return res;
       }
       if (paymentType === 'PER_SESSION') {
         return await createPerSessionEnrollment(context, body, course);
@@ -661,6 +761,9 @@ export const enrollmentsRoutes = {
           }
 
           await client.query('COMMIT');
+          if (wantsPresence) {
+            await backfillPresence(context.companyId, body.studentId, body.classId, String(body.enrollmentDate).slice(0, 10));
+          }
           return { status: 201 as const, body: mapEnrollmentFromDB(enrollment) };
         } catch (error: any) {
           await client.query('ROLLBACK');
@@ -705,6 +808,10 @@ export const enrollmentsRoutes = {
           notes: paymentMode === 'FULL' ? 'Full payment' : 'Down payment',
           recorded_by_user_id: context.userId,
         });
+      }
+
+      if (wantsPresence) {
+        await backfillPresence(context.companyId, body.studentId, body.classId, String(body.enrollmentDate).slice(0, 10));
       }
 
       return {

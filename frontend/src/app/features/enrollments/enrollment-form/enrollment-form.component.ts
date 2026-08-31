@@ -412,6 +412,33 @@ export class EnrollmentFormComponent implements OnInit {
         this.enrollmentForm.patchValue({ firstMonthPrice: null }, { emitEvent: false });
       }
     });
+    // A backdated join has consequences worth stating before Save — the held
+    // lessons it turns into absences, the months a monthly create will bill —
+    // same rules as the join-date edit on the student page.
+    effect(() => {
+      const classId = this.classIdSig();
+      const d = this.enrollDateSig();
+      this.refreshCreateImpact(classId, d);
+    });
+  }
+
+  // ── What a backdated join implies (fetched per class+date pick) ────────────
+  createImpactSig = signal<{ paymentType: string; heldSessions: number; monthsToBill: number; canMarkPresent: boolean } | null>(null);
+  /** Opt-in: mark the student present for the lessons already held. */
+  markPresentSince = signal(false);
+
+  private refreshCreateImpact(classId: string, d: Date | null): void {
+    this.createImpactSig.set(null);
+    this.markPresentSince.set(false);
+    if (this.isEditMode() || !classId || !(d instanceof Date) || isNaN(d.getTime())) return;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    // Today's and future joins have no history to warn about.
+    if (day >= today) return;
+    this.enrollmentService.createImpact(classId, this.formatDate(d)).subscribe({
+      next: (impact) => this.createImpactSig.set(impact),
+      error: () => this.createImpactSig.set(null),
+    });
   }
 
   ngOnInit() {
@@ -930,6 +957,9 @@ export class EnrollmentFormComponent implements OnInit {
         : perSession ? 'PER_SESSION' as const
         : 'ONE_TIME' as const,
       payFirstMonth: monthly ? this.monthlyPayOptionSig() === 'PAY_NOW' : undefined,
+      // Backdated join: presence for the lessons already held is the teacher's
+      // explicit choice, never a side effect (per-session excluded server-side).
+      markPresentSince: (!perSession && this.markPresentSince()) ? true : undefined,
       firstMonthDownPayment: (monthly && this.monthlyPayOptionSig() === 'PAY_PARTIAL')
         ? this.monthlyDownPaymentSig()
         : undefined,

@@ -55,6 +55,13 @@ export class EnrollmentService {
     return this.api.get<JoinDateImpact>(`enrollments/${id}/join-date-impact`, { newDate });
   }
 
+  /** What enrolling on `date` implies, before the form saves (backdated joins). */
+  createImpact(classId: string, date: string): Observable<{
+    paymentType: string; heldSessions: number; monthsToBill: number; canMarkPresent: boolean;
+  }> {
+    return this.api.get(`enrollments/create-impact`, { classId, date });
+  }
+
   /** Apply the previewed join-date change; the attendance rewrites are opt-in. */
   changeJoinDate(id: string, dto: { newDate: string; wipeAttendanceBefore?: boolean; markPresentSince?: boolean }):
     Observable<{ billsAdded: number; billsWiped: number; attendanceWiped: number; markedPresent: number }> {

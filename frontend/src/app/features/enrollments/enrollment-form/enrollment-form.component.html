@@ -169,6 +169,38 @@
             @if (isMonthly()) {
               <small class="text-gray-500 block mt-1">{{ 'ENROLLMENT_FORM.START_DATE_HINT' | translate }}</small>
             }
+
+            <!-- A backdated join, stated before Save: the lessons already held
+                 (absences unless marked present here) and, for monthly, the
+                 months the create will bill — same rules as the join-date edit. -->
+            @if (createImpactSig(); as impact) {
+              @if (impact.heldSessions > 0 || impact.monthsToBill > 1) {
+                <div class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 mt-2 text-sm text-amber-800 flex flex-col gap-2">
+                  @if (impact.monthsToBill > 1) {
+                    <div class="flex gap-2">
+                      <i class="pi pi-exclamation-triangle mt-0.5"></i>
+                      <span>{{ 'ENROLLMENT_FORM.JOINDATE_MONTHS_BILLED' | translate: { count: impact.monthsToBill } }}</span>
+                    </div>
+                  }
+                  @if (impact.heldSessions > 0) {
+                    <div class="flex gap-2">
+                      <i class="pi pi-user-minus mt-0.5"></i>
+                      <span>{{ 'ENROLLMENT_FORM.JOINDATE_ABSENCES' | translate: { count: impact.heldSessions } }}</span>
+                    </div>
+                    @if (impact.canMarkPresent) {
+                      <div class="flex items-start gap-2">
+                        <p-checkbox inputId="markPresentSince" [binary]="true"
+                          [ngModel]="markPresentSince()" (ngModelChange)="markPresentSince.set($event)"
+                          [ngModelOptions]="{ standalone: true }"></p-checkbox>
+                        <label for="markPresentSince" class="text-sm cursor-pointer">
+                          {{ 'ENROLLMENT_FORM.JOINDATE_MARK_PRESENT' | translate: { count: impact.heldSessions } }}
+                        </label>
+                      </div>
+                    }
+                  }
+                </div>
+              }
+            }
           </div>
 
           <!-- Status -->

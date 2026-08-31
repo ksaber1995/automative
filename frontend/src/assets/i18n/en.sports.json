@@ -749,6 +749,9 @@
     "END_DATE_OR_SESSIONS_REQUIRED": "Please provide either an end date or a training count"
   },
   "ENROLLMENT_FORM": {
+    "JOINDATE_MONTHS_BILLED": "This start date bills {{count}} months (from the join month through the current one).",
+    "JOINDATE_ABSENCES": "The group already held {{count}} training(s) since this date — the member will show ABSENT for them.",
+    "JOINDATE_MARK_PRESENT": "Mark the member PRESENT for those {{count}} training(s)",
     "CREATE_TITLE": "Enroll Trainee in Subscription",
     "SINGLE_COURSE": "Single Subscription",
     "SINGLE_COURSE_DESC": "Enroll the trainee in one group of one subscription.",

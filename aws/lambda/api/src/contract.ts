@@ -1574,6 +1574,10 @@ const CreateEnrollmentSchema = z.object({
   paymentStatus: PaymentStatusSchema.optional(),
   // Monthly-subscription enrollment fields (ignored for one-time courses):
   paymentType: z.enum(['ONE_TIME', 'MONTHLY_SUBSCRIPTION', 'PER_SESSION']).optional(),
+  // A backdated join may opt in to presence for the class's lessons already
+  // held, instead of reading as absences (ignored for PER_SESSION — presence
+  // bills money there). Same rule as the join-date edit.
+  markPresentSince: z.boolean().optional(),
   payFirstMonth: z.boolean().optional(),
   // Part of the first month, collected at enrollment. Mirrors the package's
   // PARTIAL down payment: the first bill is left PARTIAL with the rest owing.
@@ -5104,6 +5108,23 @@ export const contract = c.router({
         201: EnrollmentPaymentSchema,
         400: ApiErrorSchema,
         404: ApiErrorSchema,
+      },
+    },
+    // What enrolling on a given date implies, before the form saves — the held
+    // lessons a backdated join turns into absences, and the months a monthly
+    // create will bill. Static path — registered before `/:id` below.
+    createImpact: {
+      method: 'GET',
+      path: '/api/enrollments/create-impact',
+      query: z.object({ classId: UUIDSchema, date: z.string() }),
+      responses: {
+        200: z.object({
+          paymentType: z.string(),
+          heldSessions: z.number(),
+          monthsToBill: z.number(),
+          canMarkPresent: z.boolean(),
+        }),
+        400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema,
       },
     },
     getById: {
