@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -31,7 +31,7 @@ import { ratingLabelKey } from '../../exams/homework-rating.util';
   imports: [CommonModule, TranslateModule],
   templateUrl: './public-student.component.html',
 })
-export class PublicStudentComponent implements OnInit {
+export class PublicStudentComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private service = inject(PublicStudentService);
   private translate = inject(TranslateService);
@@ -238,6 +238,7 @@ export class PublicStudentComponent implements OnInit {
     this.service.getProfile(token).subscribe({
       next: (p) => {
         this.profile.set(p);
+        this.lastFetch = Date.now();
         this.loading.set(false);
       },
       // No student behind this token. Before giving up, check whether it's a
@@ -245,7 +246,31 @@ export class PublicStudentComponent implements OnInit {
       // real card and deserves to know whose it is, not a dead end.
       error: () => this.lookUpUnassignedCard(token),
     });
+    document.addEventListener('visibilitychange', this.refreshOnReturn);
   }
+
+  ngOnDestroy(): void {
+    document.removeEventListener('visibilitychange', this.refreshOnReturn);
+  }
+
+  /** When the data was last fetched, so a resurfaced tab knows it's stale. */
+  private lastFetch = 0;
+  private static readonly REFRESH_AFTER_MS = 60 * 1000;
+
+  // Re-scanning a card often brings an EXISTING tab forward instead of loading
+  // the page again (mobile browsers dedupe on URL), and this component only
+  // fetches in ngOnInit — so a long-lived tab showed attendance/payments from
+  // the day it was first opened. Refetch quietly whenever the tab returns to
+  // view with data older than a minute; the page swaps in place, no spinner.
+  private refreshOnReturn = (): void => {
+    if (document.hidden || !this.profile()) return;
+    if (Date.now() - this.lastFetch < PublicStudentComponent.REFRESH_AFTER_MS) return;
+    this.lastFetch = Date.now(); // set now so a slow response can't stack refetches
+    this.service.getProfile(this.qrToken).subscribe({
+      next: (p) => this.profile.set(p),
+      error: () => {}, // keep showing what we have; next return will retry
+    });
+  };
 
   private lookUpUnassignedCard(token: string): void {
     this.service.getUnassignedCard(token).subscribe({

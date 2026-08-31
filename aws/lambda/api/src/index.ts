@@ -418,6 +418,15 @@ const lambdaHandler = createLambdaHandler(contract, router, {
         response.headers.set('Vary', 'Origin');
       }
     },
+    // Public GETs (the QR profile a parent keeps open for weeks) carry no auth
+    // header to vary on, and some mobile browsers cache header-less JSON
+    // heuristically — the parent then re-scans and sees last month's data.
+    // no-store makes every look at the page hit the origin.
+    (response, request) => {
+      if (request.method === 'GET' && new URL(request.url).pathname.startsWith('/api/public/')) {
+        response.headers.set('Cache-Control', 'no-store');
+      }
+    },
   ],
 });
 
