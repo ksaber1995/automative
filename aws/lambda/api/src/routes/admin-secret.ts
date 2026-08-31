@@ -8,7 +8,7 @@ import {
   ensureOnlineExamsColumn,
   smsIsActive,
 } from './companies';
-import { withPortalGuard, portalCan, PortalPermission, PortalUser } from './admin-portal';
+import { withPortalGuard, PortalPermission, PortalUser } from './admin-portal';
 import { createPrintJob, ensurePrintJobSchema, mapPrintJob } from './print-jobs';
 
 /**
@@ -96,11 +96,15 @@ const unguardedAdminSecretRoutes = {
       await ensureOnlineExamsColumn();
       let rows = await query<any>(SUBSCRIPTIONS_SQL);
 
-      // An account holding only companies.read_trial gets the trial pipeline
-      // and nothing else: paying and expired tenants — and their owner emails,
-      // mobiles and addresses — are dropped HERE, not hidden by the console.
-      // A full read grant (companies.read or cards.read, or OWNER) is unscoped.
-      const trialOnly = !!portalUser && !portalCan(portalUser, ['companies.read', 'cards.read']);
+      // companies.read_trial caps the tenant list at the trial pipeline: paying
+      // and expired tenants — and their owner emails, mobiles and addresses —
+      // are dropped HERE, not hidden by the console. The cap WINS over the
+      // other read grants (cards.read also opens this route, for the Cards
+      // report), because the person ticking "trial only" means trial only —
+      // not "trial only unless some other section leaks the rest". OWNER is
+      // never capped.
+      const trialOnly = !!portalUser && portalUser.role !== 'OWNER'
+        && portalUser.permissions.includes('companies.read_trial');
       if (trialOnly) rows = rows.filter((r) => r.subscription_type === 'TRIAL');
 
       const body = rows.map((r) => ({

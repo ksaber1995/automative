@@ -31,7 +31,8 @@ export const ADMIN_PORTAL_PERMISSIONS = [
   // The scoped variant for a salesperson chasing trials: same Companies
   // section, but the API only ever returns tenants whose subscription is
   // TRIAL — paying customers (and their contact details) never leave the
-  // server. Holding companies.read as well makes this key moot.
+  // server. A cap, not a grant: it beats companies.read and cards.read on
+  // the tenant list, so the Cards report is trial-scoped too. OWNER ignores it.
   'companies.read_trial',
   'companies.write',
   'companies.delete',
@@ -50,7 +51,7 @@ export type PortalPermission = (typeof ADMIN_PORTAL_PERMISSIONS)[number];
 /** What each key lets someone do, shown next to the checkbox in the console. */
 export const ADMIN_PORTAL_PERMISSION_LABELS: Record<PortalPermission, string> = {
   'companies.read': 'See the tenant list and their subscription numbers',
-  'companies.read_trial': 'See TRIAL tenants only — active and expired tenants stay hidden',
+  'companies.read_trial': 'See TRIAL tenants only — hides active and expired tenants everywhere, even with other read grants',
   'companies.write': 'Activate, deactivate, extend and re-type a tenant',
   'companies.delete': 'Permanently delete a tenant and all of its data',
   'cards.read': 'See card pools and card lists',
