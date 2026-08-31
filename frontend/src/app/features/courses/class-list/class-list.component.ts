@@ -17,6 +17,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { BranchStateService } from '../../../core/services/branch-state.service';
 import { ClassStatus, ClassWithDetails } from '@shared/interfaces/class.interface';
 import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-confirm-dialog/delete-confirm-dialog.component';
+import { TablePageMemory } from '../../../core/utils/table-page-memory';
 
 @Component({
   selector: 'app-class-list',
@@ -59,6 +60,16 @@ export class ClassListComponent implements OnInit {
   courses = signal<any[]>([]);
   branches = signal<any[]>([]);
   loading = signal(true);
+
+  /**
+   * The table position rides the URL (?page=6) and sessionStorage, so creating
+   * or editing a class on page 6 returns to page 6 — not back to page 1.
+   */
+  pageMem = new TablePageMemory(this.router, this.route, {
+    storeKey: 'classes-list-page',
+    defaultRows: 10,
+    allowedRows: [10, 25, 50],
+  });
 
   // Bulk "put these classes in this room". Rooms landed on classes long after the
   // classes did, so an existing timetable has to be filled in — one edit page at a
