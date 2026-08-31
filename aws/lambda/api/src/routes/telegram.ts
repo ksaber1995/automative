@@ -319,6 +319,61 @@ export async function sendExamResultNotifications(
   return { configured: true, sent };
 }
 
+/**
+ * One student's exam/homework absence to their linked Telegram chats, the
+ * moment the teacher records it — the automatic sibling of the re-sendable
+ * per-exam blast above. Uses the same editable EXAM_ABSENT template (a
+ * homework swaps the word امتحان for واجب in the rendered text, so the one
+ * template serves both). No-op when Telegram is off for the tenant.
+ */
+export async function sendExamAbsenceTelegram(
+  companyId: string,
+  examId: string,
+  studentId: string,
+): Promise<void> {
+  try {
+    const settings = await loadSettings(companyId);
+    if (!settings?.enabled || !settings.bot_token) return;
+
+    const exam = await queryOne<any>(
+      `SELECT e.id, e.name, e.is_homework, co.name AS course_name
+         FROM exams e LEFT JOIN courses co ON co.id = e.course_id
+        WHERE e.id = $1 AND e.company_id = $2`,
+      [examId, companyId]
+    );
+    if (!exam) return;
+
+    const links = await query(
+      `SELECT chat_id FROM telegram_links
+        WHERE company_id = $1 AND student_id = $2 AND role = ANY($3::varchar[])`,
+      [companyId, studentId, targetRoles(settings.notify_target)]
+    );
+    if (links.length === 0) return;
+
+    const [academy, student, templates] = await Promise.all([
+      queryOne<any>('SELECT name FROM companies WHERE id = $1', [companyId]),
+      queryOne<any>('SELECT name FROM students WHERE id = $1 AND company_id = $2', [studentId, companyId]),
+      loadTemplates(companyId),
+    ]);
+    let body = renderTemplate(templates.EXAM_ABSENT, {
+      studentName: (student?.name ?? '').trim(),
+      examName: exam.name,
+      courseName: exam.course_name || '',
+      academyName: academy?.name || '',
+    });
+    // The default template speaks of an امتحان; for a homework the same
+    // sentence should say واجب. A custom template that never says امتحان is
+    // left exactly as its author wrote it.
+    if (exam.is_homework === true) body = body.replace(/امتحان/g, 'واجب');
+
+    for (const link of links) {
+      await sendMessage(settings.bot_token, link.chat_id as number, body);
+    }
+  } catch (e) {
+    console.error('telegram: sendExamAbsenceTelegram failed (ignored):', e);
+  }
+}
+
 // ── Webhook processing (inbound) ─────────────────────────────────────────────
 
 async function replyHelp(token: string, chatId: number): Promise<void> {
