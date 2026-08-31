@@ -985,7 +985,9 @@
               <div class="flex items-center gap-1">
                 {{ formatDate(enrollment.enrollmentDate) }}
                 @if (canManageEnrollments()) {
-                  <p-button icon="pi pi-calendar" [text]="true" [rounded]="true" size="small" severity="secondary"
+                  <!-- A pencil, like the price edit beside it — a calendar next to
+                       a date read as decoration, not as "you can change this". -->
+                  <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" size="small" severity="secondary"
                     (onClick)="openJoinDateDialog(enrollment)"
                     [pTooltip]="'STUDENTS.DETAIL.JOINDATE_EDIT' | translate"></p-button>
                 }

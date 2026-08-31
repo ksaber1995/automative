@@ -1,25 +1,28 @@
 <div class="container-custom py-8">
-  <!-- Header -->
-  <div class="flex items-center gap-4 mb-6">
-    <p-button icon="pi pi-arrow-left" [text]="true" severity="secondary" (onClick)="goBack()" [pTooltip]="'CLASSES.DETAIL.BACK_TO_CLASSES' | translate"></p-button>
-    <div class="flex-1">
-      <div class="flex items-center gap-3">
-        <h1 class="text-3xl font-bold text-gray-900">{{ classDetail()?.name || ('CLASSES.DETAIL.CLASS_DETAILS' | translate) }}</h1>
+  <!-- Header. Stacks on phones — the title row and three full-size buttons on
+       one unwrappable line were pushing the page wider than the screen. -->
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-center mb-6">
+    <div class="flex items-center gap-2 min-w-0 sm:flex-1">
+      <p-button icon="pi pi-arrow-left" [text]="true" severity="secondary" (onClick)="goBack()" [pTooltip]="'CLASSES.DETAIL.BACK_TO_CLASSES' | translate"></p-button>
+      <div class="flex items-center gap-3 flex-wrap min-w-0">
+        <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 break-words">{{ classDetail()?.name || ('CLASSES.DETAIL.CLASS_DETAILS' | translate) }}</h1>
         @if (classDetail()) {
           <p-tag [value]="statusLabel(classDetail()!.status)" [severity]="statusTagSeverity(classDetail()!.status)"></p-tag>
         }
       </div>
     </div>
-    <p-button [label]="'CLASSES.DETAIL.EDIT' | translate" icon="pi pi-pencil" severity="info" [outlined]="true" (onClick)="editClass()"></p-button>
-    @if (!isFinished()) {
-      <p-button [label]="'CLASSES.DETAIL.ADD_STUDENT' | translate" icon="pi pi-user-plus" severity="secondary" [outlined]="true" (onClick)="addStudent()"></p-button>
-      <p-button [label]="'CLASSES.DETAIL.FINISH_CLASS' | translate" icon="pi pi-check-circle" severity="success" [loading]="finishing()" (onClick)="confirmFinishCourse()"></p-button>
-    } @else {
-      <div class="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-lg">
-        <i class="pi pi-check-circle"></i>
-        <span class="font-medium">{{ classDetail()?.finishedAt ? ('CLASSES.DETAIL.COURSE_FINISHED_ON' | translate: { date: formatDate(classDetail()!.finishedAt!) }) : ('CLASSES.DETAIL.COURSE_FINISHED' | translate) }}</span>
-      </div>
-    }
+    <div class="flex flex-wrap items-center gap-2">
+      <p-button [label]="'CLASSES.DETAIL.EDIT' | translate" icon="pi pi-pencil" size="small" severity="info" [outlined]="true" (onClick)="editClass()"></p-button>
+      @if (!isFinished()) {
+        <p-button [label]="'CLASSES.DETAIL.ADD_STUDENT' | translate" icon="pi pi-user-plus" size="small" severity="secondary" [outlined]="true" (onClick)="addStudent()"></p-button>
+        <p-button [label]="'CLASSES.DETAIL.FINISH_CLASS' | translate" icon="pi pi-check-circle" size="small" severity="success" [loading]="finishing()" (onClick)="confirmFinishCourse()"></p-button>
+      } @else {
+        <div class="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-lg">
+          <i class="pi pi-check-circle"></i>
+          <span class="font-medium">{{ classDetail()?.finishedAt ? ('CLASSES.DETAIL.COURSE_FINISHED_ON' | translate: { date: formatDate(classDetail()!.finishedAt!) }) : ('CLASSES.DETAIL.COURSE_FINISHED' | translate) }}</span>
+        </div>
+      }
+    </div>
   </div>
 
   <p-confirmDialog></p-confirmDialog>
@@ -212,7 +215,7 @@
           <div class="mt-2">
             <!-- Active Session Banner -->
             @if (activeSession()) {
-              <div class="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-4 flex items-center justify-between">
+              <div class="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-4 flex items-center justify-between flex-wrap gap-3">
                 <div class="flex items-center gap-3">
                   <span class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
                   <div>
@@ -220,7 +223,7 @@
                     <p class="text-sm text-orange-700">{{ 'CLASSES.DETAIL.STARTED_AT' | translate: { time: formatDateTime(activeSession()!.startDate) } }}</p>
                   </div>
                 </div>
-                <div class="flex gap-2">
+                <div class="flex gap-2 flex-wrap">
                   <p-button [label]="'CLASSES.DETAIL.TAKE_ATTENDANCE' | translate" icon="pi pi-check-square" severity="info" [outlined]="true" size="small"
                     (onClick)="openAttendanceDialog(activeSession()!)"></p-button>
                   <p-button [label]="'CLASSES.DETAIL.END_SESSION' | translate" icon="pi pi-stop" severity="danger" [outlined]="true" size="small"
