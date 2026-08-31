@@ -87,6 +87,25 @@ function toIso(value: any): string | null {
   return isNaN(d.getTime()) ? String(value) : d.toISOString();
 }
 
+/**
+ * Does companies.read_trial cap this caller? A capped caller lives in a world
+ * where non-TRIAL tenants do not exist: the tenant list, the user list, and
+ * every company-aimed write in this file answer as if they were never there.
+ * The cap WINS over the caller's other read grants — the person ticking
+ * "trial only" means trial only. OWNER is never capped.
+ */
+function isTrialCapped(user?: PortalUser): boolean {
+  return !!user && user.role !== 'OWNER' && user.permissions.includes('companies.read_trial');
+}
+
+async function companyIsTrial(companyId: string): Promise<boolean> {
+  const row = await queryOne<any>(
+    `SELECT 1 FROM subscriptions WHERE company_id = $1 AND status = 'TRIAL'`,
+    [companyId],
+  );
+  return !!row;
+}
+
 const unguardedAdminSecretRoutes = {
   getSubscriptions: async ({ portalUser }: { portalUser?: PortalUser } = {}) => {
     try {
@@ -96,16 +115,9 @@ const unguardedAdminSecretRoutes = {
       await ensureOnlineExamsColumn();
       let rows = await query<any>(SUBSCRIPTIONS_SQL);
 
-      // companies.read_trial caps the tenant list at the trial pipeline: paying
-      // and expired tenants — and their owner emails, mobiles and addresses —
-      // are dropped HERE, not hidden by the console. The cap WINS over the
-      // other read grants (cards.read also opens this route, for the Cards
-      // report), because the person ticking "trial only" means trial only —
-      // not "trial only unless some other section leaks the rest". OWNER is
-      // never capped.
-      const trialOnly = !!portalUser && portalUser.role !== 'OWNER'
-        && portalUser.permissions.includes('companies.read_trial');
-      if (trialOnly) rows = rows.filter((r) => r.subscription_type === 'TRIAL');
+      // The trial cap: paying and expired tenants — and their owner emails,
+      // mobiles and addresses — are dropped HERE, not hidden by the console.
+      if (isTrialCapped(portalUser)) rows = rows.filter((r) => r.subscription_type === 'TRIAL');
 
       const body = rows.map((r) => ({
         company_id: r.company_id,
@@ -890,9 +902,10 @@ const unguardedAdminSecretRoutes = {
    * GET /api/karim-admin-secret/users?companyId=...
    * Every user account, with the tenant it belongs to. Passwords never leave here.
    */
-  listUsers: async ({ query: q }: { query: { companyId?: string } }) => {
+  listUsers: async ({ query: q, portalUser }: { query: { companyId?: string }; portalUser?: PortalUser }) => {
     try {
       const params: any[] = [];
+      const where: string[] = [];
       let sql = `
         SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.is_active,
                u.email_verified, u.created_at,
@@ -901,8 +914,16 @@ const unguardedAdminSecretRoutes = {
           LEFT JOIN companies c ON c.id = u.company_id`;
       if (q?.companyId) {
         params.push(q.companyId);
-        sql += ' WHERE u.company_id = $1';
+        where.push(`u.company_id = $${params.length}`);
       }
+      // A trial-capped caller gets the same slice here as on the tenant list:
+      // only accounts inside TRIAL tenants exist for them. Accounts with no
+      // tenant at all are hidden too — they are not trial pipeline.
+      if (isTrialCapped(portalUser)) {
+        where.push(`EXISTS (SELECT 1 FROM subscriptions s
+                             WHERE s.company_id = u.company_id AND s.status = 'TRIAL')`);
+      }
+      if (where.length) sql += ' WHERE ' + where.join(' AND ');
       sql += ' ORDER BY c.name NULLS LAST, u.created_at DESC';
 
       const rows = await query<any>(sql, params);
@@ -932,8 +953,9 @@ const unguardedAdminSecretRoutes = {
    * Create a user inside a tenant. Verified on the spot — a vendor-created account
    * has nobody to click an OTP, and an unverified account cannot log in.
    */
-  createUser: async ({ body }: {
+  createUser: async ({ body, portalUser }: {
     body: { companyId: string; email: string; password: string; firstName: string; lastName: string; role: string };
+    portalUser?: PortalUser;
   }) => {
     try {
       const email = (body?.email || '').trim().toLowerCase();
@@ -954,6 +976,11 @@ const unguardedAdminSecretRoutes = {
 
       const company = await queryOne<any>('SELECT id FROM companies WHERE id = $1', [body?.companyId]);
       if (!company) return { status: 404 as const, body: { message: 'Company not found' } };
+      // Same 404 as an unknown id: to a trial-capped caller a non-trial tenant
+      // does not exist, and a different answer would say otherwise.
+      if (isTrialCapped(portalUser) && !(await companyIsTrial(body.companyId))) {
+        return { status: 404 as const, body: { message: 'Company not found' } };
+      }
 
       // Email is UNIQUE across the whole table, not per tenant — say so plainly
       // rather than letting the insert fail on a constraint name.
@@ -994,10 +1021,15 @@ const unguardedAdminSecretRoutes = {
    * Refuses to remove a tenant's LAST admin — that would lock the customer out of
    * their own account, with no way back in except this console.
    */
-  deleteUser: async ({ params }: { params: { id: string } }) => {
+  deleteUser: async ({ params, portalUser }: { params: { id: string }; portalUser?: PortalUser }) => {
     try {
       const user = await queryOne<any>('SELECT id, role, company_id FROM users WHERE id = $1', [params.id]);
       if (!user) return { status: 404 as const, body: { message: 'User not found' } };
+      // A trial-capped caller may only touch accounts they can see — the same
+      // TRIAL slice listUsers serves them, and the same 404 as a bad id.
+      if (isTrialCapped(portalUser) && (!user.company_id || !(await companyIsTrial(user.company_id)))) {
+        return { status: 404 as const, body: { message: 'User not found' } };
+      }
 
       if (user.company_id && ['ADMIN', 'GLOBAL_ADMIN'].includes(user.role)) {
         const others = await queryOne<any>(
@@ -1048,9 +1080,10 @@ const unguardedAdminSecretRoutes = {
    * for up to a year — tokens are stateless with no revocation list. The moved
    * account must log out and back in before it sees the new tenant.
    */
-  moveUserCompany: async ({ params, body }: {
+  moveUserCompany: async ({ params, body, portalUser }: {
     params: { id: string };
     body: { companyId: string };
+    portalUser?: PortalUser;
   }) => {
     const client = await getClient();
     try {
@@ -1066,6 +1099,11 @@ const unguardedAdminSecretRoutes = {
 
       const target = await queryOne<any>('SELECT id, name FROM companies WHERE id = $1', [body?.companyId]);
       if (!target) return { status: 404 as const, body: { message: 'Company not found' } };
+      // A trial-capped caller cannot aim the debug account at a tenant they
+      // cannot see. Same 404 as an unknown id, for the same reason as above.
+      if (isTrialCapped(portalUser) && !(await companyIsTrial(target.id))) {
+        return { status: 404 as const, body: { message: 'Company not found' } };
+      }
 
       if (user.company_id === target.id) {
         return { status: 400 as const, body: { message: 'That user is already in this tenant' } };
