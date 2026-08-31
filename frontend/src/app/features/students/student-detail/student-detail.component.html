@@ -237,9 +237,6 @@
           <!-- Everyday actions stay visible; the rest live behind the "more"
                menu (see headerMenuItems for why each entry sits there). -->
           <div class="flex gap-2 flex-wrap justify-end">
-            <button pButton [label]="'STUDENT_QR.SEND_FOLLOWUP_PARENT' | translate" icon="pi pi-whatsapp"
-              class="p-button-outlined p-button-success"
-              (click)="sendFollowupToParent()"></button>
             <button pButton [label]="'STUDENT_QR.BUTTON' | translate" icon="pi pi-qrcode" class="p-button-outlined" (click)="showQrDialog.set(true)"></button>
             <button pButton [label]="'STUDENTS.DETAIL.EDIT' | translate" icon="pi pi-pencil" (click)="editStudent()"></button>
             <button pButton icon="pi pi-ellipsis-v" class="p-button-outlined"

@@ -178,9 +178,9 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ── Send follow-up to the parent, straight from the header ────────────────
-  // The same action the QR dialog offers, surfaced on the main screen so staff
-  // don't have to open the QR view to reach it.
+  // ── Send follow-up to the parent, from the header "more" menu ─────────────
+  // The same action the QR dialog offers, surfaced here so staff don't have to
+  // open the QR view to reach it.
   /** Telegram connect link, pre-fetched on load so window.open stays inside the click gesture. */
   telegramParentUrl = signal<string | null>(null);
 
@@ -213,6 +213,7 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
     this.languageService.currentLang(); // rebuild labels when the language flips
     const s = this.student();
     const items: MenuItem[] = [
+      { label: this.translate.instant('STUDENT_QR.SEND_FOLLOWUP_PARENT'), icon: 'pi pi-whatsapp', command: () => this.sendFollowupToParent() },
       { label: this.translate.instant('QR_CARDS.LINK_BUTTON'), icon: 'pi pi-id-card', command: () => this.openLinkCard() },
       { label: this.translate.instant('STUDENTS.DETAIL.SEND_NOTES'), icon: 'pi pi-whatsapp', command: () => this.openNotesDialog() },
     ];
