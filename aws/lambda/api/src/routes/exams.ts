@@ -16,7 +16,7 @@ import { ensureLessonSchema, lessonPoolSize, lessonsInCourse } from './lessons';
 import { ensureStudentAuthSchema, canonicalIdentifier, USERNAME_SHAPE, MIN_PASSWORD_LENGTH } from './student-auth';
 import bcrypt from 'bcryptjs';
 import { gradeAttempt } from '../db/exam-grading';
-import { pushExamResult } from '../utils/push';
+import { pushExamResult, pushExamAbsence } from '../utils/push';
 
 type AuthHeaders = { authorization: string };
 
@@ -1595,6 +1595,9 @@ export const examsRoutes = {
            DO UPDATE SET grade = NULL, is_absent = true, recorded_at = NOW(), updated_at = NOW()`,
           [params.id, context.companyId, exam.course_id, body.studentId],
         );
+        // Best-effort parent push: a missed exam / unsolved homework is a fact
+        // the moment the teacher records it.
+        await pushExamAbsence(context.companyId, body.studentId, params.id, exam.name, exam.is_homework === true);
       } else {
         await query(
           'DELETE FROM exam_results WHERE exam_id = $1 AND student_id = $2 AND company_id = $3',
@@ -1660,6 +1663,11 @@ export const examsRoutes = {
          RETURNING student_id`,
         absentParams,
       );
+      // Every newly-marked miss tells its parent — only the NEW rows (RETURNING),
+      // so re-clicking the button never re-notifies anyone. Best-effort each.
+      for (const row of inserted) {
+        await pushExamAbsence(context.companyId, row.student_id, params.id, exam.name, exam.is_homework === true);
+      }
       return { status: 200 as const, body: { success: true, count: inserted.length } };
     } catch (error: any) {
       console.error('Exam mark-remaining-absent error:', error);

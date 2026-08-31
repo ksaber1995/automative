@@ -269,3 +269,43 @@ export async function pushExamResult(
     console.error('push: pushExamResult failed (ignored):', e);
   }
 }
+
+/**
+ * The student was marked ABSENT on an exam, or never handed a homework in —
+ * the miss a parent most wants to hear about, told the moment the teacher
+ * records it. Same course/teacher tail as the mark push above.
+ */
+export async function pushExamAbsence(
+  companyId: string,
+  studentId: string,
+  examId: string,
+  examName: string,
+  isHomework: boolean,
+): Promise<void> {
+  try {
+    const ctx = await queryOne<any>(
+      `SELECT co.name AS course_name, s.name AS student_name,
+              (SELECT NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), '')
+                 FROM employees e
+                WHERE e.id = COALESCE(cl.instructor_id, co.instructor_id)) AS teacher_name
+         FROM exams ex
+         JOIN courses co ON co.id = ex.course_id
+         LEFT JOIN classes cl ON cl.id = ex.class_id
+         LEFT JOIN students s ON s.id = $3
+        WHERE ex.id = $1 AND ex.company_id = $2`,
+      [examId, companyId, studentId],
+    );
+    const tail = ctx
+      ? ` — ${ctx.course_name}${ctx.teacher_name ? ` مع ${ctx.teacher_name}` : ''}`
+      : '';
+    const who = ctx?.student_name || 'الطالب';
+    await sendPushToStudent(companyId, studentId, {
+      title: isHomework ? 'واجب غير محلول ❌' : 'غياب عن امتحان ❌',
+      body: isHomework
+        ? `${who} لم يحل الواجب "${examName}"${tail}.`
+        : `${who} لم يحضر امتحان "${examName}"${tail}.`,
+    });
+  } catch (e) {
+    console.error('push: pushExamAbsence failed (ignored):', e);
+  }
+}
