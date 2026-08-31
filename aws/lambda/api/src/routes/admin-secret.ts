@@ -89,10 +89,12 @@ function toIso(value: any): string | null {
 
 /**
  * Does companies.read_trial cap this caller? A capped caller lives in a world
- * where non-TRIAL tenants do not exist: the tenant list, the user list, and
- * every company-aimed write in this file answer as if they were never there.
- * The cap WINS over the caller's other read grants — the person ticking
- * "trial only" means trial only. OWNER is never capped.
+ * where non-TRIAL tenants do not exist: the tenant list and every
+ * company-aimed write in this file answer as if they were never there, and
+ * the user list shrinks to the one account such a caller has any business
+ * with — the debug login they park in trial tenants. The cap WINS over the
+ * caller's other read grants — the person ticking "trial only" means trial
+ * only. OWNER is never capped.
  */
 function isTrialCapped(user?: PortalUser): boolean {
   return !!user && user.role !== 'OWNER' && user.permissions.includes('companies.read_trial');
@@ -916,12 +918,16 @@ const unguardedAdminSecretRoutes = {
         params.push(q.companyId);
         where.push(`u.company_id = $${params.length}`);
       }
-      // A trial-capped caller gets the same slice here as on the tenant list:
-      // only accounts inside TRIAL tenants exist for them. Accounts with no
-      // tenant at all are hidden too — they are not trial pipeline.
+      // A trial-capped caller has no business browsing tenant accounts at all —
+      // their Users page exists for one job: find the debug login and park it in
+      // a trial tenant. So they get exactly one row, master@master.com, and they
+      // get it WHEREVER it currently sits: hiding it while it is parked in a
+      // paying tenant would strand it where a capped caller can never retrieve
+      // it. (Which tenant it is in is disclosed; that one name is the price of
+      // the toggle working.)
       if (isTrialCapped(portalUser)) {
-        where.push(`EXISTS (SELECT 1 FROM subscriptions s
-                             WHERE s.company_id = u.company_id AND s.status = 'TRIAL')`);
+        params.push(DEBUG_ACCOUNT_EMAIL);
+        where.push(`LOWER(TRIM(u.email)) = $${params.length}`);
       }
       if (where.length) sql += ' WHERE ' + where.join(' AND ');
       sql += ' ORDER BY c.name NULLS LAST, u.created_at DESC';
@@ -1023,12 +1029,16 @@ const unguardedAdminSecretRoutes = {
    */
   deleteUser: async ({ params, portalUser }: { params: { id: string }; portalUser?: PortalUser }) => {
     try {
-      const user = await queryOne<any>('SELECT id, role, company_id FROM users WHERE id = $1', [params.id]);
+      const user = await queryOne<any>('SELECT id, email, role, company_id FROM users WHERE id = $1', [params.id]);
       if (!user) return { status: 404 as const, body: { message: 'User not found' } };
-      // A trial-capped caller may only touch accounts they can see — the same
-      // TRIAL slice listUsers serves them, and the same 404 as a bad id.
-      if (isTrialCapped(portalUser) && (!user.company_id || !(await companyIsTrial(user.company_id)))) {
-        return { status: 404 as const, body: { message: 'User not found' } };
+      // A trial-capped caller sees exactly one account (the debug login), and
+      // even that one is move-only for them: anything else is a 404, the same
+      // answer as a bad id, so nothing invisible can be probed for.
+      if (isTrialCapped(portalUser)) {
+        if (!isDebugAccount(user.email)) {
+          return { status: 404 as const, body: { message: 'User not found' } };
+        }
+        return { status: 403 as const, body: { message: 'The debug account can be moved between tenants, not deleted.' } };
       }
 
       if (user.company_id && ['ADMIN', 'GLOBAL_ADMIN'].includes(user.role)) {
