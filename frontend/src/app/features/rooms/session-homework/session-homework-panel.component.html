@@ -36,8 +36,13 @@
         <i class="pi pi-spin pi-spinner text-2xl"></i>
       </div>
     } @else if (homeworks().length) {
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6">
-        @for (hw of homeworks(); track hw.id) {
+      <!-- THIS session's items lead; the class's older homework sits behind the
+           history toggle below, so the register opens on today's work. -->
+      @if (!currentHomeworks().length) {
+        <p class="text-sm text-gray-400 mb-3">{{ 'SESSION_HOMEWORK.EMPTY_THIS_SESSION' | translate }}</p>
+      }
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+        @for (hw of currentHomeworks(); track hw.id) {
           <!-- Row is a div, not a button: the delete control is a button of its
                own and nesting one button inside another is invalid markup. -->
           <div class="flex items-center rounded-lg border border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition">
@@ -74,6 +79,57 @@
           </div>
         }
       </div>
+
+      <!-- The class's earlier homework/exams (other sessions, or created from
+           the exams page) — reachable, not in the way. -->
+      @if (previousHomeworks().length) {
+        <div class="mb-6">
+          <button type="button"
+            class="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700"
+            (click)="showHistory.set(!showHistory())">
+            <i class="pi" [class.pi-angle-down]="!showHistory()" [class.pi-angle-up]="showHistory()"></i>
+            {{ (showHistory() ? 'SESSION_HOMEWORK.HIDE_HISTORY' : 'SESSION_HOMEWORK.SHOW_HISTORY')
+               | translate: { n: previousHomeworks().length } }}
+          </button>
+          @if (showHistory()) {
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 opacity-90">
+              @for (hw of previousHomeworks(); track hw.id) {
+                <div class="flex items-center rounded-lg border border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition">
+                  <button
+                    type="button"
+                    (click)="open(hw)"
+                    class="flex items-center justify-between flex-1 min-w-0 p-3 text-start"
+                  >
+                    <span class="min-w-0">
+                      <span class="font-semibold text-gray-800">{{ hw.name }}</span>
+                      <span class="block text-xs text-gray-500">
+                        <p-tag styleClass="me-1 text-[10px]"
+                          [value]="(hw.isHomework ? 'SESSION_HOMEWORK.TYPE_HOMEWORK' : 'SESSION_HOMEWORK.TYPE_EXAM') | translate"
+                          [severity]="hw.isHomework ? 'info' : 'warn'"></p-tag>
+                        {{ hw.examDate | date: 'mediumDate' }}
+                        @if (hw.maxGrade != null) { · {{ 'SESSION_HOMEWORK.OUT_OF' | translate }} {{ hw.maxGrade }} }
+                      </span>
+                    </span>
+                    <span class="text-xs font-medium text-purple-600 whitespace-nowrap ms-2">
+                      {{ 'SESSION_HOMEWORK.MARKED_COUNT' | translate: { n: hw.resultCount ?? 0 } }}
+                      <i class="pi pi-angle-right ms-1"></i>
+                    </span>
+                  </button>
+                  <button
+                    pButton
+                    type="button"
+                    icon="pi pi-trash"
+                    class="p-button-rounded p-button-text p-button-danger shrink-0 me-1"
+                    [pTooltip]="'SESSION_HOMEWORK.DELETE' | translate"
+                    [disabled]="deletingId() === hw.id"
+                    (click)="remove(hw)"
+                  ></button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
     } @else {
       <div class="text-center py-4 text-gray-500">
         <i class="pi pi-book text-3xl mb-2"></i>

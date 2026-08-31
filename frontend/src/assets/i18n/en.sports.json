@@ -1196,6 +1196,9 @@
     "NO_STUDENT_PHONE": "No trainee phone number on file"
   },
   "SESSION_HOMEWORK": {
+    "EMPTY_THIS_SESSION": "No drill or evaluation for this training yet — create one below.",
+    "SHOW_HISTORY": "Show previous drills & evaluations ({{n}})",
+    "HIDE_HISTORY": "Hide previous drills & evaluations ({{n}})",
     "BUTTON": "Drills / Evaluations",
     "TITLE": "Drills / Evaluations",
     "PICK_HINT": "Pick a drills or evaluation to mark, or create a new one for this group.",

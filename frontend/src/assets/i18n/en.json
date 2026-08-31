@@ -5689,6 +5689,9 @@
     "WEAK": "Weak"
   },
   "SESSION_HOMEWORK": {
+    "EMPTY_THIS_SESSION": "No homework or exam for this session yet — create one below.",
+    "SHOW_HISTORY": "Show previous homework & exams ({{n}})",
+    "HIDE_HISTORY": "Hide previous homework & exams ({{n}})",
     "BUTTON": "Homework / Exams",
     "TITLE": "Homework / Exams",
     "PICK_HINT": "Pick a homework or exam to mark, or create a new one for this class.",

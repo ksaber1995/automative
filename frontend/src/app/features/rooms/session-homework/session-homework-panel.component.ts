@@ -65,6 +65,15 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
   step = signal<'pick' | 'record'>('pick');
   homeworks = signal<ExamModel[]>([]);
   loadingList = signal(false);
+
+  /**
+   * THIS session's items lead; everything older (other sessions, or created
+   * from the exams page with no session) hides behind the history toggle — a
+   * teacher opening the register wants today's homework, not the term's.
+   */
+  showHistory = signal(false);
+  currentHomeworks = computed(() => this.homeworks().filter((h) => h.sessionId === this.sessionId()));
+  previousHomeworks = computed(() => this.homeworks().filter((h) => h.sessionId !== this.sessionId()));
   creating = signal(false);
   deletingId = signal<string | null>(null);
 
@@ -175,6 +184,7 @@ export class SessionHomeworkPanelComponent implements OnDestroy {
       if (this.visible()) {
         this.step.set('pick');
         this.active.set(null);
+        this.showHistory.set(false);
         this.loadList();
       }
     });
