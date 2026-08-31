@@ -7,6 +7,7 @@ import { PortalAuthService, PortalUser } from '../auth/portal-auth.service';
 /** What each permission key lets someone do — the caption beside its checkbox. */
 const PERMISSION_LABELS: Record<string, string> = {
   'companies.read': 'See the tenant list and their subscription numbers',
+  'companies.read_trial': 'See TRIAL tenants only — active and expired tenants stay hidden',
   'companies.write': 'Activate, deactivate, extend and re-type a tenant',
   'companies.delete': 'Permanently delete a tenant and all of its data',
   'cards.read': 'See card pools and card lists',

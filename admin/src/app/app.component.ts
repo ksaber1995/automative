@@ -198,7 +198,7 @@ export class AppComponent {
       }
 
       // Sidebar counts, which are shown before any section is opened.
-      if (this.auth.can(['companies.read', 'cards.read', 'tenant_users.read'])) this.store.loadCompanies();
+      if (this.auth.can(['companies.read', 'companies.read_trial', 'cards.read', 'tenant_users.read'])) this.store.loadCompanies();
       if (this.auth.can('tenant_users.read')) this.store.loadUsers();
       if (this.auth.can('bots.read')) this.store.loadBots();
     });
@@ -230,7 +230,7 @@ export class AppComponent {
 
   /** Sidebar "Refresh all" — reload every section this account can see. */
   protected refreshAll(): void {
-    if (this.auth.can(['companies.read', 'cards.read', 'tenant_users.read'])) this.store.loadCompanies(true);
+    if (this.auth.can(['companies.read', 'companies.read_trial', 'cards.read', 'tenant_users.read'])) this.store.loadCompanies(true);
     if (this.auth.can('tenant_users.read')) this.store.loadUsers(true);
     if (this.auth.can('bots.read')) this.store.loadBots(true);
   }

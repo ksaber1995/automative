@@ -102,11 +102,11 @@ export class PortalAuthService {
    * same thing again on every call, so a hidden button is a courtesy and not
    * the security boundary.
    */
-  can(needed: string | string[]): boolean {
+  can(needed: string | readonly string[]): boolean {
     const u = this.user();
     if (!u) return false;
     if (u.role === 'OWNER') return true;
-    const wanted = Array.isArray(needed) ? needed : [needed];
+    const wanted = Array.isArray(needed) ? needed : [needed as string];
     return wanted.some((p) => u.permissions.includes(p));
   }
 }

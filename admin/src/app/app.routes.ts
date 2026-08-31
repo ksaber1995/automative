@@ -17,7 +17,8 @@ import { PortalUsersComponent } from './portal-users/portal-users.component';
  * they are not allowed to see.
  */
 export const SECTIONS = [
-  { path: 'companies', label: 'Companies', permission: 'companies.read' },
+  // read_trial opens the same section; the API then only serves TRIAL tenants.
+  { path: 'companies', label: 'Companies', permission: ['companies.read', 'companies.read_trial'] },
   { path: 'users', label: 'Users', permission: 'tenant_users.read' },
   { path: 'cards', label: 'Cards', permission: 'cards.read' },
   { path: 'bots', label: 'Telegram bots', permission: 'bots.read' },
@@ -48,7 +49,7 @@ export const sectionGuard: CanActivateFn = (route): boolean | UrlTree => {
 
   if (!auth.signedIn()) return true;
 
-  const needed = route.data?.['permission'] as string | undefined;
+  const needed = route.data?.['permission'] as string | string[] | undefined;
   if (!needed || auth.can(needed)) return true;
   return router.parseUrl(firstAllowedPath(auth));
 };
@@ -59,7 +60,7 @@ export const routes: Routes = [
     component: CompaniesPageComponent,
     title: 'Companies · Netrofit Admin',
     canActivate: [sectionGuard],
-    data: { permission: 'companies.read' },
+    data: { permission: ['companies.read', 'companies.read_trial'] },
   },
   {
     path: 'users',

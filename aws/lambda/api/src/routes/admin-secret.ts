@@ -8,7 +8,7 @@ import {
   ensureOnlineExamsColumn,
   smsIsActive,
 } from './companies';
-import { withPortalGuard, PortalPermission } from './admin-portal';
+import { withPortalGuard, portalCan, PortalPermission, PortalUser } from './admin-portal';
 import { createPrintJob, ensurePrintJobSchema, mapPrintJob } from './print-jobs';
 
 /**
@@ -88,13 +88,21 @@ function toIso(value: any): string | null {
 }
 
 const unguardedAdminSecretRoutes = {
-  getSubscriptions: async () => {
+  getSubscriptions: async ({ portalUser }: { portalUser?: PortalUser } = {}) => {
     try {
       // The SELECT reads the SMS and online-exam columns, so they have to exist
       // before it runs.
       await ensureCompanySmsColumns();
       await ensureOnlineExamsColumn();
-      const rows = await query<any>(SUBSCRIPTIONS_SQL);
+      let rows = await query<any>(SUBSCRIPTIONS_SQL);
+
+      // An account holding only companies.read_trial gets the trial pipeline
+      // and nothing else: paying and expired tenants — and their owner emails,
+      // mobiles and addresses — are dropped HERE, not hidden by the console.
+      // A full read grant (companies.read or cards.read, or OWNER) is unscoped.
+      const trialOnly = !!portalUser && !portalCan(portalUser, ['companies.read', 'cards.read']);
+      if (trialOnly) rows = rows.filter((r) => r.subscription_type === 'TRIAL');
+
       const body = rows.map((r) => ({
         company_id: r.company_id,
         company_name: r.company_name,
@@ -1121,8 +1129,9 @@ const unguardedAdminSecretRoutes = {
  */
 const ADMIN_SECRET_PERMISSIONS: { [K in keyof typeof unguardedAdminSecretRoutes]: PortalPermission | PortalPermission[] } = {
   // The tenant list is the spine of both the Companies table and the Cards
-  // report, so either grant opens it.
-  getSubscriptions: ['companies.read', 'cards.read'],
+  // report, so either grant opens it. read_trial opens it too, but the handler
+  // then filters the rows down to TRIAL tenants for anyone holding only that.
+  getSubscriptions: ['companies.read', 'cards.read', 'companies.read_trial'],
   extendSubscription: 'companies.write',
   activateSubscription: 'companies.write',
   deactivateSubscription: 'companies.write',

@@ -28,6 +28,11 @@ import { enforceByIp, enforce, RateLimitBucket } from '../middleware/rate-limit'
  */
 export const ADMIN_PORTAL_PERMISSIONS = [
   'companies.read',
+  // The scoped variant for a salesperson chasing trials: same Companies
+  // section, but the API only ever returns tenants whose subscription is
+  // TRIAL — paying customers (and their contact details) never leave the
+  // server. Holding companies.read as well makes this key moot.
+  'companies.read_trial',
   'companies.write',
   'companies.delete',
   'cards.read',
@@ -45,6 +50,7 @@ export type PortalPermission = (typeof ADMIN_PORTAL_PERMISSIONS)[number];
 /** What each key lets someone do, shown next to the checkbox in the console. */
 export const ADMIN_PORTAL_PERMISSION_LABELS: Record<PortalPermission, string> = {
   'companies.read': 'See the tenant list and their subscription numbers',
+  'companies.read_trial': 'See TRIAL tenants only — active and expired tenants stay hidden',
   'companies.write': 'Activate, deactivate, extend and re-type a tenant',
   'companies.delete': 'Permanently delete a tenant and all of its data',
   'cards.read': 'See card pools and card lists',
@@ -320,7 +326,9 @@ export function withPortalGuard<T extends Record<string, AnyHandler>>(
     guarded[key] = async (args: any) => {
       const guard = await requirePortal(args?.headers, permissions[key as keyof T]);
       if (!guard.ok) return guard.response;
-      return handler(args);
+      // The resolved caller rides along so a handler can scope its DATA by who
+      // is asking (companies.read_trial), not just refuse the whole route.
+      return handler({ ...(args ?? {}), portalUser: guard.user });
     };
   }
   return guarded as T;
