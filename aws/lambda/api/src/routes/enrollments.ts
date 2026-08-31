@@ -510,6 +510,19 @@ async function joinDateImpactOf(companyId: string, enrollment: any, newDate: str
         AND s.start_date::date < $5::date`,
     [enrollment.student_id, enrollment.class_id, companyId, enrollment.id, newDate]
   );
+  // …the marks recorded before the new date (exam/homework results whose
+  // session — or, unsessioned, whose exam date — precedes it): a later join
+  // would claim they were earned before the student was here…
+  const marks = await queryOne<any>(
+    `SELECT COUNT(*) AS n
+       FROM exam_results r
+       JOIN exams e ON e.id = r.exam_id
+       LEFT JOIN sessions s ON s.id = e.session_id
+      WHERE r.student_id = $1 AND e.company_id = $2 AND e.class_id = $3
+        AND COALESCE(s.start_date::date, e.exam_date::date) < $4::date`,
+    [enrollment.student_id, companyId, enrollment.class_id, newDate]
+  );
+
   // …and the held lessons an earlier join turns into absences (no row yet).
   const missed = newKey < oldKey || newDate < oldDate
     ? await queryOne<any>(
@@ -534,6 +547,7 @@ async function joinDateImpactOf(companyId: string, enrollment: any, newDate: str
     billsKeptWithMoney,
     attendanceBefore: Number(before?.n ?? 0),
     attendanceBeforeHasMoney: before?.has_money === true,
+    examResultsBefore: Number(marks?.n ?? 0),
     sessionsBecomingAbsent: Number(missed?.n ?? 0),
     /** Marking present bills money on per-session courses — offered elsewhere. */
     canMarkPresent: paymentType !== 'PER_SESSION',
@@ -970,13 +984,27 @@ export const enrollmentsRoutes = {
         return apiError(400, 'ERRORS.ENROLLMENTS.INVALID_DATE', 'Invalid date');
       }
       const impact = await joinDateImpactOf(context.companyId, enrollment, newDate);
+      const movingLater = newDate > impact.oldDate;
 
-      // Wiping attendance that money already touched (a paid or package-covered
-      // per-session charge) would detach cash from what it paid for — refused,
-      // not silently skipped.
-      if (body?.wipeAttendanceBefore === true && impact.attendanceBeforeHasMoney) {
+      // ── The strict rules for a LATER join date ──────────────────────────────
+      // History before the new date must not silently survive it: paid months,
+      // attendance, and marks all claim the student was here. Money is a hard
+      // wall (refund or void it first — deleting a paid bill would destroy the
+      // record of cash collected); attendance and marks may go, but only by the
+      // caller's explicit choice, never as a side effect.
+      if (movingLater && impact.billsKeptWithMoney > 0) {
+        return apiError(400, 'ERRORS.ENROLLMENTS.JOINDATE_PAID_BILLS',
+          'The student already paid month(s) before the new date — refund or void those payments first');
+      }
+      if (impact.attendanceBeforeHasMoney &&
+          (body?.wipeAttendanceBefore === true || movingLater)) {
         return apiError(400, 'ERRORS.ENROLLMENTS.JOINDATE_ATTENDANCE_MONEY',
           'Some attendance before the new date has money on it — settle or refund those charges first');
+      }
+      if (movingLater && (impact.attendanceBefore > 0 || impact.examResultsBefore > 0)
+          && body?.wipeAttendanceBefore !== true) {
+        return apiError(400, 'ERRORS.ENROLLMENTS.JOINDATE_HISTORY_EXISTS',
+          'Attendance or marks exist before the new date — confirm wiping them, or pick another date');
       }
 
       // The date itself. class_joined_on is cleared: a hand-set join date is the
@@ -1030,6 +1058,16 @@ export const enrollmentsRoutes = {
       }
 
       if (body?.wipeAttendanceBefore === true) {
+        // Marks from before the new date go with the lessons they were earned in
+        // (sessioned homework by its session's day, unsessioned by exam date).
+        await query(
+          `DELETE FROM exam_results r
+            USING exams e LEFT JOIN sessions s ON s.id = e.session_id
+            WHERE e.id = r.exam_id AND r.student_id = $1
+              AND e.company_id = $2 AND e.class_id = $3
+              AND COALESCE(s.start_date::date, e.exam_date::date) < $4::date`,
+          [enrollment.student_id, context.companyId, enrollment.class_id, newDate]
+        );
         // The charges of the wiped lessons go with them — PENDING/WAIVED rows
         // only; the money guard above already refused anything else.
         await query(

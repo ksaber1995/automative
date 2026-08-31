@@ -77,6 +77,32 @@ export function toVertical(value: unknown): CompanyVertical {
   return value === 'SPORTS' ? 'SPORTS' : 'GENERAL';
 }
 
+let autoHomeworkColumnInitPromise: Promise<void> | null = null;
+export async function ensureAutoHomeworkColumn(): Promise<void> {
+  if (!autoHomeworkColumnInitPromise) {
+    autoHomeworkColumnInitPromise = (async () => {
+      try {
+        // Opt-in: homework is a habit, not a given — default OFF.
+        await query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS auto_create_homework BOOLEAN NOT NULL DEFAULT FALSE`);
+      } catch (e) {
+        autoHomeworkColumnInitPromise = null;
+        throw e;
+      }
+    })();
+  }
+  return autoHomeworkColumnInitPromise;
+}
+
+/** Does this company want a homework created with every new session? */
+export async function isAutoHomeworkEnabled(companyId: string): Promise<boolean> {
+  await ensureAutoHomeworkColumn();
+  const row = await queryOne<any>(
+    'SELECT auto_create_homework FROM companies WHERE id = $1',
+    [companyId]
+  );
+  return row?.auto_create_homework === true;
+}
+
 let autoManageColumnInitPromise: Promise<void> | null = null;
 export async function ensureAutoManageSessionsColumn(): Promise<void> {
   if (!autoManageColumnInitPromise) {
@@ -604,10 +630,10 @@ export const companiesRoutes = {
 
   getSettings: async ({ headers }: { headers: { authorization: string } }) => {
     try {
-      await Promise.all([ensureAutoManageSessionsColumn(), ensureAutoConfirmSessionPaymentsColumn(), ensureHomeworkGradingColumn(), ensureFreeTrialLimitColumn()]);
+      await Promise.all([ensureAutoManageSessionsColumn(), ensureAutoConfirmSessionPaymentsColumn(), ensureHomeworkGradingColumn(), ensureFreeTrialLimitColumn(), ensureAutoHomeworkColumn()]);
       const context = await extractTenantContext(headers.authorization);
       const company = await queryOne(
-        'SELECT id, name, global_expense_allocation, auto_manage_sessions, auto_confirm_session_payments, homework_grading_mode, free_session_trial_limit FROM companies WHERE id = $1',
+        'SELECT id, name, global_expense_allocation, auto_manage_sessions, auto_confirm_session_payments, homework_grading_mode, free_session_trial_limit, auto_create_homework FROM companies WHERE id = $1',
         [context.companyId]
       );
       if (!company) {
@@ -623,6 +649,7 @@ export const companiesRoutes = {
           autoConfirmSessionPayments: company.auto_confirm_session_payments === true,
           homeworkGradingMode: company.homework_grading_mode === 'RATING' ? 'RATING' : 'NUMERIC',
           freeSessionTrialLimit: parseInt(company.free_session_trial_limit ?? 0, 10) || 0,
+          autoCreateHomework: company.auto_create_homework === true,
         },
       };
     } catch (error) {
@@ -631,9 +658,9 @@ export const companiesRoutes = {
     }
   },
 
-  updateSettings: async ({ body, headers }: { body: { globalExpenseAllocation?: string; autoManageSessions?: boolean; autoConfirmSessionPayments?: boolean; homeworkGradingMode?: string; freeSessionTrialLimit?: number }; headers: { authorization: string } }) => {
+  updateSettings: async ({ body, headers }: { body: { globalExpenseAllocation?: string; autoManageSessions?: boolean; autoConfirmSessionPayments?: boolean; homeworkGradingMode?: string; freeSessionTrialLimit?: number; autoCreateHomework?: boolean }; headers: { authorization: string } }) => {
     try {
-      await Promise.all([ensureAutoManageSessionsColumn(), ensureAutoConfirmSessionPaymentsColumn(), ensureHomeworkGradingColumn(), ensureFreeTrialLimitColumn()]);
+      await Promise.all([ensureAutoManageSessionsColumn(), ensureAutoConfirmSessionPaymentsColumn(), ensureHomeworkGradingColumn(), ensureFreeTrialLimitColumn(), ensureAutoHomeworkColumn()]);
       const context = await extractTenantContext(headers.authorization);
 
       if (context.role !== 'ADMIN' && context.role !== 'GLOBAL_ADMIN') {
@@ -649,6 +676,9 @@ export const companiesRoutes = {
       }
       if (body.autoConfirmSessionPayments !== undefined) {
         updateData.auto_confirm_session_payments = body.autoConfirmSessionPayments === true;
+      }
+      if (body.autoCreateHomework !== undefined) {
+        updateData.auto_create_homework = body.autoCreateHomework === true;
       }
       if (body.homeworkGradingMode !== undefined) {
         if (!HOMEWORK_GRADING_MODES.includes(body.homeworkGradingMode as any)) {
@@ -681,6 +711,7 @@ export const companiesRoutes = {
           autoConfirmSessionPayments: company.auto_confirm_session_payments === true,
           homeworkGradingMode: company.homework_grading_mode === 'RATING' ? 'RATING' : 'NUMERIC',
           freeSessionTrialLimit: parseInt(company.free_session_trial_limit ?? 0, 10) || 0,
+          autoCreateHomework: company.auto_create_homework === true,
         },
       };
     } catch (error) {

@@ -24,6 +24,8 @@ export interface CompanySettings {
   homeworkGradingMode: HomeworkGradingMode;
   /** Free (trial) sessions one student may ever attend. 0 = unlimited. */
   freeSessionTrialLimit: number;
+  /** Opt-in: a homework is created automatically with every new (non-free) session. */
+  autoCreateHomework: boolean;
 }
 
 export interface CompanyProfileData {

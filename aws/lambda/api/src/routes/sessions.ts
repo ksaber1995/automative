@@ -2,7 +2,8 @@ import { insert, update, query, queryOne } from '../db/connection';
 import { extractTenantContext, canAccessBranch, isGlobalAdmin, checkGranularPermission, appendBranchSqlFilter } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
 import { notifySessionAttendance } from './telegram';
-import { ensureAutoManageSessionsColumn, assertOnlineExams, isOnlineExamsEnabled } from './companies';
+import { ensureAutoManageSessionsColumn, assertOnlineExams, isOnlineExamsEnabled, isAutoHomeworkEnabled } from './companies';
+import { ensureExamTables, isRatingCompany, HOMEWORK_RATING_MAX } from './exams';
 import { ensureLessonSchema } from './lessons';
 import { chargeAbsencesAtSessionEnd } from './session-payments';
 import { pushSessionAbsences } from '../utils/push';
@@ -374,6 +375,57 @@ function mapSessionWithDetailsFromDB(row: any) {
   };
 }
 
+/**
+ * The auto-homework setting: a company that marks homework every lesson gets it
+ * created with the session instead of tapping it out by hand each time.
+ *
+ * Best-effort and idempotent — starting the lesson must never fail over it, and
+ * a session gets at most one auto homework (a second start of the same session,
+ * or the teacher having already added one, is left alone). Free (trial)
+ * sessions get none: visitors don't hand in homework. Named after the session
+ * number the way the homework panel numbers them; marked out of 5 in RATING
+ * mode, else out of 10.
+ */
+async function autoCreateHomeworkForSession(companyId: string, session: any): Promise<void> {
+  try {
+    if (!session?.id || session.is_free === true) return;
+    if (!(await isAutoHomeworkEnabled(companyId))) return;
+    await ensureExamTables();
+
+    const existing = await queryOne<any>(
+      `SELECT 1 AS present FROM exams
+        WHERE session_id = $1 AND is_homework = true AND is_active = true LIMIT 1`,
+      [session.id]
+    );
+    if (existing) return;
+
+    const cls = await queryOne<any>(
+      `SELECT cl.id, cl.course_id, co.branch_id
+         FROM classes cl JOIN courses co ON co.id = cl.course_id
+        WHERE cl.id = $1 AND co.company_id = $2`,
+      [session.class_id, companyId]
+    );
+    if (!cls) return;
+
+    const n = session.session_number != null ? parseInt(session.session_number, 10) : null;
+    await insert('exams', {
+      company_id: companyId,
+      branch_id: cls.branch_id,
+      course_id: cls.course_id,
+      name: n != null ? `واجب ${n}` : 'واجب',
+      exam_date: new Date().toISOString().slice(0, 10),
+      max_grade: (await isRatingCompany(companyId)) ? HOMEWORK_RATING_MAX : 10,
+      status: 'SCHEDULED',
+      is_homework: true,
+      class_id: session.class_id,
+      session_id: session.id,
+      is_active: true,
+    });
+  } catch (e) {
+    console.error('Auto-create homework failed (ignored):', e);
+  }
+}
+
 export const sessionsRoutes = {
   start: async ({ body, headers }: { body: any; headers: { authorization: string } }) => {
     try {
@@ -456,6 +508,8 @@ export const sessionsRoutes = {
             [session.id, t.employeeId, t.role || 'PRIMARY', t.status || 'PRESENT', t.notes || null]
           );
         }
+
+        await autoCreateHomeworkForSession(context.companyId, session);
 
         return { status: 201 as const, body: mapSessionFromDB(session) };
       }
@@ -571,6 +625,8 @@ export const sessionsRoutes = {
           ]
         );
       }
+
+      await autoCreateHomeworkForSession(context.companyId, session);
 
       return { status: 201 as const, body: mapSessionFromDB(session) };
     } catch (error) {
@@ -804,6 +860,10 @@ export const sessionsRoutes = {
             [session.id, cls.instructor_id]
           );
         }
+
+        // An auto-started lesson is still a lesson — homework rides along here too.
+        await autoCreateHomeworkForSession(context.companyId, session);
+
         started++;
       }
 

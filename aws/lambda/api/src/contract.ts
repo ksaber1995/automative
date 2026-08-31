@@ -5151,6 +5151,9 @@ export const contract = c.router({
           billsKeptWithMoney: z.number(),
           attendanceBefore: z.number(),
           attendanceBeforeHasMoney: z.boolean(),
+          // Marks recorded before the new date — a later join strands them, so
+          // the server refuses unless the caller confirms wiping them.
+          examResultsBefore: z.number(),
           sessionsBecomingAbsent: z.number(),
           canMarkPresent: z.boolean(),
         }),
@@ -5908,6 +5911,8 @@ export const contract = c.router({
           homeworkGradingMode: HomeworkGradingModeSchema,
           // Free (TRIAL) sessions one student may ever attend. 0 = unlimited.
           freeSessionTrialLimit: z.number().int().min(0),
+          // Create a homework automatically with every new (non-free) session.
+          autoCreateHomework: z.boolean(),
         }),
         401: ApiErrorSchema,
       },
@@ -5939,6 +5944,7 @@ export const contract = c.router({
         autoConfirmSessionPayments: z.boolean().optional(),
         homeworkGradingMode: HomeworkGradingModeSchema.optional(),
         freeSessionTrialLimit: z.number().int().min(0).optional(),
+        autoCreateHomework: z.boolean().optional(),
       }),
       responses: {
         200: z.object({
@@ -5950,6 +5956,7 @@ export const contract = c.router({
           homeworkGradingMode: HomeworkGradingModeSchema,
           // Free (TRIAL) sessions one student may ever attend. 0 = unlimited.
           freeSessionTrialLimit: z.number().int().min(0),
+          autoCreateHomework: z.boolean(),
         }),
         400: ApiErrorSchema,
         403: ApiErrorSchema,

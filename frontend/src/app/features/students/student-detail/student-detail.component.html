@@ -2068,18 +2068,24 @@
                 <span>{{ 'STUDENTS.DETAIL.JOINDATE_BILLS_WIPE' | translate: { count: impact.billsToWipe } }}</span>
               </div>
             }
-            @if (impact.billsKeptWithMoney > 0) {
+            <!-- HARD WALL: months already paid before the new date. Deleting a
+                 paid bill would destroy the record of collected cash, so the
+                 move is refused until those payments are refunded or voided. -->
+            @if (joinDateMovingLater() && impact.billsKeptWithMoney > 0) {
               <div class="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800 flex gap-2">
-                <i class="pi pi-info-circle mt-0.5"></i>
-                <span>{{ 'STUDENTS.DETAIL.JOINDATE_BILLS_KEPT' | translate: { count: impact.billsKeptWithMoney } }}</span>
+                <i class="pi pi-ban mt-0.5"></i>
+                <span>{{ 'STUDENTS.DETAIL.JOINDATE_PAID_BILLS_BLOCK' | translate: { count: impact.billsKeptWithMoney } }}</span>
               </div>
             }
 
-            <!-- Attendance consequences: rewrites are opt-in, per move. -->
-            @if (impact.attendanceBefore > 0) {
-              <div class="border rounded-lg p-3 flex flex-col gap-2">
+            <!-- History before the new date: a later join must not strand it.
+                 Wiping it is the explicit checkbox, never a side effect. -->
+            @if (impact.attendanceBefore > 0 || (joinDateMovingLater() && impact.examResultsBefore > 0)) {
+              <div class="border rounded-lg p-3 flex flex-col gap-2"
+                [class.border-red-300]="joinDateMovingLater() && !wipeAttendanceBefore()">
                 <div class="text-sm text-gray-700">
-                  {{ 'STUDENTS.DETAIL.JOINDATE_ATT_BEFORE' | translate: { count: impact.attendanceBefore } }}
+                  {{ 'STUDENTS.DETAIL.JOINDATE_HISTORY_BEFORE' | translate: {
+                       attendance: impact.attendanceBefore, marks: impact.examResultsBefore } }}
                 </div>
                 @if (impact.attendanceBeforeHasMoney) {
                   <p class="text-xs text-red-600 m-0">{{ 'STUDENTS.DETAIL.JOINDATE_ATT_MONEY' | translate }}</p>
@@ -2088,9 +2094,13 @@
                     <p-checkbox inputId="wipeAttendanceBefore" [binary]="true"
                       [ngModel]="wipeAttendanceBefore()" (ngModelChange)="wipeAttendanceBefore.set($event)"></p-checkbox>
                     <label for="wipeAttendanceBefore" class="text-sm cursor-pointer">
-                      {{ 'STUDENTS.DETAIL.JOINDATE_ATT_WIPE' | translate: { count: impact.attendanceBefore } }}
+                      {{ 'STUDENTS.DETAIL.JOINDATE_HISTORY_WIPE' | translate: {
+                           attendance: impact.attendanceBefore, marks: impact.examResultsBefore } }}
                     </label>
                   </div>
+                  @if (joinDateMovingLater() && !wipeAttendanceBefore()) {
+                    <p class="text-xs text-red-600 m-0 ms-6">{{ 'STUDENTS.DETAIL.JOINDATE_HISTORY_REQUIRED' | translate }}</p>
+                  }
                 }
               </div>
             }
@@ -2126,7 +2136,7 @@
     <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [outlined]="true"
       (onClick)="showJoinDateDialog = false"></p-button>
     <p-button [label]="'STUDENTS.DETAIL.JOINDATE_SAVE' | translate" icon="pi pi-check"
-      [loading]="actionLoading()" [disabled]="joinDateChecking() || !joinDateChanged()"
+      [loading]="actionLoading()" [disabled]="joinDateChecking() || !joinDateChanged() || joinDateBlocked()"
       (onClick)="submitJoinDate()"></p-button>
   </ng-template>
 </p-dialog>

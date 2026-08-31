@@ -43,6 +43,9 @@ CREATE TABLE companies (
     -- staff member to click through one by one. Off by default — sticky once
     -- toggled, in either direction, until an admin changes it again.
     auto_confirm_session_payments BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Auto-create a homework with every new (non-free) session (migration 107).
+    -- Opt-in: homework every lesson is a habit, not a given.
+    auto_create_homework BOOLEAN NOT NULL DEFAULT FALSE,
     -- SMS entitlement (migration 097), sold per tenant and switched on from the
     -- admin console. Two columns because "activated" and "paid up to" are
     -- different facts: a lapsed tenant keeps the flag but stops being entitled,

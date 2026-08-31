@@ -1343,10 +1343,30 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
     return !!impact && impact.newDate !== impact.oldDate;
   }
 
+  joinDateMovingLater(): boolean {
+    const impact = this.joinDateImpact();
+    return !!impact && impact.newDate > impact.oldDate;
+  }
+
+  /**
+   * A LATER join is refused while history before the new date would survive it:
+   * a paid month is a hard wall (refund/void first); attendance and marks pass
+   * only with the explicit wipe. Mirrors the server's own guards, so the button
+   * never offers what the API would reject.
+   */
+  joinDateBlocked(): boolean {
+    const impact = this.joinDateImpact();
+    if (!impact || !this.joinDateMovingLater()) return false;
+    if (impact.billsKeptWithMoney > 0) return true;
+    if (impact.attendanceBeforeHasMoney) return true;
+    if ((impact.attendanceBefore > 0 || impact.examResultsBefore > 0) && !this.wipeAttendanceBefore()) return true;
+    return false;
+  }
+
   submitJoinDate() {
     const enrollment = this.joinDateEnrollment();
     const impact = this.joinDateImpact();
-    if (!enrollment || !this.joinDateValue || !impact || !this.joinDateChanged()) return;
+    if (!enrollment || !this.joinDateValue || !impact || !this.joinDateChanged() || this.joinDateBlocked()) return;
     this.actionLoading.set(true);
     this.enrollmentService.changeJoinDate(enrollment.id, {
       newDate: this.ymdLocal(this.joinDateValue),

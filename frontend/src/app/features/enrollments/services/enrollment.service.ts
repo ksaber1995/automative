@@ -14,6 +14,8 @@ export interface JoinDateImpact {
   billsKeptWithMoney: number;
   attendanceBefore: number;
   attendanceBeforeHasMoney: boolean;
+  /** Marks recorded before the new date — a later join must not strand them. */
+  examResultsBefore: number;
   sessionsBecomingAbsent: number;
   canMarkPresent: boolean;
 }

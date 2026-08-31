@@ -63,6 +63,27 @@
         </div>
       </div>
 
+      <!-- Homework every lesson, without tapping it out by hand each time:
+           starting a session also creates its homework, named by the session
+           number. Free (trial) sessions never get one. -->
+      <div class="px-2 pb-2">
+        <div class="flex items-start gap-4 border-2 rounded-xl p-5 transition-all"
+          [class.border-blue-500]="autoCreateHomework()"
+          [class.bg-blue-50]="autoCreateHomework()"
+          [class.border-gray-200]="!autoCreateHomework()">
+          <p-checkbox
+            [ngModel]="autoCreateHomework()"
+            (ngModelChange)="autoCreateHomework.set($event)"
+            [binary]="true"
+            inputId="autoCreateHomework">
+          </p-checkbox>
+          <label for="autoCreateHomework" class="flex-1 cursor-pointer">
+            <span class="font-bold text-gray-900 text-lg block mb-1">{{ 'SETTINGS.AUTO_HOMEWORK_LABEL' | translate }}</span>
+            <span class="text-gray-600 text-sm">{{ 'SETTINGS.AUTO_HOMEWORK_HINT' | translate }}</span>
+          </label>
+        </div>
+      </div>
+
       <!-- A free session is open to the whole academy by design — that is what
            the trial is for. This is the one lever that stops a prospect riding
            free lessons for ever without ever enrolling. -->
