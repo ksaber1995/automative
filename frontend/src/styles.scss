@@ -99,3 +99,43 @@
     text-align: right;
   }
 }
+
+/* ── Table paginators ─────────────────────────────────────────────
+   Every list table shows its paginator at both ends now (TablePageUxDirective),
+   and two full-height bars around a table read as chrome. Both are slimmed
+   down, and the TOP one is reduced to orientation and navigation: the
+   rows-per-page dropdown renders only at the bottom — one place to change it,
+   less clutter where the eye lands first. The "current / total" report gets
+   tabular figures so it does not wiggle while paging. */
+.p-datatable .p-paginator {
+  padding: 0.4rem 0.75rem;
+}
+
+.p-datatable-paginator-top .p-paginator {
+  border-bottom: 1px solid var(--p-datatable-border-color, #e5e7eb);
+  background: transparent;
+}
+
+.p-datatable-paginator-top .p-paginator-rpp-dropdown {
+  display: none;
+}
+
+.p-paginator .p-paginator-current {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+  color: var(--p-text-muted-color, #6b7280);
+}
+
+/* Slightly tighter page buttons; the selected one carries the weight. */
+.p-paginator .p-paginator-pages .p-paginator-page,
+.p-paginator .p-paginator-first,
+.p-paginator .p-paginator-prev,
+.p-paginator .p-paginator-next,
+.p-paginator .p-paginator-last {
+  min-width: 2.125rem;
+  height: 2.125rem;
+}
+
+.p-paginator .p-paginator-page.p-paginator-page-selected {
+  font-weight: 700;
+}

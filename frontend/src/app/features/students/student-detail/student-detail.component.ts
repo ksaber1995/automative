@@ -258,6 +258,41 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
   tabEnrollments = computed(() =>
     this.enrollmentTab() === 'withdrawn-courses' ? this.withdrawnEnrollments() : this.activeEnrollments()
   );
+  /**
+   * The same course badges the students LIST shows, so the profile agrees with
+   * the row that led here: regular enrolments plus each non-cancelled bundle's
+   * course tallies, with the bundle share kept apart for the badge's hint.
+   */
+  courseCounts = computed(() => {
+    let masterActive = 0;
+    let masterCompleted = 0;
+    for (const m of this.masterEnrollments()) {
+      if (m.status === 'CANCELLED') continue;
+      masterActive += m.activeCourses;
+      masterCompleted += m.completedCourses;
+    }
+    return {
+      active: this.activeEnrollments().length + masterActive,
+      completed: this.finishedEnrollments().length + masterCompleted,
+      masterActive,
+      masterCompleted,
+    };
+  });
+
+  activeCoursesTooltip(): string {
+    return this.coursesTooltip('ACTIVE_ENROLLMENTS_TOOLTIP', this.courseCounts().masterActive);
+  }
+
+  completedCoursesTooltip(): string {
+    return this.coursesTooltip('COMPLETED_ENROLLMENTS_TOOLTIP', this.courseCounts().masterCompleted);
+  }
+
+  private coursesTooltip(baseKey: string, fromMaster: number): string {
+    const base = this.translate.instant(`STUDENTS.LIST.${baseKey}`);
+    if (!fromMaster) return base;
+    return `${base} · ${this.translate.instant('STUDENTS.LIST.MASTER_COURSE_HINT', { count: fromMaster })}`;
+  }
+
   activeMasterEnrollments = computed(() => this.masterEnrollments().filter(m => m.status !== 'COMPLETED' && m.status !== 'CANCELLED'));
   finishedMasterEnrollments = computed(() => this.masterEnrollments().filter(m => m.status === 'COMPLETED'));
   /** A cancelled subscription is history, not a live bundle — it gets its own tab. */

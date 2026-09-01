@@ -208,8 +208,10 @@ export class StudentListComponent implements OnInit {
 
   // Pagination that survives leaving the page — see TablePageMemory.
   private route = inject(ActivatedRoute);
+  // storeKey bumped with the 10 → 50 default: the session copy remembers the
+  // rows the OLD default produced, and would pin every returning tab to 10.
   pageMem = new TablePageMemory(this.router, this.route, {
-    storeKey: 'studentsListPage', defaultRows: 10, allowedRows: [10, 25, 50],
+    storeKey: 'studentsListPage.v2', defaultRows: 50, allowedRows: [10, 25, 50],
   });
 
   ngOnInit() {

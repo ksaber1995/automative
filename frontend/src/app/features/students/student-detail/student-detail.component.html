@@ -289,6 +289,25 @@
                 [severity]="s.isActive ? 'success' : 'danger'"
               ></p-tag>
             </div>
+            <!-- The same badges as the students list — bundle courses included,
+                 with the hint saying how many arrived via a master course. -->
+            <div class="flex flex-wrap items-center">
+              <span class="font-medium text-gray-600 w-32 shrink-0">{{ 'STUDENTS.LIST.COL_COURSES' | translate }}</span>
+              <span class="flex gap-2 flex-wrap">
+                <p-tag
+                  [value]="'STUDENTS.LIST.ACTIVE_ENROLLMENTS' | translate: { count: courseCounts().active }"
+                  severity="info"
+                  [pTooltip]="activeCoursesTooltip()"
+                ></p-tag>
+                @if (!isTeacher()) {
+                  <p-tag
+                    [value]="'STUDENTS.LIST.COMPLETED_ENROLLMENTS' | translate: { count: courseCounts().completed }"
+                    severity="success"
+                    [pTooltip]="completedCoursesTooltip()"
+                  ></p-tag>
+                }
+              </span>
+            </div>
           </div>
         </div>
 
