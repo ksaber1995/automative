@@ -896,6 +896,98 @@ export const attendanceRoutes = {
   },
 
   /**
+   * POST /api/attendance/session/:sessionId/student/:studentId
+   * Mark ONE enrolled student present — the register correction the student
+   * profile makes, where the QR path (checkinByQr) has no token to offer.
+   *
+   * NORMAL rows only: substitutions and trials keep their own flows. No
+   * arrival notification goes out — this is bookkeeping after the fact, not a
+   * check-in at the door — but the per-session charge is still raised, because
+   * presence is what asks for the money, whichever screen records it.
+   */
+  markPresent: async ({ params, headers }: { params: { sessionId: string; studentId: string }; headers: { authorization: string } }) => {
+    try {
+      await ensureAttendanceMagicColumns();
+      await ensureFreeSessionSchema();   // the charge guard reads session.is_free
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const session = await queryOne(
+        'SELECT * FROM sessions WHERE id = $1 AND company_id = $2',
+        [params.sessionId, context.companyId]
+      );
+      if (!session) return apiError(404, 'ERRORS.SESSIONS.NOT_FOUND', 'Session not found');
+      if (!canAccessBranch(context, session.branch_id)) {
+        return apiError(403, 'ERRORS.SESSIONS.ACCESS_DENIED', 'Access denied to this session');
+      }
+
+      const student = await queryOne<any>(
+        'SELECT id FROM students WHERE id = $1 AND company_id = $2',
+        [params.studentId, context.companyId]
+      );
+      if (!student) return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Student not found');
+
+      // Enrolment is what makes this session THEIRS to have missed. A student
+      // with no place in the class goes through the QR/trial flows instead.
+      const enrolled = await queryOne<any>(
+        `SELECT 1 FROM (
+            SELECT student_id FROM enrollments
+            WHERE class_id = $1 AND company_id = $2 AND status NOT IN ('DROPPED', 'CANCELLED')
+            UNION
+            SELECT student_id FROM master_class_enrollments
+            WHERE class_id = $1 AND company_id = $2 AND status != 'DROPPED'
+         ) enrolled
+         WHERE student_id = $3`,
+        [session.class_id, context.companyId, params.studentId]
+      );
+      if (!enrolled) {
+        return apiError(400, 'ERRORS.ATTENDANCE.NOT_ENROLLED', 'Student is not enrolled in this class');
+      }
+
+      const inserted = await query(
+        `INSERT INTO session_attendance (session_id, student_id, attendance_type)
+         VALUES ($1, $2, 'NORMAL')
+         ON CONFLICT (session_id, student_id) DO NOTHING
+         RETURNING id`,
+        [params.sessionId, params.studentId]
+      );
+      const alreadyPresent = inserted.length === 0;
+
+      // They attended their own lesson after all — a make-up standing in for it
+      // now stands in for nothing. Best-effort, like everywhere else.
+      try {
+        await releaseSubstitutionClaims(context.companyId, params.sessionId, [params.studentId]);
+      } catch (subErr) {
+        console.error('Substitution release (markPresent) error:', subErr);
+      }
+
+      // PER_SESSION courses: raise/consume the charge exactly as a check-in
+      // would (the helper itself skips free sessions). Best-effort.
+      let sessionCharge: any = null;
+      try {
+        sessionCharge = await chargeSingleCheckin(context.companyId, session, params.studentId);
+      } catch (billErr) {
+        console.error('Per-session charge (markPresent) error:', billErr);
+      }
+
+      return {
+        status: 200 as const,
+        body: {
+          message: alreadyPresent ? 'Student was already marked present' : 'Student marked present',
+          code: alreadyPresent ? 'ATTENDANCE.ALREADY_PRESENT' : 'ATTENDANCE.MARKED_PRESENT',
+          alreadyPresent,
+          sessionCharge,
+        },
+      };
+    } catch (error) {
+      console.error('Mark present error:', error);
+      return mapThrownError(error, 'ERRORS.ATTENDANCE.SAVE_FAILED', 'Failed to mark the student present');
+    }
+  },
+
+  /**
    * POST /api/attendance/session/:sessionId/checkin
    * Mark a single student present by scanning their QR token. Idempotent —
    * re-scanning an already-present student is a no-op (returns alreadyPresent).

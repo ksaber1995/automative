@@ -772,6 +772,39 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
     });
   }
 
+  // ── Correcting the register from the profile ────────────────────────────────
+  /** Same permission as taking attendance — correcting it is the same act. */
+  canEditAttendance = (): boolean => this.authService.canWrite('academy');
+  attendanceBusyId = signal<string | null>(null);
+
+  /**
+   * Flip one session PRESENT ⇄ ABSENT. Only plain rows: substitutions and
+   * trials have their own flows (and their own money), so their rows stay
+   * read-only here. The API runs the same side effects as the register —
+   * a per-session charge is raised or reversed, make-ups re-settle.
+   */
+  toggleAttendance(rec: StudentAttendanceRecord) {
+    const studentId = this.student()?.id;
+    if (!studentId || this.attendanceBusyId()) return;
+    const markingPresent = rec.status === 'ABSENT';
+    this.attendanceBusyId.set(rec.sessionId);
+    const call = markingPresent
+      ? this.attendanceService.markPresent(rec.sessionId, studentId)
+      : this.attendanceService.removeAttendee(rec.sessionId, studentId);
+    call.subscribe({
+      next: () => {
+        this.attendanceBusyId.set(null);
+        this.notificationService.success(this.translate.instant(
+          markingPresent ? 'STUDENTS.DETAIL.ATTENDANCE_MARKED_PRESENT' : 'STUDENTS.DETAIL.ATTENDANCE_MARKED_ABSENT'));
+        this.loadAttendance(studentId);
+      },
+      error: () => {
+        // Interceptor toasted the translated error.
+        this.attendanceBusyId.set(null);
+      },
+    });
+  }
+
   loadMasterEnrollments(id: string) {
     this.masterEnrollmentService.getByStudent(id).subscribe({
       next: (rows) => {

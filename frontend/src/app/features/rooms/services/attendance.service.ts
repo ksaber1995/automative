@@ -200,6 +200,15 @@ export class AttendanceService {
     return this.api.delete<{ message: string; code: string }>(`attendance/session/${sessionId}/student/${studentId}`);
   }
 
+  /**
+   * The reverse: mark one enrolled student present without a QR token — the
+   * register correction the student profile makes.
+   */
+  markPresent(sessionId: string, studentId: string): Observable<{ message: string; code: string; alreadyPresent: boolean }> {
+    return this.api.post<{ message: string; code: string; alreadyPresent: boolean }>(
+      `attendance/session/${sessionId}/student/${studentId}`, {});
+  }
+
   /** Mark a single student present by scanning their QR token. Idempotent. */
   checkinByQr(sessionId: string, qrToken: string): Observable<QrCheckinResult> {
     return this.api.post<QrCheckinResult>(

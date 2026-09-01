@@ -8091,6 +8091,25 @@ export const contract = c.router({
         401: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema, 500: ApiErrorSchema,
       },
     },
+    // The reverse of removeAttendee for an enrolled student: the register
+    // correction the student profile makes, where there is no QR to scan.
+    markPresent: {
+      method: 'POST' as const,
+      path: '/api/attendance/session/:sessionId/student/:studentId',
+      pathParams: z.object({ sessionId: UUIDSchema, studentId: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({
+          message: z.string(),
+          code: z.string(),
+          alreadyPresent: z.boolean(),
+          // The PENDING per-session charge this correction raised, when the
+          // course bills per session — null otherwise.
+          sessionCharge: z.any().nullable(),
+        }),
+        400: ApiErrorSchema, 401: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema, 500: ApiErrorSchema,
+      },
+    },
     getBySession: {
       method: 'GET' as const,
       path: '/api/attendance/session/:sessionId',

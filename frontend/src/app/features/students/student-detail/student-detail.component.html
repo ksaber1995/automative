@@ -1562,6 +1562,7 @@
               <th pSortableColumn="className">{{ 'STUDENTS.DETAIL.ATTENDANCE_COL_CLASS' | translate }} <p-sortIcon field="className"></p-sortIcon></th>
               <th pSortableColumn="roomCode">{{ 'STUDENTS.DETAIL.ATTENDANCE_COL_ROOM' | translate }} <p-sortIcon field="roomCode"></p-sortIcon></th>
               <th pSortableColumn="isPresent">{{ 'STUDENTS.DETAIL.ATTENDANCE_COL_STATUS' | translate }} <p-sortIcon field="isPresent"></p-sortIcon></th>
+              @if (canEditAttendance()) { <th style="width: 60px;"></th> }
             </tr>
           </ng-template>
           <ng-template pTemplate="body" let-rec>
@@ -1638,6 +1639,21 @@
                   </span>
                 }
               </td>
+              <!-- The correction: flip PRESENT ⇄ ABSENT on plain rows only.
+                   Substitutions and trials have their own flows (and their own
+                   money), so their rows stay read-only here. -->
+              @if (canEditAttendance()) {
+                <td class="text-center">
+                  @if (rec.status === 'ABSENT' || (rec.status === 'PRESENT' && rec.attendedAs !== 'SUBSTITUTION')) {
+                    <p-button [text]="true" size="small" [rounded]="true"
+                      [icon]="rec.status === 'ABSENT' ? 'pi pi-check' : 'pi pi-times'"
+                      [severity]="rec.status === 'ABSENT' ? 'success' : 'danger'"
+                      [loading]="attendanceBusyId() === rec.sessionId"
+                      [pTooltip]="(rec.status === 'ABSENT' ? 'STUDENTS.DETAIL.ATTENDANCE_MARK_PRESENT' : 'STUDENTS.DETAIL.ATTENDANCE_MARK_ABSENT') | translate"
+                      (onClick)="toggleAttendance(rec)"></p-button>
+                  }
+                </td>
+              }
             </tr>
           </ng-template>
         </p-table>
