@@ -27,6 +27,7 @@ import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 import { StudentQrDialogComponent } from '../student-qr/student-qr-dialog.component';
 import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/whatsapp.util';
 import { WhatsappTemplatesService } from '../../../core/services/whatsapp-templates.service';
+import { WhatsappService } from '../../whatsapp/services/whatsapp.service';
 import { TelegramService } from '../../telegram/telegram.service';
 import { LanguageService } from '../../../core/services/language.service';
 import { GlobalScanService } from '../../../core/services/global-scan.service';
@@ -128,6 +129,7 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
   private confirmationService = inject(ConfirmationService);
   private destroyRef = inject(DestroyRef);
   private templatesSvc = inject(WhatsappTemplatesService);
+  private whatsappService = inject(WhatsappService);
   private telegramSvc = inject(TelegramService);
   private languageService = inject(LanguageService);
 
@@ -202,6 +204,36 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  // ── Parent link from the platform (Netrofit) number ───────────────────────
+  // Server-side send, no chat window opens — the parent gets the message from
+  // Netrofit's own number. Paid tenants only; the probe below hides the menu
+  // entry from everyone else, and the API re-checks regardless.
+  parentLinkCapable = signal(false);
+  private sendingParentLink = signal(false);
+
+  private probeParentLinkCapability(): void {
+    this.whatsappService.parentLinkCapability().subscribe({
+      next: (cap) => this.parentLinkCapable.set(cap.available),
+      error: () => this.parentLinkCapable.set(false),
+    });
+  }
+
+  sendParentLinkViaPlatform(): void {
+    const s = this.student();
+    if (!s || this.sendingParentLink()) return;
+    this.sendingParentLink.set(true);
+    this.whatsappService.sendParentLink(s.id).subscribe({
+      next: () => {
+        this.sendingParentLink.set(false);
+        this.notificationService.success(this.translate.instant('WHATSAPP.PARENT_LINK_SENT'));
+      },
+      error: () => {
+        // Interceptor toasted the translated error.
+        this.sendingParentLink.set(false);
+      },
+    });
+  }
+
   /**
    * Secondary header actions, folded behind one "more" button so the header
    * stays scannable. The link-card entry is deliberately not gated on
@@ -216,6 +248,13 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
     const s = this.student();
     const items: MenuItem[] = [
       { label: this.translate.instant('STUDENT_QR.SEND_FOLLOWUP_PARENT'), icon: 'pi pi-whatsapp', command: () => this.sendFollowupToParent() },
+      // Only for paid tenants with the platform number configured — the
+      // capability probe keeps the entry away from everyone else.
+      ...(this.parentLinkCapable() ? [{
+        label: this.translate.instant('STUDENT_QR.SEND_FOLLOWUP_PARENT_PLATFORM'),
+        icon: 'pi pi-send',
+        command: () => this.sendParentLinkViaPlatform(),
+      }] : []),
       { label: this.translate.instant('QR_CARDS.LINK_BUTTON'), icon: 'pi pi-id-card', command: () => this.openLinkCard() },
       { label: this.translate.instant('STUDENTS.DETAIL.SEND_NOTES'), icon: 'pi pi-whatsapp', command: () => this.openNotesDialog() },
     ];
@@ -690,6 +729,8 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
         this.loadStudentData(id);
       }
     });
+    // Tenant-level, not per-student — once per page life is enough.
+    this.probeParentLinkCapability();
   }
 
   /**

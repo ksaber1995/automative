@@ -110,6 +110,18 @@ export interface WaPlatformConfig {
   meta_app_secret: string;
   meta_config_id: string;
   webhook_verify_token: string;
+  /**
+   * Netrofit's OWN sending number — for messages the platform sends on a
+   * tenant's behalf (the parent-link send). Pasted into the secret by hand:
+   * the phone_number_id of the Netrofit number and a permanent system-user
+   * token holding whatsapp_business_messaging. Absent on fresh stacks, and
+   * isWaPlatformSenderConfigured() gates every use.
+   */
+  platform_phone_number_id?: string;
+  platform_access_token?: string;
+  /** The approved template the parent-link send uses; defaults in wa-cloud.ts. */
+  parent_link_template_name?: string;
+  parent_link_template_language?: string;
 }
 
 /** One tenant's connected number. Written when they finish Embedded Signup. */
@@ -135,6 +147,11 @@ export async function getWaPlatformConfig(): Promise<WaPlatformConfig> {
  */
 export function isWaPlatformConfigured(config: WaPlatformConfig): boolean {
   return !!(config?.meta_app_id && config?.meta_app_secret && config?.meta_config_id);
+}
+
+/** True once the platform's own sending number and token have been pasted in. */
+export function isWaPlatformSenderConfigured(config: WaPlatformConfig): boolean {
+  return !!(config?.platform_phone_number_id && config?.platform_access_token);
 }
 
 function waTenantSecretId(companyId: string): string {

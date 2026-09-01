@@ -4,6 +4,7 @@ import { apiError, mapThrownError } from '../utils/api-error';
 import {
   getWaPlatformConfig,
   isWaPlatformConfigured,
+  isWaPlatformSenderConfigured,
   getWaTenantCredentials,
   putWaTenantCredentials,
   deleteWaTenantCredentials,
@@ -46,6 +47,33 @@ function toE164(raw: string): string | null {
   if (digits.startsWith('20')) return digits;
   if (digits.startsWith('0')) return `20${digits.slice(1)}`;
   return digits;
+}
+
+/**
+ * toE164 above, but for any tenant's country: the platform-number send serves
+ * every academy, and a Saudi tenant's locally-written 05xxxxxxxx must become
+ * 9665xxxxxxxx, not 205xxxxxxxx. Mirrors the frontend's toWhatsappNumber.
+ */
+function toE164WithDialCode(raw: string | null | undefined, dialCode: string | null | undefined): string | null {
+  const digits = String(raw || '').replace(/[^\d]/g, '');
+  const dc = String(dialCode || '').replace(/[^\d]/g, '') || '20';
+  if (!digits) return null;
+  if (digits.startsWith(dc)) return digits;
+  if (digits.startsWith('0')) return `${dc}${digits.slice(1)}`;
+  return `${dc}${digits}`;
+}
+
+/**
+ * Paid = anything that is not a trial and not expired (production rows carry
+ * ACTIVE; the schema also allows MONTHLY/ANNUAL). The platform-number send is
+ * part of what a subscription buys, so trial tenants keep click-to-chat only.
+ */
+async function companyHasPaidSubscription(companyId: string): Promise<boolean> {
+  const row = await queryOne<any>(
+    `SELECT 1 FROM subscriptions WHERE company_id = $1 AND status NOT IN ('TRIAL', 'EXPIRED')`,
+    [companyId]
+  );
+  return !!row;
 }
 
 /** Turn a Meta failure into the tenant's error, keeping Meta's own wording. */
@@ -653,6 +681,94 @@ export const waCloudRoutes = {
     } catch (error) {
       console.error('WA getMessages error:', error);
       return mapThrownError(error, 'ERRORS.WA.MESSAGES_FAILED', 'Failed to load messages');
+    }
+  },
+
+  // ── Parent link from the PLATFORM number ──
+  // Netrofit's own number sends the public-student-page link to a parent, so
+  // a tenant gets the feature without connecting a number of their own. Sold
+  // with the paid plan: trial tenants keep the click-to-chat path only.
+
+  /**
+   * GET /api/wa/parent-link — may THIS tenant use the platform send?
+   * The student page builds its menu from this, so the entry never shows to a
+   * trial tenant or before the platform number's token has been pasted in.
+   */
+  parentLinkCapability: async ({ headers }: { headers: { authorization: string } }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!(await companyHasPaidSubscription(context.companyId))) {
+        return { status: 200 as const, body: { available: false, reason: 'TRIAL' as string | null } };
+      }
+      const config = await getWaPlatformConfig();
+      if (!isWaPlatformSenderConfigured(config)) {
+        return { status: 200 as const, body: { available: false, reason: 'NOT_CONFIGURED' as string | null } };
+      }
+      return { status: 200 as const, body: { available: true, reason: null as string | null } };
+    } catch (error) {
+      console.error('WA parentLinkCapability error:', error);
+      // A probe must never break the page it decorates.
+      return { status: 200 as const, body: { available: false, reason: 'ERROR' as string | null } };
+    }
+  },
+
+  /**
+   * POST /api/wa/parent-link  { studentId }
+   *
+   * A template send, necessarily: the parent has (usually) never messaged the
+   * platform number, so there is no 24h window for free-form text. The
+   * template must exist APPROVED on the platform WABA — by default
+   * `netrofit_parent_link` (ar) with three body params: academy name, student
+   * name, link. The secret can override name/language.
+   */
+  sendParentLink: async ({ body, headers }: {
+    body: { studentId: string };
+    headers: { authorization: string };
+  }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      if (!(await companyHasPaidSubscription(context.companyId))) {
+        return apiError(403, 'ERRORS.WA.PAID_PLAN_ONLY', 'Sending from the Netrofit number is available on paid plans only');
+      }
+      const config = await getWaPlatformConfig();
+      if (!isWaPlatformSenderConfigured(config)) {
+        return apiError(501, 'ERRORS.WA.PLATFORM_SENDER_NOT_CONFIGURED', 'The platform WhatsApp number is not configured yet');
+      }
+
+      const student = await queryOne<any>(
+        `SELECT id, name, parent_name, parent_phone, qr_token
+           FROM students WHERE id = $1 AND company_id = $2`,
+        [body?.studentId, context.companyId]
+      );
+      if (!student) return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Student not found');
+      if (!student.qr_token) return apiError(400, 'ERRORS.WA.NO_QR_TOKEN', 'This student has no parent link yet');
+
+      // The caller's own dial code, exactly what the click-to-chat path uses —
+      // a Saudi academy's locally-written numbers must get 966, not Egypt's 20.
+      const caller = await queryOne<any>('SELECT country_code FROM users WHERE id = $1', [context.userId]);
+      const to = toE164WithDialCode(student.parent_phone, caller?.country_code);
+      if (!to) return apiError(400, 'ERRORS.WA.NO_PARENT_PHONE', 'This student has no parent phone number');
+
+      const company = await queryOne<any>('SELECT name FROM companies WHERE id = $1', [context.companyId]);
+      const appOrigin = process.env.FRONTEND_BASE_URL || 'https://app.netrofit.com';
+      const link = `${appOrigin}/p/s/${student.qr_token}`;
+
+      const { messageId } = await sendTemplate({
+        phoneNumberId: config.platform_phone_number_id!,
+        token: config.platform_access_token!,
+        to,
+        templateName: config.parent_link_template_name || 'netrofit_parent_link',
+        language: config.parent_link_template_language || 'ar',
+        bodyParams: [company?.name || 'Netrofit', student.name, link],
+      });
+
+      return { status: 200 as const, body: { sent: true, messageId: messageId ?? null, to } };
+    } catch (error) {
+      console.error('WA sendParentLink error:', error);
+      return mapMetaError(error, 'ERRORS.WA.SEND_FAILED', 'Failed to send the parent link');
     }
   },
 

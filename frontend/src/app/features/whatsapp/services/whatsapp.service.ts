@@ -87,6 +87,16 @@ export class WhatsappService {
   }
 
   send(dto: WaSendRequest): Observable<WaMessage> { return this.api.post<WaMessage>('wa/send', dto); }
+
+  /** May this tenant send the parent link from the PLATFORM (Netrofit) number? */
+  parentLinkCapability(): Observable<{ available: boolean; reason: string | null }> {
+    return this.api.get<{ available: boolean; reason: string | null }>('wa/parent-link');
+  }
+
+  /** Send the student's public-page link to the parent from the platform number. */
+  sendParentLink(studentId: string): Observable<{ sent: boolean; messageId: string | null; to: string }> {
+    return this.api.post<{ sent: boolean; messageId: string | null; to: string }>('wa/parent-link', { studentId });
+  }
 }
 
 export interface WaConnectConfig {

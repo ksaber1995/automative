@@ -856,6 +856,10 @@
       "NOT_CONNECTED": "Connect a WhatsApp number first",
       "CREDENTIALS_MISSING": "This number needs reconnecting",
       "NO_RECIPIENT": "No phone number to send to",
+      "PAID_PLAN_ONLY": "Sending from the Netrofit number is available on paid plans only",
+      "PLATFORM_SENDER_NOT_CONFIGURED": "The Netrofit WhatsApp number is not configured yet",
+      "NO_PARENT_PHONE": "This student has no parent phone number",
+      "NO_QR_TOKEN": "This student has no parent link yet",
       "TEMPLATE_INACTIVE": "That template is switched off",
       "TEMPLATE_NOT_APPROVED": "That template has no approved Meta name yet",
       "EMPTY_MESSAGE": "Write a message first",
@@ -5693,6 +5697,7 @@
     "ACTIVE_LIFELONG": "Active — lifelong",
     "SEND_QR_STUDENT": "Send QR to student",
     "SEND_FOLLOWUP_PARENT": "Send follow-up to parent",
+    "SEND_FOLLOWUP_PARENT_PLATFORM": "Send parent link from Netrofit number",
     "NO_STUDENT_PHONE": "No student phone number on file",
     "NO_PARENT_PHONE": "No parent phone number on file"
   },
@@ -6408,6 +6413,7 @@
   },
   "WHATSAPP": {
     "TELEGRAM_CONNECT_LINE": "📲 Connect to our Telegram bot to get instant attendance notifications:\n{{link}}",
+    "PARENT_LINK_SENT": "Parent link sent from the Netrofit WhatsApp number",
     "STUDENT_CODE_LINE": "🔑 Your student code: {{code}}\nUse it to check in if you don't have your card with you.",
     "SEND": "Send via WhatsApp",
     "NO_PHONE": "No WhatsApp number on file",

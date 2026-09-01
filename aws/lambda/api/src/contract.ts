@@ -4199,6 +4199,25 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       responses: { 200: z.array(WaMessageSchema), 403: ApiErrorSchema, 404: ApiErrorSchema },
     },
+    // The parent-link send from the PLATFORM number (paid tenants only) — the
+    // capability probe drives whether the student page offers the entry at all.
+    parentLinkCapability: {
+      method: 'GET',
+      path: '/api/wa/parent-link',
+      responses: {
+        200: z.object({ available: z.boolean(), reason: z.string().nullable() }),
+        401: ApiErrorSchema,
+      },
+    },
+    sendParentLink: {
+      method: 'POST',
+      path: '/api/wa/parent-link',
+      body: z.object({ studentId: UUIDSchema }),
+      responses: {
+        200: z.object({ sent: z.boolean(), messageId: z.string().nullable(), to: z.string() }),
+        400: ApiErrorSchema, 401: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema, 501: ApiErrorSchema,
+      },
+    },
     webhookVerify: {
       method: 'GET',
       path: '/api/public/wa/webhook',
