@@ -7,6 +7,7 @@ import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
+import { InputTextModule } from 'primeng/inputtext';
 import { TooltipModule } from 'primeng/tooltip';
 import { SelectModule } from 'primeng/select';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
@@ -33,6 +34,7 @@ import { CourseWithEnrollmentCount } from '@shared/interfaces/course.interface';
     TableModule,
     ButtonModule,
     TagModule,
+    InputTextModule,
     TooltipModule,
     SelectModule,
     ConfirmDialogModule,
@@ -62,6 +64,7 @@ export class CourseListComponent implements OnInit {
   levels = signal<LookupOption[]>([]);
   loading = signal(true);
 
+  searchTerm = signal('');
   selectedBranchId = signal<string | null>(null);
   selectedLevelId = signal<string | null>(null);
   selectedPaymentType = signal<'ALL' | 'ONE_TIME' | 'MONTHLY_SUBSCRIPTION' | 'PER_SESSION'>('ALL');
@@ -128,7 +131,11 @@ export class CourseListComponent implements OnInit {
     const level = this.selectedLevelId();
     const paymentType = this.selectedPaymentType();
     const instructor = this.selectedInstructorId();
+    // Search lives here, above the tab split, so the Active/Inactive counts
+    // answer the question being asked — same as every other filter on the page.
+    const search = this.searchTerm().trim().toLowerCase();
     return this.courses().filter(c => {
+      if (search && !c.name.toLowerCase().includes(search)) return false;
       const branchMatch =
         branch === null ? true :
         branch === '__global__' ? c.branchId === null :
@@ -202,6 +209,7 @@ export class CourseListComponent implements OnInit {
   }
 
   clearFilters() {
+    this.searchTerm.set('');
     this.selectedBranchId.set(null);
     this.selectedLevelId.set(null);
     this.selectedPaymentType.set('ALL');

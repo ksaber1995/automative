@@ -2821,7 +2821,8 @@
       "COL_PAYMENT_TYPE": "Payment Type",
       "COL_TEACHER": "Teacher",
       "ALL_TEACHERS": "All teachers",
-      "NO_TEACHER": "No teacher"
+      "NO_TEACHER": "No teacher",
+      "SEARCH_PLACEHOLDER": "Search by name…"
     },
     "FORM": {
       "EDIT_TITLE": "Edit Course",

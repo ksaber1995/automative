@@ -2821,7 +2821,8 @@
       "COL_PAYMENT_TYPE": "نوع الدفع",
       "COL_TEACHER": "المدرس",
       "ALL_TEACHERS": "كل المدرسين",
-      "NO_TEACHER": "بدون مدرس"
+      "NO_TEACHER": "بدون مدرس",
+      "SEARCH_PLACEHOLDER": "ابحث بالاسم…"
     },
     "FORM": {
       "EDIT_TITLE": "تعديل الكورس",

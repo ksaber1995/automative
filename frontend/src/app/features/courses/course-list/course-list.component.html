@@ -7,6 +7,19 @@
   <p-card>
     <!-- Branch filter (status filter replaced by tabs below) -->
     <div class="flex flex-wrap gap-3 mb-4">
+      <!-- Search by name; sits with the other filters, so the tab counts follow it too -->
+      <span class="relative block" style="min-width: 220px">
+        <i class="pi pi-search absolute top-1/2 -translate-y-1/2 start-3 text-gray-400"></i>
+        <input
+          type="text"
+          pInputText
+          [ngModel]="searchTerm()"
+          (ngModelChange)="searchTerm.set($event)"
+          [placeholder]="'COURSES.LIST.SEARCH_PLACEHOLDER' | translate"
+          class="w-full ps-9"
+        />
+      </span>
+
       @if (branchState.showBranchPicker()) {
       <p-select
         [options]="branchOptions()"
@@ -60,7 +73,7 @@
         ></p-select>
       }
 
-      @if (selectedBranchId() || selectedLevelId() || selectedPaymentType() !== 'ALL' || selectedInstructorId()) {
+      @if (searchTerm() || selectedBranchId() || selectedLevelId() || selectedPaymentType() !== 'ALL' || selectedInstructorId()) {
         <p-button
           [label]="'COURSES.LIST.CLEAR' | translate"
           icon="pi pi-times"
