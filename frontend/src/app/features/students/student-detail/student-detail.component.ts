@@ -556,6 +556,25 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
   });
 
   /**
+   * The rate the profile header shows. The attendance card's own figure follows
+   * that card's class/kind filters; this one never does — the header answers
+   * "how reliable is this student overall", not "in the rows currently shown".
+   * Null (row hidden) until there is at least one rated session: 0% would read
+   * as "never comes" about someone who simply hasn't had a lesson yet.
+   */
+  overallAttendanceRate = computed<number | null>(() => {
+    const rated = this.attendanceRecords().filter(r => r.status !== 'TRIAL');
+    if (!rated.length) return null;
+    const attended = rated.filter(r => r.isPresent || r.status === 'SUBSTITUTED').length;
+    return Math.round((attended / rated.length) * 100);
+  });
+
+  attendanceRateSeverity(): 'success' | 'warn' | 'danger' {
+    const rate = this.overallAttendanceRate() ?? 0;
+    return rate >= 80 ? 'success' : rate >= 50 ? 'warn' : 'danger';
+  }
+
+  /**
    * Reversing money is its own permission now: recording a payment is
    * `enrollments: write`, undoing one is `refunds: write`, so whoever collects
    * fees cannot quietly un-collect them. Hides the button the API would 403.

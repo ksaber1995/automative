@@ -4570,6 +4570,8 @@
       "ATTENDANCE_ABSENT": "absent",
       "ATTENDANCE_SUBSTITUTED": "substituted",
       "ATTENDANCE_RATE": "rate",
+      "ATTENDANCE_RATE_LABEL": "Attendance",
+      "ATTENDANCE_RATE_HINT": "Overall attendance rate — made-up lessons count as attended, free trials are not counted",
       "ATTENDANCE_COL_DATE": "Date",
       "ATTENDANCE_COL_CLASS": "Class",
       "ATTENDANCE_COL_ROOM": "Room",

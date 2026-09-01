@@ -4694,6 +4694,8 @@
       "ATTENDANCE_ABSENT": "غائب",
       "ATTENDANCE_SUBSTITUTED": "تعويضي",
       "ATTENDANCE_RATE": "النسبة",
+      "ATTENDANCE_RATE_LABEL": "الحضور",
+      "ATTENDANCE_RATE_HINT": "نسبة الحضور الإجمالية — حصص التعويض تُحتسب حضوراً، والحصص التجريبية المجانية لا تُحتسب",
       "ATTENDANCE_COL_DATE": "التاريخ",
       "ATTENDANCE_COL_CLASS": "المجموعة",
       "ATTENDANCE_COL_ROOM": "القاعة",

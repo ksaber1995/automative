@@ -308,6 +308,19 @@
                 }
               </span>
             </div>
+            <!-- Overall, unlike the attendance card's figure, which follows its
+                 filters. Hidden until a first rated session exists — 0% would
+                 read as "never comes" about someone yet to have a lesson. -->
+            @if (overallAttendanceRate() !== null) {
+              <div class="flex flex-wrap items-center">
+                <span class="font-medium text-gray-600 w-32 shrink-0">{{ 'STUDENTS.DETAIL.ATTENDANCE_RATE_LABEL' | translate }}</span>
+                <p-tag
+                  [value]="overallAttendanceRate() + '%'"
+                  [severity]="attendanceRateSeverity()"
+                  [pTooltip]="'STUDENTS.DETAIL.ATTENDANCE_RATE_HINT' | translate"
+                ></p-tag>
+              </div>
+            }
           </div>
         </div>
 
