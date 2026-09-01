@@ -1554,6 +1554,16 @@ const ClassSchema = z.object({
   finishedAt: z.string().nullable().optional(),
   type: ClassTypeSchema.optional(),
   status: ClassStatusSchema.optional(),
+  /** Live register: who is still coming. Hides dropped and inactive students. */
+  studentCount: z.number().optional(),
+  /**
+   * Every enrollment row the class holds, dropped and left students included.
+   * The Delete button is hidden when this is above zero — see
+   * ENROLLMENT_COUNT_SUBQUERY in routes/classes.ts for why it is not
+   * studentCount.
+   */
+  enrollmentCount: z.number().optional(),
+  hasActiveSession: z.boolean().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -4976,6 +4986,24 @@ export const contract = c.router({
       responses: {
         200: ApiErrorSchema,
         404: ApiErrorSchema,
+        // 409: the class has attendance or money on it and is not deletable.
+        // `records` says what is in the way so the UI can name it.
+        409: ApiErrorSchema.extend({
+          records: z
+            .object({
+              attendance: z.number(),
+              charges: z.number(),
+              packages: z.number(),
+              monthlyPayments: z.number(),
+              paidEnrollments: z.number(),
+              bundleEnrollments: z.number(),
+              salaryPayments: z.number(),
+              examAttempts: z.number(),
+              students: z.number(),
+              collected: z.number(),
+            })
+            .optional(),
+        }),
       },
     },
     finish: {

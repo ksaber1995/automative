@@ -93,6 +93,21 @@ export class ClassListComponent implements OnInit {
   }
 
   /**
+   * Does this class hold any enrollment at all — including students who have
+   * dropped or left? If so it is not offered a Delete button: deleting it would
+   * take their attendance and payments with it, and the API refuses anyway.
+   * Finish the class instead.
+   *
+   * `enrollmentCount` is the honest number (the register count hides dropped and
+   * inactive students). The register is still checked as a fallback so an older
+   * API response, which has no enrollmentCount, cannot make Delete reappear on
+   * a class that clearly has students.
+   */
+  hasEnrollments(c: ClassWithDetails): boolean {
+    return ((c as any).enrollmentCount ?? 0) > 0 || this.enrolledCount(c) > 0;
+  }
+
+  /**
    * Nothing stops an enrollment once a class is full — maxStudents is a plan, not
    * a lock — so a room can quietly end up over its seats. Flag it on the list
    * rather than leaving "13 / 12" to be read as ordinary.

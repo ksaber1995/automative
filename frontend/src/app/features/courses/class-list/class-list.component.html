@@ -244,7 +244,11 @@
                   [pTooltip]="'CLASSES.LIST.EDIT' | translate"
                 ></p-button>
               }
-              @if ( classItem.status !== 'DONE') {
+              <!-- Delete is offered only for a class nobody has ever been
+                   enrolled into. Once it holds enrollments it holds their
+                   attendance and payments too, so the way out is Finish, not
+                   Delete — the API refuses these regardless. -->
+              @if (classItem.status !== 'DONE' && !hasEnrollments(classItem)) {
                 <p-button
                   icon="pi pi-trash"
                   [rounded]="true"

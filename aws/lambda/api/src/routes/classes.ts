@@ -196,6 +196,21 @@ const DAY_TIMES_SUBQUERY = `COALESCE((
   WHERE cdt.class_id = c.id
 ), '[]'::json) AS day_times_json`;
 
+/**
+ * How many enrollment rows this class holds AT ALL — dropped and left students
+ * included, plus bundle links. Aliased `c` must be the classes row.
+ *
+ * The sibling `student_count` is the live register and deliberately hides
+ * dropped/inactive students; this one must not, because it is what decides
+ * whether the UI offers a Delete button. A class whose students have all left
+ * still holds their enrollments, attendance and payments — deleting it would
+ * take all of that with it, which is how «tuesday G6» lost 28 students.
+ */
+const ENROLLMENT_COUNT_SUBQUERY = `(
+  (SELECT COALESCE(COUNT(*), 0) FROM enrollments en WHERE en.class_id = c.id)
+  + (SELECT COALESCE(COUNT(*), 0) FROM master_class_enrollments mce WHERE mce.class_id = c.id)
+) AS enrollment_count`;
+
 // The per-day times a create/update body wants. Prefers the explicit `dayTimes`
 // array; falls back to the legacy "one time for all listed days" shape.
 function resolveDayTimes(body: any): DayTime[] | null {
@@ -396,6 +411,15 @@ function mapClassWithDetailsFromDB(row: any) {
     instructorName: row.instructor_name,
     instructorEmail: row.instructor_email ?? null,
     studentCount: parseInt(row.student_count ?? row.current_enrollment ?? '0', 10),
+    /**
+     * EVERY enrollment row this class holds — dropped and left students
+     * included, plus bundle links. Deliberately not `studentCount`, which is
+     * the live register (it hides dropped and inactive students): a class whose
+     * students have all left still holds their enrollments, attendance and
+     * payments, and is exactly the class nobody should be offered a Delete
+     * button for. The UI hides Delete on this; the API refuses independently.
+     */
+    enrollmentCount: parseInt(row.enrollment_count ?? '0', 10),
     hasActiveSession: row.has_active_session === true || row.has_active_session === 'true' || parseInt(row.has_active_session ?? '0', 10) > 0,
   };
 }
@@ -745,6 +769,7 @@ export const classesRoutes = {
             WHERE mce.class_id = c.id AND mce.status != 'DROPPED'
               AND ${studentIsPresentById('mce.student_id')}
           ) AS student_count,
+          ${ENROLLMENT_COUNT_SUBQUERY},
           EXISTS (
             SELECT 1 FROM sessions s
             -- Only formally-started sessions count: a prepared (started=false)
@@ -826,6 +851,7 @@ export const classesRoutes = {
             WHERE mce.class_id = c.id AND mce.status != 'DROPPED'
               AND ${studentIsPresentById('mce.student_id')}
           ) AS student_count,
+          ${ENROLLMENT_COUNT_SUBQUERY},
           EXISTS (
             SELECT 1 FROM sessions s
             -- Only formally-started sessions count: a prepared (started=false)
@@ -1092,6 +1118,7 @@ export const classesRoutes = {
             WHERE mce.class_id = c.id AND mce.status != 'DROPPED'
               AND ${studentIsPresentById('mce.student_id')}
           ) AS student_count,
+          ${ENROLLMENT_COUNT_SUBQUERY},
           ${DAY_TIMES_SUBQUERY}
         FROM classes c
         INNER JOIN courses co ON c.course_id = co.id
@@ -1391,44 +1418,84 @@ export const classesRoutes = {
         return apiError(403, 'ERRORS.CLASSES.ACCESS_DENIED_DELETE', 'Access denied to delete this class');
       }
 
-      // Does the class carry any financial footprint? If so, a hard delete would
-      // cascade-destroy payment/salary records, so we soft-delete instead. We
-      // check paid enrollments, monthly/per-session payments, teacher salary
-      // payments, and any master-bundle enrollment (a paid bundle link).
-      const footprint = await queryOne<{ has_payments: boolean }>(
-        `SELECT (
-            EXISTS (SELECT 1 FROM enrollments e
-                     WHERE e.class_id = $1 AND (COALESCE(e.amount_paid,0) > 0 OR COALESCE(e.down_payment,0) > 0))
-         OR EXISTS (SELECT 1 FROM master_class_enrollments mce WHERE mce.class_id = $1)
-         OR EXISTS (SELECT 1 FROM monthly_subscription_payments msp
-                      JOIN enrollments e ON msp.enrollment_id = e.id
-                     WHERE e.class_id = $1 AND COALESCE(msp.amount_paid,0) > 0)
-         OR EXISTS (SELECT 1 FROM session_payments sp
-                      JOIN enrollments e ON sp.enrollment_id = e.id
-                     WHERE e.class_id = $1)
-         OR EXISTS (SELECT 1 FROM session_packages spk
-                      JOIN enrollments e ON spk.enrollment_id = e.id
-                     WHERE e.class_id = $1)
-         OR EXISTS (SELECT 1 FROM session_salary_payments ssp
-                      JOIN sessions s ON ssp.session_id = s.id
-                     WHERE s.class_id = $1)
-         ) AS has_payments`,
+      // What history would this delete take with it? Counted rather than reduced
+      // to a boolean, so the refusal below can say WHAT is in the way.
+      const records = await queryOne<any>(
+        `SELECT
+            (SELECT COUNT(*) FROM session_attendance sa
+               JOIN sessions s ON s.id = sa.session_id
+              WHERE s.class_id = $1)                                    AS attendance,
+            (SELECT COUNT(DISTINCT sa.student_id) FROM session_attendance sa
+               JOIN sessions s ON s.id = sa.session_id
+              WHERE s.class_id = $1)                                    AS students,
+            (SELECT COUNT(*) FROM session_payments sp
+               JOIN enrollments e ON sp.enrollment_id = e.id
+              WHERE e.class_id = $1)                                    AS charges,
+            (SELECT COALESCE(SUM(sp.amount_paid),0) FROM session_payments sp
+               JOIN enrollments e ON sp.enrollment_id = e.id
+              WHERE e.class_id = $1)                                    AS collected,
+            (SELECT COUNT(*) FROM session_packages spk
+               JOIN enrollments e ON spk.enrollment_id = e.id
+              WHERE e.class_id = $1)                                    AS packages,
+            (SELECT COUNT(*) FROM monthly_subscription_payments msp
+               JOIN enrollments e ON msp.enrollment_id = e.id
+              WHERE e.class_id = $1 AND COALESCE(msp.amount_paid,0) > 0) AS monthly_payments,
+            (SELECT COUNT(*) FROM enrollments e
+              WHERE e.class_id = $1
+                AND (COALESCE(e.amount_paid,0) > 0 OR COALESCE(e.down_payment,0) > 0)) AS paid_enrollments,
+            (SELECT COUNT(*) FROM master_class_enrollments mce
+              WHERE mce.class_id = $1)                                  AS bundle_enrollments,
+            (SELECT COUNT(*) FROM session_salary_payments ssp
+               JOIN sessions s ON ssp.session_id = s.id
+              WHERE s.class_id = $1)                                    AS salary_payments,
+            (SELECT COUNT(*) FROM exam_attempts ea
+               JOIN exams x ON x.id = ea.exam_id
+              WHERE x.class_id = $1)                                    AS exam_attempts`,
         [params.id]
       );
 
-      if (footprint?.has_payments) {
-        // Soft delete: hide the class from the tenant, drop its enrollments so
-        // nothing keeps billing or shows the student as active, but keep the row
-        // and all payment records intact for financial integrity.
-        await update('classes', params.id, { is_active: false, deleted_at: new Date().toISOString() });
-        await query(`UPDATE enrollments SET status = 'DROPPED' WHERE class_id = $1 AND status != 'DROPPED'`, [params.id]);
-        await query(`UPDATE master_class_enrollments SET status = 'DROPPED' WHERE class_id = $1 AND status != 'DROPPED'`, [params.id]);
-      } else {
-        // No money involved: hard-delete the class. Foreign keys cascade to its
-        // enrollments, sessions, attendance and teacher-attendance rows, removing
-        // every reference to it.
-        await query('DELETE FROM classes WHERE id = $1', [params.id]);
+      const counts = {
+        attendance: Number(records?.attendance ?? 0),
+        charges: Number(records?.charges ?? 0),
+        packages: Number(records?.packages ?? 0),
+        monthlyPayments: Number(records?.monthly_payments ?? 0),
+        paidEnrollments: Number(records?.paid_enrollments ?? 0),
+        bundleEnrollments: Number(records?.bundle_enrollments ?? 0),
+        salaryPayments: Number(records?.salary_payments ?? 0),
+        examAttempts: Number(records?.exam_attempts ?? 0),
+        students: Number(records?.students ?? 0),
+        collected: Number(records?.collected ?? 0),
+      };
+
+      // A class that has taught somebody, or taken a pound off them, is not
+      // deletable — it is history, and the tenant wants it finished, not erased.
+      //
+      // This used to SOFT-delete such a class instead: hide the row and bulk-run
+      // `UPDATE enrollments SET status = 'DROPPED'` over every student in it.
+      // That is what happened to «tuesday G6» on 2026-09-01 — one click mid-
+      // session dropped all 28 enrolled students, and because the bulk UPDATE
+      // never touched updated_at, nothing recorded that it had happened. To the
+      // academy their students had silently left a course they were sitting in.
+      // Refusing is the only honest answer: the alternative hides a class the
+      // tenant is still taking money for, and there is no undo in the app.
+      // Finish the class instead (POST /classes/:id/finish) — reversible, keeps
+      // the roster, and stops it appearing as live.
+      if (Object.values(counts).some((n) => n > 0)) {
+        return {
+          status: 409 as const,
+          body: {
+            code: 'ERRORS.CLASSES.HAS_RECORDS',
+            message:
+              'This class has attendance or payments recorded, so it cannot be deleted. ' +
+              'Finish it instead to take it out of the active list — its students and records stay intact.',
+            records: counts,
+          },
+        };
       }
+
+      // Nothing has ever happened in this class — created by mistake, or empty.
+      // Foreign keys cascade to its (unused) enrollments, sessions and schedule.
+      await query('DELETE FROM classes WHERE id = $1', [params.id]);
 
       return {
         status: 200 as const,
