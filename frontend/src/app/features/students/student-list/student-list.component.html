@@ -140,7 +140,7 @@
           <th pSortableColumn="name">{{ 'STUDENTS.LIST.COL_NAME' | translate }} <p-sortIcon field="name"></p-sortIcon></th>
           <th pSortableColumn="parentPhone">{{ 'STUDENTS.LIST.COL_CONTACT' | translate }} <p-sortIcon field="parentPhone"></p-sortIcon></th>
           <th pSortableColumn="schoolName">{{ 'STUDENTS.LIST.COL_SCHOOL' | translate }} <p-sortIcon field="schoolName"></p-sortIcon></th>
-          @if (!authService.isTeacher()) {
+          @if (showBranchColumn()) {
             <th pSortableColumn="branchId">{{ 'STUDENTS.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
           }
           <th class="text-center">{{ 'STUDENTS.LIST.COL_COURSES' | translate }}</th>
@@ -180,7 +180,7 @@
               <span class="text-gray-400">—</span>
             }
           </td>
-          @if (!authService.isTeacher()) {
+          @if (showBranchColumn()) {
             <td>{{ getBranchName(student.branchId) }}</td>
           }
           <td>
@@ -282,7 +282,10 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td [attr.colspan]="authService.isTeacher() ? 10 : 11" class="text-center">{{ 'STUDENTS.LIST.NO_DATA' | translate }}</td>
+          <!-- Code, name, contact, school, (branch), courses, attendance,
+               channel, actions. Tracks showBranchColumn() so the "no data" row
+               keeps spanning the full width. -->
+          <td [attr.colspan]="showBranchColumn() ? 9 : 8" class="text-center">{{ 'STUDENTS.LIST.NO_DATA' | translate }}</td>
         </tr>
       </ng-template>
     </p-table>

@@ -800,6 +800,15 @@ export class StudentListComponent implements OnInit {
    */
   showTeacherFilter = computed(() => !this.authService.isTeacher());
 
+  /**
+   * A Branch column only earns its width when there is more than one branch to
+   * tell apart — otherwise it repeats the same name down every row. Same test
+   * the branch filter above the table already uses (and the courses list), so
+   * the column and the filter appear and disappear together.
+   */
+  showBranchColumn = computed(() =>
+    !this.authService.isTeacher() && this.branchState.showBranchPicker());
+
   /** Nothing ticked under "selected only" — there'd be no cards to render. */
   zipFilterEmpty = computed(() =>
     this.zipScope() === 'filter' &&
