@@ -66,4 +66,27 @@ export class QrCardService {
   byStudent(studentId: string): Observable<QrCard[]> {
     return this.api.get<QrCard[]>(`qr-cards/student/${studentId}`);
   }
+
+  /**
+   * "Are you nearly out of cards?" — the pool page downloads the whole pool to
+   * count it, which is far too much for a nudge on every page load, and is
+   * vendor-only anyway. This is three numbers.
+   *
+   * `warn` is decided by the server (both switches plus the threshold), so no
+   * caller re-implements the rule.
+   */
+  poolStatus(): Observable<CardPoolStatus> {
+    return this.api.get<CardPoolStatus>('qr-cards/pool-status');
+  }
+}
+
+/** What the tenant is told about their own pool. No card data, just counts. */
+export interface CardPoolStatus {
+  /** The only flag to branch on: the nudge is on for them AND they are low. */
+  warn: boolean;
+  /** Cards nobody holds yet — what is left to give out. */
+  remaining: number;
+  threshold: number;
+  /** The nudge is switched on for this tenant (whether or not they are low). */
+  enabled: boolean;
 }

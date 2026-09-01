@@ -718,6 +718,65 @@ const unguardedAdminSecretRoutes = {
   },
 
   /**
+   * POST /api/karim-admin-secret/companies/:companyId/card-warning
+   *   { enabled, threshold? }
+   *
+   * Switch the "you are nearly out of cards" nudge on or off for one client, and
+   * set the count it fires at.
+   *
+   * Per tenant on purpose: the nudge tells an academy to order more cards from
+   * us, which is only meaningful for the clients who buy printed cards — for
+   * anyone else it is a dialog about a thing they cannot act on.
+   *
+   * `threshold` absent leaves the stored number alone, so flipping the warning
+   * off and on again does not silently reset a tuned value.
+   */
+  setCardLowWarning: async ({ params, body }: {
+    params: { companyId: string };
+    body: { enabled: boolean; threshold?: number | null };
+  }) => {
+    try {
+      await ensureQrCardSchema();
+      const company = await queryOne<any>('SELECT id FROM companies WHERE id = $1', [params.companyId]);
+      if (!company) return { status: 404 as const, body: { message: 'Company not found' } };
+
+      const enabled = body?.enabled === true;
+
+      const setsThreshold = body != null && 'threshold' in body && body.threshold != null;
+      let threshold: number | null = null;
+      if (setsThreshold) {
+        threshold = Math.floor(Number(body.threshold));
+        // Rejected rather than clamped: a threshold the caller did not mean
+        // either nags a client constantly or never fires at all.
+        if (!Number.isFinite(threshold) || threshold < 1 || threshold > 10000) {
+          return { status: 400 as const, body: { message: 'threshold must be between 1 and 10000' } };
+        }
+      }
+
+      const row = await queryOne<any>(
+        setsThreshold
+          ? `UPDATE companies SET card_low_warning_enabled = $2, card_low_warning_threshold = $3, updated_at = NOW()
+              WHERE id = $1 RETURNING card_low_warning_enabled, card_low_warning_threshold`
+          : `UPDATE companies SET card_low_warning_enabled = $2, updated_at = NOW()
+              WHERE id = $1 RETURNING card_low_warning_enabled, card_low_warning_threshold`,
+        setsThreshold ? [params.companyId, enabled, threshold] : [params.companyId, enabled],
+      );
+
+      return {
+        status: 200 as const,
+        body: {
+          success: true,
+          card_low_warning_enabled: row?.card_low_warning_enabled === true,
+          card_low_warning_threshold: Number(row?.card_low_warning_threshold ?? 10),
+        },
+      };
+    } catch (error: any) {
+      console.error('karim-admin-secret set card warning failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Set card warning failed' } };
+    }
+  },
+
+  /**
    * GET /api/karim-admin-secret/companies/:companyId/qr-cards
    * How big is this client's pool, and how much of it is already handed out.
    */
@@ -726,6 +785,8 @@ const unguardedAdminSecretRoutes = {
       await ensureQrCardSchema();
       const row = await queryOne<any>(
         `SELECT c.qr_cards_enabled,
+                c.card_low_warning_enabled,
+                c.card_low_warning_threshold,
                 (SELECT COUNT(*) FROM qr_cards q WHERE q.company_id = c.id) AS total,
                 (SELECT COUNT(*) FROM qr_cards q WHERE q.company_id = c.id AND q.student_id IS NOT NULL) AS linked,
                 (SELECT COUNT(*) FROM qr_cards q WHERE q.company_id = c.id AND q.printed_at IS NOT NULL) AS printed,
@@ -741,6 +802,8 @@ const unguardedAdminSecretRoutes = {
         status: 200 as const,
         body: {
           qr_cards_enabled: row.qr_cards_enabled === true,
+          card_low_warning_enabled: row.card_low_warning_enabled === true,
+          card_low_warning_threshold: Number(row.card_low_warning_threshold ?? 10),
           total: Number(row.total ?? 0),
           linked: Number(row.linked ?? 0),
           printed: Number(row.printed ?? 0),
@@ -1241,6 +1304,8 @@ const ADMIN_SECRET_PERMISSIONS: { [K in keyof typeof unguardedAdminSecretRoutes]
   qrCardStats: 'cards.read',
   listQrCards: 'cards.read',
   setQrCardsEnabled: 'cards.write',
+  // Selling/withdrawing the reorder nudge is part of running a client's pool.
+  setCardLowWarning: 'cards.write',
   generateQrCards: 'cards.write',
   markQrCardsPrinted: 'cards.write',
   deleteQrCards: 'cards.write',

@@ -6522,6 +6522,10 @@
     "DEC": "December"
   },
   "QR_CARDS": {
+    "LOW_POOL_TITLE": "Running out of cards",
+    "LOW_POOL_HEADING": "Only {{count}} cards left",
+    "LOW_POOL_MESSAGE": "You are nearly out of student cards. Contact us to order the next batch so you do not run out before your new students arrive.",
+    "LOW_POOL_DISMISS": "Got it",
     "TITLE": "QR cards",
     "SUBTITLE": "Print a batch of blank cards, then link one to a student by scanning it.",
     "NEW_BATCH": "Print run",

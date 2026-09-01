@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
-  CompanySubscription, PoolType, POOL_TYPES, SubscriptionsService,
+  CompanySubscription, PoolType, POOL_TYPES, QrCardStats, SubscriptionsService,
 } from '../subscriptions.service';
 import { PortalAuthService } from '../auth/portal-auth.service';
 import { AdminStore } from '../admin-store.service';
@@ -217,6 +217,13 @@ import { syncQueryParams } from '../shared/query-sync';
                             </button>
                             @if (q.qr_cards_enabled) {
                               <button (click)="menuOpenId.set(null); openQrCards(r)">Add QR cards…</button>
+                              <!-- The tenant's "nearly out of cards" dialog. Only
+                                   offered once they have a pool: warning a client
+                                   with no cards about running out of them is
+                                   noise they cannot act on. -->
+                              <button (click)="menuOpenId.set(null); openCardWarning(r)">
+                                Low-card warning{{ q.card_low_warning_enabled ? ' (on, ≤ ' + (q.card_low_warning_threshold ?? 10) + ')' : ' (off)' }}…
+                              </button>
                             }
                           } @else {
                             <!-- Stays open: the QR items appear in place once loaded. -->
@@ -269,6 +276,50 @@ import { syncQueryParams } from '../shared/query-sync';
           <div class="modal-foot">
             <button class="act" [disabled]="busyId() === row.company_id" (click)="closeSms()">Cancel</button>
             <button class="act activate" [disabled]="busyId() === row.company_id" (click)="confirmSms(row)">
+              {{ busyId() === row.company_id ? 'Saving…' : 'Save' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- The tenant's "you are nearly out of cards" dialog: who gets it, and when.
+         Off by default, switched on per client, because it tells them to order
+         more cards FROM US — for a client who does not buy printed cards it is a
+         dialog about something they cannot act on. -->
+    @if (cardWarnRow(); as row) {
+      <div class="overlay" (click)="cardWarnRow.set(null)">
+        <div class="modal" (click)="$event.stopPropagation()">
+          <h2>Low-card warning for {{ row.company_name }}</h2>
+          <p class="modal-sub">
+            When their pool runs low, show them a dialog asking them to order the next batch.
+            Once a day at most, and they can close it — it never blocks their work.
+          </p>
+
+          <label class="sms-toggle">
+            <input type="checkbox" [ngModel]="cardWarnEnabled()" (ngModelChange)="cardWarnEnabled.set($event)" />
+            <span>Warn this client</span>
+          </label>
+
+          <label class="lbl">Warn when cards left drops to</label>
+          <input class="search" type="number" min="1" max="10000"
+            [ngModel]="cardWarnThreshold()" (ngModelChange)="cardWarnThreshold.set($event)" />
+          <p class="modal-sub">
+            Counted as cards nobody holds yet — printed or not. "Nearly out" is a different
+            number for a client handing out 5 cards a month and one handing out 200.
+          </p>
+          @if (qrStats()[row.company_id]; as q) {
+            <p class="modal-sub">
+              They currently hold <strong>{{ q.total - q.linked }}</strong> unassigned
+              of {{ q.total }} cards.
+            </p>
+          }
+
+          @if (cardWarnError(); as e) { <div class="error">{{ e }}</div> }
+
+          <div class="modal-foot">
+            <button class="act" [disabled]="busyId() === row.company_id" (click)="cardWarnRow.set(null)">Cancel</button>
+            <button class="act activate" [disabled]="busyId() === row.company_id" (click)="saveCardWarning(row)">
               {{ busyId() === row.company_id ? 'Saving…' : 'Save' }}
             </button>
           </div>
@@ -685,7 +736,7 @@ export class CompaniesPageComponent {
   // ── Pre-printed QR cards, per client ───────────────────────────────────────
   // The pool is sold per academy: off until we switch it on. Stats are fetched
   // per row rather than in the big companies query, so the table stays cheap.
-  protected qrStats = signal<Record<string, { qr_cards_enabled: boolean; total: number; linked: number }>>({});
+  protected qrStats = signal<Record<string, QrCardStats>>({});
   protected qrRow = signal<CompanySubscription | null>(null);
   qrCount = 100;
   protected readonly poolTypes = POOL_TYPES;
@@ -717,6 +768,51 @@ export class CompaniesPageComponent {
         this.qrStats.update((m) => ({ ...m, [companyId]: stats }));
       },
       error: (err) => this.fail('QR cards', err),
+    });
+  }
+
+  // ── The tenant's low-card warning ─────────────────────────────────────────
+  protected cardWarnRow = signal<CompanySubscription | null>(null);
+  protected cardWarnEnabled = signal(false);
+  protected cardWarnThreshold = signal<number>(10);
+  protected cardWarnError = signal<string | null>(null);
+
+  protected openCardWarning(r: CompanySubscription): void {
+    const stats = this.qrStats()[r.company_id];
+    this.cardWarnError.set(null);
+    this.cardWarnEnabled.set(stats?.card_low_warning_enabled === true);
+    this.cardWarnThreshold.set(stats?.card_low_warning_threshold ?? 10);
+    this.cardWarnRow.set(r);
+  }
+
+  protected saveCardWarning(r: CompanySubscription): void {
+    const threshold = Math.floor(Number(this.cardWarnThreshold()));
+    // Checked here as well as server-side so a typo is caught before a round
+    // trip; the API rejects it either way rather than clamping to something the
+    // operator did not mean.
+    if (!Number.isFinite(threshold) || threshold < 1 || threshold > 10000) {
+      this.cardWarnError.set('The threshold must be between 1 and 10000.');
+      return;
+    }
+
+    const enabled = this.cardWarnEnabled();
+    this.busyId.set(r.company_id);
+    this.service.setCardLowWarning(r.company_id, enabled, threshold).subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.cardWarnRow.set(null);
+        this.store.showFlash(
+          enabled
+            ? `${r.company_name} will be warned at ${threshold} cards left.`
+            : `Low-card warning off for ${r.company_name}.`,
+        );
+        // Re-read so the menu label matches what was just saved.
+        this.loadQrStats(r.company_id);
+      },
+      error: (err) => {
+        this.busyId.set(null);
+        this.cardWarnError.set(err?.error?.message || err?.message || 'Request failed');
+      },
     });
   }
 

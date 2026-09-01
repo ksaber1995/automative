@@ -137,9 +137,30 @@ export class SubscriptionsService {
   // print run for them without signing in as them.
 
   /** Is the pool on for this client, and how big is it. */
-  qrCardStats(companyId: string): Observable<{ qr_cards_enabled: boolean; total: number; linked: number }> {
-    return this.http.get<{ qr_cards_enabled: boolean; total: number; linked: number }>(
+  qrCardStats(companyId: string): Observable<QrCardStats> {
+    return this.http.get<QrCardStats>(
       `${ADMIN_ENDPOINT}/companies/${companyId}/qr-cards`,
+    );
+  }
+
+  /**
+   * Turn the tenant's "you are nearly out of cards, order more" dialog on or
+   * off, and set the remaining-card count it fires at.
+   *
+   * Per client on purpose: the dialog asks them to order from us, so it is only
+   * meaningful for the ones who buy printed cards. Omit `threshold` to leave the
+   * stored number alone.
+   */
+  setCardLowWarning(
+    companyId: string,
+    enabled: boolean,
+    threshold?: number | null,
+  ): Observable<{ success: boolean; card_low_warning_enabled: boolean; card_low_warning_threshold: number }> {
+    const body: { enabled: boolean; threshold?: number | null } = { enabled };
+    if (threshold !== undefined) body.threshold = threshold;
+    return this.http.post<{ success: boolean; card_low_warning_enabled: boolean; card_low_warning_threshold: number }>(
+      `${ADMIN_ENDPOINT}/companies/${companyId}/card-warning`,
+      body,
     );
   }
 
@@ -253,6 +274,19 @@ export class SubscriptionsService {
   moveUserCompany(id: string, companyId: string): Observable<TenantUser> {
     return this.http.patch<TenantUser>(`${ADMIN_ENDPOINT}/users/${id}/company`, { companyId });
   }
+}
+
+/** A client's card pool at a glance, plus whether they get the reorder nudge. */
+export interface QrCardStats {
+  qr_cards_enabled: boolean;
+  total: number;
+  linked: number;
+  printed?: number;
+  unprinted?: number;
+  poolValue?: number;
+  /** The "nearly out of cards" dialog: on for this client, and at what count. */
+  card_low_warning_enabled?: boolean;
+  card_low_warning_threshold?: number;
 }
 
 /** The types a QR card print run can be stamped with. Meaning is not fixed yet. */

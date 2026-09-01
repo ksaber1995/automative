@@ -3813,6 +3813,24 @@ export const contract = c.router({
       body: z.object({ ids: z.array(UUIDSchema).optional() }),
       responses: { 200: z.object({ marked: z.number() }), 400: ApiErrorSchema, 403: ApiErrorSchema },
     },
+    /**
+     * "Are you nearly out of cards?" — drives the reorder nudge. Answers 200 with
+     * `warn: false` for every tenant the nudge is off for, so the client has one
+     * flag to read and no rule to re-implement. 401 is a real 401.
+     */
+    poolStatus: {
+      method: 'GET',
+      path: '/api/qr-cards/pool-status',
+      responses: {
+        200: z.object({
+          warn: z.boolean(),
+          remaining: z.number(),
+          threshold: z.number(),
+          enabled: z.boolean(),
+        }),
+        401: ApiErrorSchema,
+      },
+    },
   },
 
   // CRM (Phase 1) — lead pipeline for ADVANCED-plan academies
@@ -7095,7 +7113,31 @@ export const contract = c.router({
           printed: z.number().optional(),
           unprinted: z.number().optional(),
           poolValue: z.number().optional(),
+          /** The reorder nudge: whether this client gets it, and at what count. */
+          card_low_warning_enabled: z.boolean().optional(),
+          card_low_warning_threshold: z.number().optional(),
         }),
+        404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    // Turn the "nearly out of cards" nudge on/off for one client, and set the
+    // count it fires at. Omitting `threshold` keeps the stored number.
+    setCardLowWarning: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/companies/:companyId/card-warning',
+      pathParams: z.object({ companyId: UUIDSchema }),
+      body: z.object({
+        enabled: z.boolean(),
+        threshold: z.number().int().min(1).max(10000).nullable().optional(),
+      }),
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          card_low_warning_enabled: z.boolean(),
+          card_low_warning_threshold: z.number(),
+        }),
+        400: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
         500: z.object({ message: z.string() }),
       },

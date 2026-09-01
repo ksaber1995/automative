@@ -13,6 +13,7 @@ import { cameraScanConfig } from '../utils/scanner-formats.util';
 import { BreadcrumbsComponent } from '../../shared/components/breadcrumbs/breadcrumbs.component';
 import { AuthService } from '../services/auth.service';
 import { SubscriptionService } from '../services/subscription.service';
+import { CardPoolService } from '../services/card-pool.service';
 import { LanguageService } from '../services/language.service';
 import { NotificationService } from '../services/notification.service';
 import { StudentService } from '../../features/students/services/student.service';
@@ -78,6 +79,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
   pushedBySidebar = computed(() => this.sidebarVisible() && !this.isMobile());
   currentUser = this.authService.currentUser;
   subscriptionService = inject(SubscriptionService);
+  cardPool = inject(CardPoolService);
   languageService = inject(LanguageService);
   private translate = inject(TranslateService);
   private notifications = inject(NotificationService);
@@ -190,6 +192,8 @@ export class LayoutComponent implements OnInit, OnDestroy {
     if (this.isMobile()) this.sidebarVisible.set(false);
 
     this.subscriptionService.load().subscribe({ error: () => {} });
+    // Costs no request for a tenant with no card pool — see CardPoolService.
+    this.cardPool.load();
     this.syncOpenGroupFromUrl(this.router.url);
     this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))

@@ -63,6 +63,17 @@ export async function ensureQrCardSchema(): Promise<void> {
   // Off by default: an academy only gets the pool once we switch it on for them.
   await query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS qr_cards_enabled BOOLEAN NOT NULL DEFAULT false`);
 
+  // "You are nearly out of cards, ask us for more" (migration 109). Off by
+  // default and switched on per tenant from the admin console: the nudge only
+  // makes sense for a client who actually buys printed cards from us, and
+  // nagging one who does not would be noise about a thing they cannot act on.
+  //
+  // The threshold rides alongside the flag rather than being a constant, because
+  // "nearly out" is a different number for an academy handing out 5 cards a month
+  // and one handing out 200.
+  await query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS card_low_warning_enabled BOOLEAN NOT NULL DEFAULT false`);
+  await query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS card_low_warning_threshold INTEGER NOT NULL DEFAULT 10`);
+
   // The student code this card overwrote when it was linked, so unlinking can put
   // it back. Cards linked before this column existed have NULL — unlink() then
   // issues a fresh organic code instead, which is the best it can do: the old
@@ -291,6 +302,69 @@ async function restoreStudentCode(
 }
 
 export const qrCardsRoutes = {
+  /**
+   * GET /api/qr-cards/pool-status
+   *
+   * "Are you about to run out of cards?" — the one thing the tenant's own app
+   * needs to know about the pool, for the nudge to order more.
+   *
+   * `remaining` counts cards nobody holds yet (student_id IS NULL), printed or
+   * not: running out means having no card left to give a new student, and
+   * whether a card has been through the printer is our logistics, not theirs.
+   *
+   * Deliberately ungated beyond a valid session: it returns three numbers and no
+   * personal data, and the warning is for whoever happens to run the place —
+   * gating it on students:read would hide it from the office manager who is the
+   * person that actually reorders.
+   *
+   * Answers softly. Every failure after auth returns `warn: false` rather than
+   * an error, because this decorates a page it must never break; auth itself is
+   * resolved OUTSIDE that catch so an expired session still says 401 instead of
+   * masquerading as "nothing to warn about" (the trap fixed in wa-cloud.ts).
+   */
+  poolStatus: async ({ headers }: { headers: AuthHeaders }) => {
+    let context;
+    try {
+      context = await extractTenantContext(headers.authorization);
+    } catch (error) {
+      return mapThrownError(error, 'ERRORS.AUTH.UNAUTHORIZED', 'Unauthorized', 401);
+    }
+    try {
+      await ensureQrCardSchema();
+      const row = await queryOne<any>(
+        `SELECT c.qr_cards_enabled,
+                c.card_low_warning_enabled,
+                c.card_low_warning_threshold,
+                (SELECT COUNT(*) FROM qr_cards q
+                  WHERE q.company_id = c.id AND q.student_id IS NULL) AS remaining
+           FROM companies c WHERE c.id = $1`,
+        [context.companyId],
+      );
+
+      const enabled = row?.qr_cards_enabled === true && row?.card_low_warning_enabled === true;
+      const threshold = Number(row?.card_low_warning_threshold ?? 10);
+      const remaining = Number(row?.remaining ?? 0);
+
+      return {
+        status: 200 as const,
+        body: {
+          // The single flag the client branches on, so it never re-implements
+          // the rule about which of the two switches has to be on.
+          warn: enabled && remaining <= threshold,
+          remaining,
+          threshold,
+          enabled,
+        },
+      };
+    } catch (error) {
+      console.error('QR card pool status error:', error);
+      return {
+        status: 200 as const,
+        body: { warn: false, remaining: 0, threshold: 0, enabled: false },
+      };
+    }
+  },
+
   /** Print run: mint `count` blank cards, numbered on from the last serial. */
   generate: async ({ body, headers }: { body: { count: number; startFrom?: number | null }; headers: AuthHeaders }) => {
     try {

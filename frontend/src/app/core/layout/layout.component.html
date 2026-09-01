@@ -238,6 +238,31 @@
   </ng-template>
 </p-dialog>
 
+<!-- Card pool running low.
+     Closable, unlike the two expiry dialogs below: those are hard stops, this
+     one is a reminder to place an order and must never stand between the user
+     and their work. Shown at most once a day per tenant (CardPoolService), and
+     only for the tenants the vendor switched the nudge on for. -->
+<p-dialog [visible]="cardPool.showDialog()" (visibleChange)="!$event && cardPool.dismiss()"
+  [modal]="true" [closable]="true" [dismissableMask]="true" [style]="{ width: '460px' }"
+  [header]="'QR_CARDS.LOW_POOL_TITLE' | translate">
+  <div class="text-center py-6 px-4">
+    <i class="pi pi-id-card text-6xl text-amber-400 mb-4 block"></i>
+    <h3 class="text-xl font-bold text-gray-800 mb-2">
+      {{ 'QR_CARDS.LOW_POOL_HEADING' | translate: { count: cardPool.remaining() } }}
+    </h3>
+    <p class="text-gray-500">{{ 'QR_CARDS.LOW_POOL_MESSAGE' | translate }}</p>
+  </div>
+  <ng-template pTemplate="footer">
+    <button pButton
+      [label]="'QR_CARDS.LOW_POOL_DISMISS' | translate"
+      icon="pi pi-check"
+      severity="secondary"
+      (click)="cardPool.dismiss()">
+    </button>
+  </ng-template>
+</p-dialog>
+
 <!-- Subscription Expired Dialog -->
 <p-dialog [visible]="subscriptionService.isSubscriptionExpired()" [modal]="true"
   [closable]="false" [style]="{ width: '480px' }"
