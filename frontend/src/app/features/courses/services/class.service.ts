@@ -68,6 +68,11 @@ export class ClassService {
     return this.api.post<Class>(`classes/${id}/finish`, {});
   }
 
+  /** The undo for finishClass — a class marked done by mistake goes back to active. */
+  reopenClass(id: string): Observable<Class> {
+    return this.api.post<Class>(`classes/${id}/reopen`, {});
+  }
+
   checkTeacherAvailability(params: {
     /** Omitted for TEACHER-type companies — the check runs against all their classes. */
     instructorId?: string;

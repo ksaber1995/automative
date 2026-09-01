@@ -4962,6 +4962,18 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    // The undo for finish: a class marked done by mistake goes back to active.
+    reopen: {
+      method: 'POST',
+      path: '/api/classes/:id/reopen',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: ClassSchema,
+        400: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
   },
 
   // Master class enrollments (joining a class within a bundle)

@@ -19,7 +19,9 @@
         }
       </p>
     </div>
-    <div class="flex items-center gap-3">
+    <!-- flex-wrap, or this row of tags + four labeled buttons is one unbreakable
+         line that drags the whole page into horizontal scroll on a phone. -->
+    <div class="flex items-center gap-3 flex-wrap">
       @if (exam()?.isOnline) {
         <p-tag icon="pi pi-desktop" [value]="'EXAMS.ONLINE.BADGE' | translate" severity="info"></p-tag>
       }

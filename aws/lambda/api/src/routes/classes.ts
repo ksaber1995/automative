@@ -1493,4 +1493,58 @@ export const classesRoutes = {
       return mapThrownError(error, 'ERRORS.CLASSES.FINISH_FAILED', 'Failed to finish class', 400);
     }
   },
+
+  /**
+   * POST /api/classes/:id/reopen — undo `finish`. Marking a class done is a
+   * judgement, not an event, and judgements get corrected: this puts the class
+   * back among the active ones (is_active returns with is_finished, exactly
+   * the pair `finish` flipped). Enrolments are untouched either way — finish
+   * never changed them, so there is nothing to restore.
+   */
+  reopen: async ({ params, headers }: { params: { id: string }; headers: { authorization: string } }) => {
+    try {
+      await ensureClassStatusColumns();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const existing = await loadClassForTenant(params.id, context.companyId);
+      if (!existing) {
+        return apiError(404, 'ERRORS.CLASSES.NOT_FOUND', 'Class not found');
+      }
+      if (!canAccessBranch(context, existing.branch_id)) {
+        return apiError(403, 'ERRORS.CLASSES.ACCESS_DENIED', 'Access denied to this class');
+      }
+      // A soft-deleted class is also is_active = false; reopening one would
+      // resurrect it into the lists behind the tenant's back.
+      if (existing.deleted_at) {
+        return apiError(404, 'ERRORS.CLASSES.NOT_FOUND', 'Class not found');
+      }
+      if (!existing.is_finished) {
+        return apiError(400, 'ERRORS.CLASSES.NOT_FINISHED', 'Class is not finished');
+      }
+
+      const updated = await update('classes', params.id, {
+        is_finished: false,
+        finished_at: null,
+        is_active: true,
+      });
+      if (!updated) {
+        return apiError(404, 'ERRORS.CLASSES.NOT_FOUND', 'Class not found');
+      }
+
+      return {
+        status: 200 as const,
+        body: mapClassFromDB({
+          ...updated,
+          company_id: existing.company_id,
+          branch_id: existing.branch_id,
+        }),
+      };
+    } catch (error) {
+      console.error('Reopen class error:', error);
+      return mapThrownError(error, 'ERRORS.CLASSES.REOPEN_FAILED', 'Failed to reopen class', 400);
+    }
+  },
 };

@@ -21,6 +21,8 @@
           <i class="pi pi-check-circle"></i>
           <span class="font-medium">{{ classDetail()?.finishedAt ? ('CLASSES.DETAIL.COURSE_FINISHED_ON' | translate: { date: formatDate(classDetail()!.finishedAt!) }) : ('CLASSES.DETAIL.COURSE_FINISHED' | translate) }}</span>
         </div>
+        <!-- The undo: done is a judgement, and judgements get corrected. -->
+        <p-button [label]="'CLASSES.DETAIL.REOPEN_CLASS' | translate" icon="pi pi-undo" size="small" severity="secondary" [outlined]="true" [loading]="reopening()" (onClick)="confirmReopenCourse()"></p-button>
       }
     </div>
   </div>

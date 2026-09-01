@@ -107,6 +107,7 @@ export class ClassDetailComponent implements OnInit {
   loadingSessions = signal(false);
   savingSession = signal(false);
   finishing = signal(false);
+  reopening = signal(false);
 
   isFinished = () => this.classDetail()?.status === 'DONE' || !!this.classDetail()?.isFinished;
 
@@ -513,6 +514,36 @@ export class ClassDetailComponent implements OnInit {
       error: () => {
         // Interceptor toasted the translated error.
         this.finishing.set(false);
+      },
+    });
+  }
+
+  confirmReopenCourse() {
+    const cls = this.classDetail();
+    if (!cls) return;
+    this.confirmationService.confirm({
+      header: this.translate.instant('CLASSES.DETAIL.REOPEN_CLASS_TITLE'),
+      message: this.translate.instant('CLASSES.DETAIL.REOPEN_CLASS_MSG', { name: cls.name }),
+      icon: 'pi pi-undo',
+      acceptLabel: this.translate.instant('CLASSES.DETAIL.REOPEN_CLASS'),
+      rejectLabel: this.translate.instant('CLASSES.DETAIL.CANCEL'),
+      accept: () => this.reopenCourse(),
+    });
+  }
+
+  reopenCourse() {
+    if (this.reopening()) return;
+    this.reopening.set(true);
+    this.classService.reopenClass(this.classId).subscribe({
+      next: (updated) => {
+        this.reopening.set(false);
+        this.notificationService.success(this.translate.instant('CLASSES.DETAIL.COURSE_REOPENED'));
+        const current = this.classDetail();
+        this.classDetail.set(current ? { ...current, ...updated } : null);
+      },
+      error: () => {
+        // Interceptor toasted the translated error.
+        this.reopening.set(false);
       },
     });
   }

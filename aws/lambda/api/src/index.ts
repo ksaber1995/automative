@@ -192,6 +192,7 @@ const router = {
     checkRoomAvailability: classesRoutes.checkRoomAvailability,
     getEnrollments: classesRoutes.getEnrollments,
     finish: classesRoutes.finish,
+    reopen: classesRoutes.reopen,
     getById: classesRoutes.getById,
     update: classesRoutes.update,
     delete: classesRoutes.delete,
