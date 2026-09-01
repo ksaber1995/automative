@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -37,6 +38,7 @@ import { downloadCsv, CsvColumn } from '../../../core/utils/csv';
   selector: 'app-report-list',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule,
     FormsModule,
     CardModule,

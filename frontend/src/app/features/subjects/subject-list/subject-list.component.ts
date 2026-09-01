@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
@@ -19,6 +20,7 @@ import { Subject } from '@shared/interfaces/subject.interface';
   selector: 'app-subject-list',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule,
     ReactiveFormsModule,
     CardModule,

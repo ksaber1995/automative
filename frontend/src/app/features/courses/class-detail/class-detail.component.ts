@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal, computed, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -32,6 +33,7 @@ import { ClassWithDetails } from '@shared/interfaces/class.interface';
   selector: 'app-class-detail',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule,
     TranslateModule,
     CardModule,

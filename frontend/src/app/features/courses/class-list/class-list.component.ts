@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -23,6 +24,7 @@ import { TablePageMemory } from '../../../core/utils/table-page-memory';
   selector: 'app-class-list',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule,
     FormsModule,
     CardModule,

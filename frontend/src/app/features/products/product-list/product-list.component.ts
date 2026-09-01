@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, signal, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
@@ -28,6 +29,7 @@ import { toLocalYmd } from '../../../core/utils/date.util';
   selector: 'app-product-list',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule,
     TableModule,
     ButtonModule,

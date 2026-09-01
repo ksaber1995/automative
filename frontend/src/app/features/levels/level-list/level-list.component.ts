@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
@@ -30,6 +31,7 @@ function ageRangeValidator(group: AbstractControl): ValidationErrors | null {
   selector: 'app-level-list',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule,
     ReactiveFormsModule,
     CardModule,

@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -25,6 +26,7 @@ const ALL = '__ALL__';
   selector: 'app-cash-management',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule, FormsModule, CardModule, ButtonModule, TableModule, TagModule,
     DialogModule, SelectModule, InputNumberModule, TextareaModule, DatePickerModule, TooltipModule,
     DeleteConfirmDialogComponent, TranslateModule,

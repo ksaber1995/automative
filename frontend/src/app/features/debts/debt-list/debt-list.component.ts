@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
@@ -14,6 +15,7 @@ import { AuthService } from '../../../core/services/auth.service';
   selector: 'app-debt-list',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule,
     TableModule,
     ButtonModule,

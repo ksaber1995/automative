@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -20,6 +21,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
   selector: 'app-branch-list',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule,
     FormsModule,
     CardModule,

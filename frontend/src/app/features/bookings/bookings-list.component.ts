@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -43,6 +44,7 @@ interface BookingRow {
   selector: 'app-bookings-list',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TagModule,
     DialogModule, InputNumberModule, SelectButtonModule, TooltipModule, ConfirmDialogModule, TranslateModule,
   ],

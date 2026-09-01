@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal, computed, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
@@ -78,6 +79,7 @@ function endTimeAfterStartValidator(startDate: string) {
   selector: 'app-sessions-dashboard',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule,
     RouterModule,
     ReactiveFormsModule,

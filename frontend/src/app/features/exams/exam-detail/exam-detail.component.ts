@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -30,6 +31,7 @@ import { ExamAttemptRow, ExamModel, ExamResultRow } from '@shared/interfaces/exa
   selector: 'app-exam-detail',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule,
     RouterModule,
     FormsModule,

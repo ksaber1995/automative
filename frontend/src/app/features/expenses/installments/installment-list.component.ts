@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
@@ -19,6 +20,7 @@ import { DeleteConfirmDialogComponent } from '../../../shared/components/delete-
   selector: 'app-installment-list',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TagModule,
     TooltipModule, DeleteConfirmDialogComponent, TranslateModule,
   ],

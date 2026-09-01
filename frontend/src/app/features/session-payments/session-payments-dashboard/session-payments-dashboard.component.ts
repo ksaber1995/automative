@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, OnDestroy, inject, signal, computed, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -50,6 +51,7 @@ type StatusTab = 'ALL' | 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE' | 'ON_HOLD' 
   selector: 'app-session-payments-dashboard',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule, FormsModule, TranslateModule,
     CardModule, TableModule, ButtonModule, TagModule, TooltipModule, SelectModule,
     DialogModule, ConfirmDialogModule, InputNumberModule, InputTextModule, DatePickerModule, TextareaModule,

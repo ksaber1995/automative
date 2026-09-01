@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
@@ -26,6 +27,7 @@ interface EnrollmentDisplay extends Enrollment {
   selector: 'app-enrollment-list',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule,
     CardModule,
     TableModule,

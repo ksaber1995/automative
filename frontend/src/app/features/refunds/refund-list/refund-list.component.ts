@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -25,6 +26,7 @@ import { RefundWithDetails } from '@shared/interfaces/enrollment.interface';
   selector: 'app-refund-list',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule, FormsModule,
     CardModule, TableModule, ButtonModule, TagModule,
     SelectModule, DatePickerModule, InputTextModule, TooltipModule,

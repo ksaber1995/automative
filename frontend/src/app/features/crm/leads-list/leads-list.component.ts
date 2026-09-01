@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -32,6 +33,7 @@ type Sev = 'secondary' | 'info' | 'warn' | 'success' | 'danger' | 'contrast';
   selector: 'app-leads-list',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TagModule,
     DialogModule, SelectModule, InputTextModule, TextareaModule, DatePickerModule,
     TooltipModule, ConfirmDialogModule, DragDropModule, TranslateModule, LeadPanelComponent,

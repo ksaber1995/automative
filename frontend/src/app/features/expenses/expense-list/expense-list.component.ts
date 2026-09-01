@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
@@ -33,6 +34,7 @@ type ExpenseTab = 'all' | 'due' | 'direct' | 'installments' | 'events';
   selector: 'app-expense-list',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TooltipModule,
     TagModule, DialogModule, DatePickerModule, InputNumberModule, InputTextModule,
     TextareaModule, TabsModule, DeleteConfirmDialogComponent, TranslateModule

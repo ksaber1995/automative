@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
@@ -36,6 +37,7 @@ function fromYmd(s: string | null): Date | null {
   selector: 'app-school-semester-list',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule,
     ReactiveFormsModule,
     CardModule,

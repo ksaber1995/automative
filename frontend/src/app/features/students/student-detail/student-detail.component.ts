@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, OnDestroy, inject, signal, computed, DestroyRef, ViewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
@@ -67,6 +68,7 @@ import { ProductSale } from '@shared/interfaces/product-sale.interface';
   selector: 'app-student-detail',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule,
     FormsModule,
     CardModule,

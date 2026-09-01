@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, OnDestroy, ViewChild, inject, input, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -38,7 +39,8 @@ import { Class } from '@shared/interfaces/class.interface';
 @Component({
   selector: 'app-session-history',
   standalone: true,
-  imports: [CommonModule, FormsModule, CardModule, ButtonModule, TagModule, TableModule, SelectModule, ConfirmDialogModule, TooltipModule, TranslateModule, SessionPayDialogComponent],
+  imports: [
+    TablePageUxDirective,CommonModule, FormsModule, CardModule, ButtonModule, TagModule, TableModule, SelectModule, ConfirmDialogModule, TooltipModule, TranslateModule, SessionPayDialogComponent],
   templateUrl: './session-history.component.html',
   // Own instance so the delete confirmation targets THIS component's dialog and
   // not the Sessions page's, which hosts us as its History tab.

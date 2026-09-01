@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -25,6 +26,7 @@ import { CourseWithEnrollmentCount } from '@shared/interfaces/course.interface';
   selector: 'app-course-list',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule,
     FormsModule,
     CardModule,

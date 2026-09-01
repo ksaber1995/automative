@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, signal, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
@@ -26,6 +27,7 @@ import { toLocalYmd } from '../../../core/utils/date.util';
   selector: 'app-sales-history',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule, RouterLink, TableModule, ButtonModule, CardModule, DialogModule, TagModule,
     InputNumberModule, CheckboxModule, DatePickerModule, SelectModule, TextareaModule, TooltipModule,
     FormsModule, TranslateModule, AmountPipe,

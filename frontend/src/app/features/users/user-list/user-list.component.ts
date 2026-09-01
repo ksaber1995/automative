@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
@@ -26,6 +27,7 @@ import { Branch } from '@shared/interfaces/branch.interface';
   selector: 'app-user-list',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule, FormsModule,
     TableModule, ButtonModule, TagModule, SelectModule,
     InputTextModule, ConfirmDialogModule, TooltipModule, AvatarModule, BadgeModule,

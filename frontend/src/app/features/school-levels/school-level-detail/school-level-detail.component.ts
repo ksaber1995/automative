@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -28,6 +29,7 @@ import { SchoolSubject } from '@shared/interfaces/school-subject.interface';
   selector: 'app-school-level-detail',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule,
     RouterModule,
     ReactiveFormsModule,

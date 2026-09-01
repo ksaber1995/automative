@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
@@ -18,7 +19,8 @@ import { AmountPipe } from '../../../shared/pipes/amount.pipe';
 @Component({
   selector: 'app-revenue-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TagModule, TooltipModule, TranslateModule,
+  imports: [
+    TablePageUxDirective,CommonModule, FormsModule, CardModule, TableModule, ButtonModule, TagModule, TooltipModule, TranslateModule,
     AmountPipe,
   ],
   templateUrl: './revenue-list.component.html',
