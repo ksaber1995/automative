@@ -695,8 +695,15 @@ export const waCloudRoutes = {
    * trial tenant or before the platform number's token has been pasted in.
    */
   parentLinkCapability: async ({ headers }: { headers: { authorization: string } }) => {
+    // Auth failures answer as auth failures — only the checks AFTER a valid
+    // session are soft, because a probe must never break the page it decorates.
+    let context;
     try {
-      const context = await extractTenantContext(headers.authorization);
+      context = await extractTenantContext(headers.authorization);
+    } catch (error) {
+      return mapThrownError(error, 'ERRORS.AUTH.UNAUTHORIZED', 'Unauthorized', 401);
+    }
+    try {
       if (!(await companyHasPaidSubscription(context.companyId))) {
         return { status: 200 as const, body: { available: false, reason: 'TRIAL' as string | null } };
       }
@@ -707,7 +714,6 @@ export const waCloudRoutes = {
       return { status: 200 as const, body: { available: true, reason: null as string | null } };
     } catch (error) {
       console.error('WA parentLinkCapability error:', error);
-      // A probe must never break the page it decorates.
       return { status: 200 as const, body: { available: false, reason: 'ERROR' as string | null } };
     }
   },
