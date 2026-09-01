@@ -66,6 +66,28 @@
   }
 }
 
+/* ── Tables read in the page's direction ──────────────────────────
+   Every table aligns with the reading direction by default: left in English
+   (ltr), right in Arabic (rtl). This exists because the browser's own default
+   for <th> is CENTER, and PrimeNG 21 only start-aligns header cells through a
+   class (.p-datatable-header-cell) its Angular table never puts on the <th>
+   you write in a header template — so headers floated to the middle while
+   body cells sat at the start.
+
+   Deliberately the weakest rule that can win (0,0,2): any .text-center /
+   .text-right a template puts on a cell still beats it, so intentionally
+   centered columns (counts, badges) keep their alignment in both languages. */
+table th,
+table td {
+  text-align: start;
+}
+
+/* The datepicker's day numbers center themselves (flex spans); its weekday
+   headers relied on the browser's centered-th default the rule above removes. */
+.p-datepicker-weekday-cell {
+  text-align: center;
+}
+
 /* ── RTL / Arabic font support ───────────────────────────── */
 [dir='rtl'] {
   font-family: 'Segoe UI', Tahoma, 'Arial', sans-serif;
@@ -90,12 +112,6 @@
 
   /* PrimeNG input text alignment */
   .p-inputtext {
-    text-align: right;
-  }
-
-  /* Table header and cell alignment */
-  .p-datatable .p-datatable-thead > tr > th,
-  .p-datatable .p-datatable-tbody > tr > td {
     text-align: right;
   }
 }
