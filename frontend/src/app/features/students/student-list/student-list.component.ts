@@ -32,6 +32,7 @@ import { StudentImportDialogComponent } from '../student-import/student-import-d
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
 import { MasterClassEnrollmentService } from '../../master-courses/services/master-class-enrollment.service';
+import { AttendanceService } from '../../rooms/services/attendance.service';
 import { MasterClassEnrollment } from '@shared/interfaces/master-class-enrollment.interface';
 import { ClassService } from '../../courses/services/class.service';
 import { CourseService } from '../../courses/services/course.service';
@@ -86,6 +87,7 @@ export class StudentListComponent implements OnInit {
   private lookupService = inject(LookupService);
   private enrollmentService = inject(EnrollmentService);
   private masterClassEnrollmentService = inject(MasterClassEnrollmentService);
+  private attendanceService = inject(AttendanceService);
   private classService = inject(ClassService);
   private courseService = inject(CourseService);
   private companyService = inject(CompanyService);
@@ -219,6 +221,40 @@ export class StudentListComponent implements OnInit {
     this.loadCourses();
     this.loadStudents();
     this.loadEnrollmentCounts();
+    this.loadAttendanceRates();
+  }
+
+  // ── The Attendance column ───────────────────────────────────────────────────
+  // studentId → attended/rated tallies, one bulk call. Same rules as the
+  // profile's overall rate, so the two screens agree about a student.
+  attendanceRates = signal<Map<string, { rated: number; attended: number }>>(new Map());
+
+  loadAttendanceRates() {
+    this.attendanceService.getRates().subscribe({
+      next: (rows) => {
+        this.attendanceRates.set(new Map(rows.map(r => [r.studentId, { rated: r.rated, attended: r.attended }])));
+      },
+      // No academy-read, or a hiccup: the column shows — everywhere, no toast.
+      error: () => {},
+    });
+  }
+
+  /** Null while unrated — a dash reads better than a 0% about a new student. */
+  attendanceRate(studentId: string): number | null {
+    const r = this.attendanceRates().get(studentId);
+    if (!r || !r.rated) return null;
+    return Math.round((r.attended / r.rated) * 100);
+  }
+
+  attendanceRateSeverity(studentId: string): 'success' | 'warn' | 'danger' {
+    const rate = this.attendanceRate(studentId) ?? 0;
+    return rate >= 80 ? 'success' : rate >= 50 ? 'warn' : 'danger';
+  }
+
+  attendanceRateTooltip(studentId: string): string {
+    const r = this.attendanceRates().get(studentId);
+    if (!r || !r.rated) return '';
+    return this.translate.instant('STUDENTS.LIST.ATTENDANCE_RATE_TOOLTIP', { attended: r.attended, rated: r.rated });
   }
 
   loadCourses() {

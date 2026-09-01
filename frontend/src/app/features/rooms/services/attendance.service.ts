@@ -222,6 +222,12 @@ export class AttendanceService {
     return this.api.get<StudentAttendanceRecord[]>(`attendance/student/${studentId}`);
   }
 
+  /** Per-student attended/rated tallies, company-wide — the students list's rate column. */
+  getRates(branchId?: string): Observable<{ studentId: string; rated: number; attended: number }[]> {
+    return this.api.get<{ studentId: string; rated: number; attended: number }[]>(
+      'attendance/rates', branchId ? { branchId } : undefined);
+  }
+
   /** Get per-session attendance summary for a class */
   getByClass(classId: string): Observable<ClassAttendanceSummary[]> {
     return this.api.get<ClassAttendanceSummary[]>(`attendance/class/${classId}`);

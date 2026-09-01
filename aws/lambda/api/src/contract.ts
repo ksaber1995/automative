@@ -8320,6 +8320,21 @@ export const contract = c.router({
     },
     // Registered before /class/:classId — itty-router matches in registration
     // order, and a static path listed after a param one is never reached.
+    // Per-student attended/rated tallies, company-wide — the students list's
+    // Attendance column in one query. Same rules as the profile's overall rate.
+    attendanceRates: {
+      method: 'GET' as const,
+      path: '/api/attendance/rates',
+      query: z.object({ branchId: OptionalUUIDSchema }),
+      responses: {
+        200: z.array(z.object({
+          studentId: UUIDSchema,
+          rated: z.number(),
+          attended: z.number(),
+        })),
+        401: ApiErrorSchema, 403: ApiErrorSchema, 500: ApiErrorSchema,
+      },
+    },
     absenceStreaks: {
       method: 'GET' as const,
       path: '/api/attendance/absence-streaks',

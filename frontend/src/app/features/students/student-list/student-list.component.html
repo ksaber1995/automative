@@ -144,6 +144,7 @@
             <th pSortableColumn="branchId">{{ 'STUDENTS.LIST.COL_BRANCH' | translate }} <p-sortIcon field="branchId"></p-sortIcon></th>
           }
           <th class="text-center">{{ 'STUDENTS.LIST.COL_COURSES' | translate }}</th>
+          <th class="text-center">{{ 'STUDENTS.LIST.COL_ATTENDANCE' | translate }}</th>
           <th pSortableColumn="acquisitionChannel">{{ 'STUDENTS.LIST.COL_CHANNEL' | translate }}</th>
           <th>{{ 'STUDENTS.LIST.COL_ACTIONS' | translate }}</th>
         </tr>
@@ -208,6 +209,20 @@
               }
             </div>
           </td>
+          <!-- Same figure as the profile header: overall, made-up lessons count
+               as attended, free trials unrated. A dash until a first rated
+               session — 0% would slander a student yet to have a lesson. -->
+          <td class="text-center">
+            @if (attendanceRate(student.id) !== null) {
+              <p-tag
+                [value]="attendanceRate(student.id) + '%'"
+                [severity]="attendanceRateSeverity(student.id)"
+                [pTooltip]="attendanceRateTooltip(student.id)"
+              ></p-tag>
+            } @else {
+              <span class="text-gray-400">—</span>
+            }
+          </td>
           <td>
             @if (student.acquisitionChannel) {
               <p-tag [value]="getChannelLabel(student.acquisitionChannel)" severity="info"></p-tag>
@@ -267,7 +282,7 @@
       </ng-template>
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td [attr.colspan]="authService.isTeacher() ? 9 : 10" class="text-center">{{ 'STUDENTS.LIST.NO_DATA' | translate }}</td>
+          <td [attr.colspan]="authService.isTeacher() ? 10 : 11" class="text-center">{{ 'STUDENTS.LIST.NO_DATA' | translate }}</td>
         </tr>
       </ng-template>
     </p-table>

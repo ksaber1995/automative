@@ -4290,6 +4290,8 @@
       "ACTIVE_ENROLLMENTS_TOOLTIP": "Active enrollments",
       "COMPLETED_ENROLLMENTS_TOOLTIP": "Completed enrollments",
       "MASTER_COURSE_HINT": "{{count}} via a master course bundle",
+      "COL_ATTENDANCE": "Attendance",
+      "ATTENDANCE_RATE_TOOLTIP": "Attended {{attended}} of {{rated}} rated sessions — made-up lessons count, free trials don't",
       "QR_ALL": "All",
       "QR_ACTIVATED": "QR Activated",
       "QR_NOT_ACTIVATED": "QR Not Activated",

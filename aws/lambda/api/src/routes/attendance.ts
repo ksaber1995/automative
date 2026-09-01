@@ -1714,6 +1714,114 @@ export const attendanceRoutes = {
   },
 
   /**
+   * GET /api/attendance/rates?branchId=
+   *
+   * One row per student: how many rated sessions their classes have held for
+   * them, and how many they attended — the students list's Attendance column,
+   * in a single query instead of one profile call per row.
+   *
+   * Same rules as the profile's overall figure: sessions from before the
+   * student joined the class are not theirs to have missed (join-day gate),
+   * a make-up elsewhere counts as attended, free sessions are not rated.
+   * Two deliberate divergences, both minor: only ENDED sessions count (a
+   * lesson still running is not an absence yet), and lessons attended in a
+   * class since left are not chased down — this is an overview column, the
+   * profile stays the source of truth.
+   */
+  attendanceRates: async ({ query: q, headers }: {
+    query: { branchId?: string };
+    headers: { authorization: string };
+  }) => {
+    try {
+      await ensureAttendanceMagicColumns();
+      await ensureFreeSessionSchema();
+      await ensureSubstitutionLinkSchema();
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'academy', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const params: any[] = [context.companyId];
+      let scopeSql = '';
+      if (q?.branchId) {
+        if (!canAccessBranch(context, q.branchId)) {
+          return apiError(403, 'ERRORS.PERMISSION.BRANCH_ACCESS', 'Access denied to this branch');
+        }
+        params.push(q.branchId);
+        scopeSql += ` AND co.branch_id = $${params.length}`;
+      } else {
+        const branchClause = appendBranchSqlFilter(context, params, 'co.branch_id');
+        if (branchClause) scopeSql += ` AND ${branchClause}`;
+      }
+
+      const rows = await query(
+        // Finished classes stay in scope, unlike the follow-up query above:
+        // a class ending does not erase the term's attendance record.
+        `WITH scope AS (
+           SELECT c.id AS class_id, c.course_id
+           FROM classes c
+           JOIN courses co ON co.id = c.course_id
+           WHERE co.company_id = $1
+             AND c.deleted_at IS NULL
+             ${scopeSql}
+         ),
+         sess AS (
+           SELECT s.id, s.class_id, s.session_number, s.start_date
+           FROM sessions s
+           JOIN scope sc ON sc.class_id = s.class_id
+           WHERE s.company_id = $1
+             AND s.end_date IS NOT NULL
+             AND COALESCE(s.is_free, false) = false
+         ),
+         enrolled AS (
+           SELECT DISTINCT student_id, class_id FROM enrollments
+           WHERE company_id = $1 AND status NOT IN ('DROPPED', 'CANCELLED')
+           UNION
+           SELECT DISTINCT student_id, class_id FROM master_class_enrollments
+           WHERE company_id = $1 AND status != 'DROPPED'
+         ),
+         presence AS (
+           SELECT e.student_id,
+             (
+               EXISTS (
+                 SELECT 1 FROM session_attendance sa
+                 WHERE sa.session_id = ss.id AND sa.student_id = e.student_id
+                   AND sa.attendance_type IN ('NORMAL', 'SUBSTITUTION')
+               )
+               OR ${substitutionCoversExists({
+                 student: 'e.student_id',
+                 sessionId: 'ss.id',
+                 courseId: '(SELECT course_id FROM classes WHERE id = ss.class_id)',
+                 sessionNumber: 'ss.session_number',
+               })}
+             ) AS present
+           FROM sess ss
+           JOIN enrolled e ON e.class_id = ss.class_id
+             AND ${joinedBySession('e.student_id', 'ss.class_id', 'ss.start_date')}
+         )
+         SELECT student_id,
+                COUNT(*)::int AS rated,
+                (COUNT(*) FILTER (WHERE present))::int AS attended
+         FROM presence
+         GROUP BY student_id`,
+        params
+      );
+
+      return {
+        status: 200 as const,
+        body: rows.map((r: any) => ({
+          studentId: r.student_id,
+          rated: parseInt(r.rated, 10) || 0,
+          attended: parseInt(r.attended, 10) || 0,
+        })),
+      };
+    } catch (error) {
+      console.error('Attendance rates error:', error);
+      return mapThrownError(error, 'ERRORS.ATTENDANCE.GET_FAILED', 'Failed to load attendance rates');
+    }
+  },
+
+  /**
    * GET /api/attendance/class/:classId
    * Returns per-session attendance summary for a class.
    */
