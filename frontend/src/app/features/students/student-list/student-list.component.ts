@@ -1,3 +1,4 @@
+import { TablePageUxDirective } from '../../../core/directives/table-page-ux.directive';
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { formatStudentCode, normalizeStudentCode } from '../../../core/utils/student-code.util';
 import { matchesSearchTokens } from '../../../core/utils/search.util';
@@ -30,8 +31,8 @@ import { CompanyService } from '../../../core/services/company.service';
 import { StudentImportDialogComponent } from '../student-import/student-import-dialog.component';
 import { LookupService, LookupOption } from '../../../core/services/lookup.service';
 import { EnrollmentService } from '../../enrollments/services/enrollment.service';
-import { MasterEnrollmentService } from '../../master-courses/services/master-enrollment.service';
-import { MasterEnrollmentProgress } from '@shared/interfaces/master-enrollment.interface';
+import { MasterClassEnrollmentService } from '../../master-courses/services/master-class-enrollment.service';
+import { MasterClassEnrollment } from '@shared/interfaces/master-class-enrollment.interface';
 import { ClassService } from '../../courses/services/class.service';
 import { CourseService } from '../../courses/services/course.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -54,6 +55,7 @@ interface EnrollmentCounts {
   selector: 'app-student-list',
   standalone: true,
   imports: [
+    TablePageUxDirective,
     CommonModule,
     FormsModule,
     CardModule,
@@ -83,7 +85,7 @@ export class StudentListComponent implements OnInit {
   private studentService = inject(StudentService);
   private lookupService = inject(LookupService);
   private enrollmentService = inject(EnrollmentService);
-  private masterEnrollmentService = inject(MasterEnrollmentService);
+  private masterClassEnrollmentService = inject(MasterClassEnrollmentService);
   private classService = inject(ClassService);
   private courseService = inject(CourseService);
   private companyService = inject(CompanyService);
@@ -243,7 +245,7 @@ export class StudentListComponent implements OnInit {
   loadEnrollmentCounts() {
     let enrollments: { studentId: string; classId: string; courseId?: string }[] = [];
     let classes: Class[] = [];
-    let masters: MasterEnrollmentProgress[] = [];
+    let masterRows: MasterClassEnrollment[] = [];
     let pending = 3;
     const finalize = () => {
       pending--;
@@ -252,13 +254,33 @@ export class StudentListComponent implements OnInit {
         classes.map(c => [c.id, c.status === 'DONE' || c.isFinished === true])
       );
       const classCourseById = new Map(classes.map(c => [c.id, c.courseId]));
+      // Bundle enrolments (master_class_enrollments, not /api/enrollments) ride
+      // the same pipeline as regular ones: counts, the course/class filters and
+      // the export all treat them as the enrolments they are — only the money
+      // went through the bundle. DROPPED ones are out; the rest carry a flag so
+      // the badge's hint can say how much of the number came through a bundle.
+      const fromMaster = masterRows
+        .filter(m => m.status !== 'DROPPED')
+        .map(m => ({
+          studentId: m.studentId, classId: m.classId, courseId: m.courseId,
+          isMaster: true, isDone: m.status === 'COMPLETED',
+        }));
+      const all: { studentId: string; classId: string; courseId?: string; isMaster?: boolean; isDone?: boolean }[] =
+        [...enrollments, ...fromMaster];
       const map: Record<string, EnrollmentCounts> = {};
+      const masterMap: Record<string, EnrollmentCounts> = {};
       const courseMap = new Map<string, Set<string>>();
       const classMap = new Map<string, Set<string>>();
-      for (const e of enrollments) {
+      for (const e of all) {
         if (!map[e.studentId]) map[e.studentId] = { active: 0, completed: 0 };
-        if (classDoneById.get(e.classId)) map[e.studentId].completed++;
+        const done = classDoneById.get(e.classId) === true || e.isDone === true;
+        if (done) map[e.studentId].completed++;
         else map[e.studentId].active++;
+        if (e.isMaster) {
+          if (!masterMap[e.studentId]) masterMap[e.studentId] = { active: 0, completed: 0 };
+          if (done) masterMap[e.studentId].completed++;
+          else masterMap[e.studentId].active++;
+        }
         // Build the student → courses set for the course filter (courseId comes
         // from the enrollment, falling back to the enrollment's class).
         const courseId = e.courseId || classCourseById.get(e.classId);
@@ -272,22 +294,6 @@ export class StudentListComponent implements OnInit {
           classMap.get(e.studentId)!.add(e.classId);
         }
       }
-      // Bundle enrolments count too — a student whose courses all come through
-      // a master course is not "0 active". Their per-class rows live in
-      // master_class_enrollments (not /api/enrollments), and the list endpoint
-      // already serves the active/completed tallies per bundle, so those are
-      // added on top and remembered separately for the badge's hint.
-      const masterMap: Record<string, EnrollmentCounts> = {};
-      for (const m of masters) {
-        if (m.status === 'CANCELLED') continue;
-        if (!m.activeCourses && !m.completedCourses) continue;
-        if (!map[m.studentId]) map[m.studentId] = { active: 0, completed: 0 };
-        if (!masterMap[m.studentId]) masterMap[m.studentId] = { active: 0, completed: 0 };
-        map[m.studentId].active += m.activeCourses;
-        map[m.studentId].completed += m.completedCourses;
-        masterMap[m.studentId].active += m.activeCourses;
-        masterMap[m.studentId].completed += m.completedCourses;
-      }
       this.enrollmentCounts.set(map);
       this.masterCounts.set(masterMap);
       this.studentCourseMap.set(courseMap);
@@ -295,7 +301,11 @@ export class StudentListComponent implements OnInit {
       // Kept whole for the export, which needs the class behind each enrolment,
       // not just how many there were. DROPPED is left out: that student is no
       // longer in the class, so listing them against its time would be wrong.
-      this.enrollments.set(enrollments.filter((e: any) => e.status !== 'DROPPED'));
+      // Bundle rows are already non-dropped and belong in the export the same.
+      this.enrollments.set([
+        ...enrollments.filter((e: any) => e.status !== 'DROPPED'),
+        ...fromMaster,
+      ]);
     };
     this.enrollmentService.getAllEnrollments().subscribe({
       next: (list) => { enrollments = list; finalize(); },
@@ -305,8 +315,8 @@ export class StudentListComponent implements OnInit {
       next: (list) => { classes = list; this.allClasses.set(list); finalize(); },
       error: () => finalize(),
     });
-    this.masterEnrollmentService.list().subscribe({
-      next: (list) => { masters = list; finalize(); },
+    this.masterClassEnrollmentService.listAll().subscribe({
+      next: (list) => { masterRows = list; finalize(); },
       error: () => finalize(),
     });
   }

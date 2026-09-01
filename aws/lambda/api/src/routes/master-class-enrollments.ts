@@ -103,11 +103,25 @@ export const masterClassEnrollmentsRoutes = {
     }
   },
 
-  listByMasterEnrollment: async ({ query: q, headers }: { query: { masterEnrollmentId: string }; headers: AuthHeaders }) => {
+  listByMasterEnrollment: async ({ query: q, headers }: { query: { masterEnrollmentId?: string }; headers: AuthHeaders }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
       if (!checkGranularPermission(context, 'enrollments', 'read')) {
         return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+
+      const params: any[] = [context.companyId];
+      let where = 'mce.company_id = $1';
+      if (q?.masterEnrollmentId) {
+        params.push(q.masterEnrollmentId);
+        where += ` AND mce.master_enrollment_id = $${params.length}`;
+      } else {
+        // The bulk form feeds the students list's per-student course counts and
+        // filters (company-wide, like /api/enrollments). A cancelled bundle's
+        // classes are history rather than enrolment, so they stay out here —
+        // the per-bundle form above keeps returning them for the detail page.
+        where += ` AND EXISTS (SELECT 1 FROM master_enrollments me
+                                WHERE me.id = mce.master_enrollment_id AND me.status <> 'CANCELLED')`;
       }
 
       const rows = await query(
@@ -118,9 +132,9 @@ export const masterClassEnrollmentsRoutes = {
          FROM master_class_enrollments mce
          LEFT JOIN classes cl ON cl.id = mce.class_id
          LEFT JOIN courses co ON co.id = mce.course_id
-         WHERE mce.master_enrollment_id = $1 AND mce.company_id = $2
+         WHERE ${where}
          ORDER BY mce.created_at DESC`,
-        [q.masterEnrollmentId, context.companyId]
+        params
       );
 
       return { status: 200 as const, body: rows.map(mapRow) };

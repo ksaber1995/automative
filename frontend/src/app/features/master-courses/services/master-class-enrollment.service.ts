@@ -15,6 +15,11 @@ export class MasterClassEnrollmentService {
     return this.api.get<MasterClassEnrollment[]>('master-class-enrollments', { masterEnrollmentId });
   }
 
+  /** Every non-cancelled bundle's class rows, company-wide (the students list). */
+  listAll(): Observable<MasterClassEnrollment[]> {
+    return this.api.get<MasterClassEnrollment[]>('master-class-enrollments');
+  }
+
   updateStatus(id: string, status: 'ACTIVE' | 'COMPLETED' | 'DROPPED', notes?: string): Observable<MasterClassEnrollment> {
     return this.api.patch<MasterClassEnrollment>(`master-class-enrollments/${id}`, { status, notes });
   }

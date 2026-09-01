@@ -4987,7 +4987,10 @@ export const contract = c.router({
     listByMasterEnrollment: {
       method: 'GET' as const,
       path: '/api/master-class-enrollments',
-      query: z.object({ masterEnrollmentId: UUIDSchema }),
+      // Optional since the students list needs the whole company's rows in one
+      // call (its per-student course counts and filters would otherwise cost a
+      // request per bundle). Omitted = all, minus cancelled bundles.
+      query: z.object({ masterEnrollmentId: UUIDSchema.optional() }),
       responses: {
         200: z.array(z.any()),
         403: ApiErrorSchema,
