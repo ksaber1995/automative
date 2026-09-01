@@ -1,6 +1,11 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { query, queryOne } from '../db/connection';
+import { query, queryOne, getClient } from '../db/connection';
+import {
+  DEBUG_USER_DEFAULT_ROLE,
+  TENANT_USER_ROLES,
+  ensureDebugUserColumns,
+} from '../utils/debug-account';
 import { getJWTSecret } from '../utils/secrets';
 import { enforceByIp, enforce, RateLimitBucket } from '../middleware/rate-limit';
 
@@ -499,10 +504,30 @@ export const adminPortalRoutes = {
     }
   },
 
-  /** POST /api/karim-admin-secret/portal/users  { email, password, name?, role?, permissions? } */
+  /**
+   * POST /api/karim-admin-secret/portal/users
+   *   { email, password, name?, role?, permissions?, debugUser? }
+   *
+   * `debugUser` ({ companyId, email, password, firstName?, lastName?, role? })
+   * also creates the person's own DEBUG login inside a tenant — a users row
+   * with is_debug = true, owned by the portal user being created (so their
+   * Users page shows it and they can move it between tenants). The two rows
+   * are inserted in one transaction: a portal user whose debug login failed to
+   * appear would be half of what was asked for.
+   *
+   * Creating a tenant account is a tenant_users.write act, so the section
+   * needs that grant too when debugUser is sent — portal_users.write alone
+   * must not become a back door into customers' tenants.
+   */
   createUser: async ({ headers, body }: {
     headers: { authorization?: string };
-    body: { email: string; password: string; name?: string | null; role?: string; permissions?: string[] };
+    body: {
+      email: string; password: string; name?: string | null; role?: string; permissions?: string[];
+      debugUser?: {
+        companyId: string; email: string; password: string;
+        firstName?: string; lastName?: string; role?: string;
+      } | null;
+    };
   }) => {
     const guard = await requirePortal(headers, 'portal_users.write');
     if (!guard.ok) return guard.response;
@@ -525,13 +550,109 @@ export const adminPortalRoutes = {
         return { status: 409 as const, body: { code: 'ADMIN_PORTAL.EMAIL_TAKEN', message: 'That email already has access.' } };
       }
 
-      const row = await queryOne<any>(
-        `INSERT INTO admin_secret_users (email, password_hash, name, role, permissions)
-         VALUES ($1, $2, $3, $4, $5::jsonb) RETURNING *`,
-        [email, await bcrypt.hash(password, 10), (body?.name ?? '').trim() || null, role,
-         JSON.stringify(cleanPermissions(body?.permissions))],
-      );
-      return { status: 201 as const, body: toPortalUser(row) };
+      // Everything about the debug login is checked BEFORE anything is written,
+      // so a bad debug request never leaves a portal user behind without one.
+      let debug: {
+        email: string; passwordHash: string; firstName: string; lastName: string;
+        role: string; companyId: string;
+      } | null = null;
+      if (body?.debugUser) {
+        if (!portalCan(guard.user, 'tenant_users.write')) {
+          return { status: 403 as const, body: { code: 'ADMIN_PORTAL.FORBIDDEN', message: 'Creating a debug login also needs tenant_users.write.' } };
+        }
+        await ensureDebugUserColumns();
+        const d = body.debugUser;
+        const dEmail = normaliseEmail(d.email);
+        if (!dEmail || !dEmail.includes('@')) {
+          return { status: 400 as const, body: { code: 'ADMIN_PORTAL.BAD_EMAIL', message: 'The debug login needs a valid email.' } };
+        }
+        // Tenant accounts have a 6-character floor (routes/auth.ts), not the
+        // portal's 8 — this creates a tenant account.
+        if ((d.password ?? '').length < 6) {
+          return { status: 400 as const, body: { code: 'ADMIN_PORTAL.WEAK_PASSWORD', message: 'The debug login password must be at least 6 characters.' } };
+        }
+        const dRole = (d.role || DEBUG_USER_DEFAULT_ROLE).trim().toUpperCase();
+        if (!TENANT_USER_ROLES.includes(dRole)) {
+          return { status: 400 as const, body: { code: 'ADMIN_PORTAL.BAD_ROLE', message: `The debug login role must be one of: ${TENANT_USER_ROLES.join(', ')}` } };
+        }
+        const company = await queryOne<any>('SELECT id FROM companies WHERE id = $1', [d.companyId]);
+        if (!company) {
+          return { status: 400 as const, body: { code: 'ADMIN_PORTAL.NO_COMPANY', message: 'The tenant to park the debug login in does not exist.' } };
+        }
+        // The trial cap follows its holder everywhere: a capped caller cannot
+        // aim a debug login at a tenant they cannot see.
+        const capped = guard.user.role !== 'OWNER' && guard.user.permissions.includes('companies.read_trial');
+        if (capped && !(await queryOne<any>(`SELECT 1 FROM subscriptions WHERE company_id = $1 AND status = 'TRIAL'`, [d.companyId]))) {
+          return { status: 400 as const, body: { code: 'ADMIN_PORTAL.NO_COMPANY', message: 'The tenant to park the debug login in does not exist.' } };
+        }
+        if (await queryOne<any>('SELECT 1 FROM users WHERE LOWER(email) = $1', [dEmail])) {
+          return { status: 409 as const, body: { code: 'ADMIN_PORTAL.EMAIL_TAKEN', message: 'That debug login email already belongs to a user.' } };
+        }
+        debug = {
+          email: dEmail,
+          passwordHash: await bcrypt.hash(d.password, 10),
+          firstName: (d.firstName ?? '').trim() || 'Debug',
+          lastName: (d.lastName ?? '').trim() || ((body?.name ?? '').trim() || 'Login'),
+          role: dRole,
+          companyId: d.companyId,
+        };
+      }
+
+      const client = await getClient();
+      let row: any;
+      let debugRow: any = null;
+      try {
+        await client.query('BEGIN');
+        const inserted = await client.query(
+          `INSERT INTO admin_secret_users (email, password_hash, name, role, permissions)
+           VALUES ($1, $2, $3, $4, $5::jsonb) RETURNING *`,
+          [email, await bcrypt.hash(password, 10), (body?.name ?? '').trim() || null, role,
+           JSON.stringify(cleanPermissions(body?.permissions))],
+        );
+        row = inserted.rows[0];
+        if (debug) {
+          const dInserted = await client.query(
+            `INSERT INTO users (email, password, first_name, last_name, role, company_id,
+                                is_active, email_verified, is_debug, debug_owner_id)
+             VALUES ($1, $2, $3, $4, $5, $6, true, true, true, $7)
+             RETURNING id, email, first_name, last_name, role, is_active, email_verified,
+                       company_id, created_at, is_debug, debug_owner_id`,
+            [debug.email, debug.passwordHash, debug.firstName, debug.lastName,
+             debug.role, debug.companyId, row.id],
+          );
+          debugRow = dInserted.rows[0];
+        }
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw e;
+      } finally {
+        client.release();
+      }
+
+      return {
+        status: 201 as const,
+        body: {
+          ...toPortalUser(row),
+          debug_user: debugRow
+            ? {
+                id: debugRow.id,
+                email: debugRow.email,
+                first_name: debugRow.first_name,
+                last_name: debugRow.last_name,
+                role: debugRow.role,
+                is_active: debugRow.is_active !== false,
+                email_verified: debugRow.email_verified === true,
+                company_id: debugRow.company_id ?? null,
+                company_name: null,
+                created_at: debugRow.created_at ? new Date(debugRow.created_at).toISOString() : null,
+                is_debug: true,
+                debug_owner_id: debugRow.debug_owner_id ?? null,
+                debug_owner_email: row.email,
+              }
+            : null,
+        },
+      };
     } catch (error: any) {
       console.error('Admin portal create user failed:', error);
       return { status: 500 as const, body: { code: 'ADMIN_PORTAL.CREATE_FAILED', message: error?.message || 'Could not create the user' } };
@@ -629,6 +750,12 @@ export const adminPortalRoutes = {
         return { status: 403 as const, body: { code: 'ADMIN_PORTAL.OWNER_ONLY', message: 'Only an owner can remove an owner.' } };
       }
       await query('DELETE FROM admin_secret_users WHERE id = $1', [params.id]);
+      // Their debug logins survive them as SHARED (owner cleared), not deleted:
+      // a debug login is parked inside a customer's tenant, and quietly deleting
+      // an account there is not what removing console access means. Shared, it
+      // stays visible on the Users page where an owner can move or remove it.
+      await ensureDebugUserColumns();
+      await query('UPDATE users SET debug_owner_id = NULL WHERE debug_owner_id = $1', [params.id]);
       return { status: 200 as const, body: { success: true } };
     } catch (error: any) {
       console.error('Admin portal delete user failed:', error);

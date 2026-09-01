@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { ensureQrCardSchema, nextCardSerial, firstTakenCardNumber, CARD_SERIAL_BASE_V2 } from './qr-cards';
 import { query, queryOne, getClient } from '../db/connection';
-import { DEBUG_ACCOUNT_EMAIL, isDebugAccount } from '../utils/debug-account';
+import { TENANT_USER_ROLES, ensureDebugUserColumns } from '../utils/debug-account';
 import {
   ensureCompanyTypeConstraint,
   ensureCompanySmsColumns,
@@ -18,11 +18,12 @@ import { createPrintJob, ensurePrintJobSchema, mapPrintJob } from './print-jobs'
  */
 const APP_ORIGIN = process.env.FRONTEND_BASE_URL || 'https://app.netrofit.com';
 
-/** The roles a user account can hold (mirrors the users.role CHECK constraint). */
-export const ADMIN_ROLES = [
-  'GLOBAL_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'SALES_MANAGER',
-  'BRANCH_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'VIEWER',
-];
+/**
+ * The roles a user account can hold (mirrors the users.role CHECK constraint).
+ * The list itself moved to utils/debug-account.ts so routes/admin-portal.ts can
+ * use it too without an import cycle; this alias keeps existing importers.
+ */
+export const ADMIN_ROLES = TENANT_USER_ROLES;
 
 /**
  * The owner's cross-tenant view: one row per company with subscription status,
@@ -85,6 +86,36 @@ function toIso(value: any): string | null {
   if (!value) return null;
   const d = new Date(value);
   return isNaN(d.getTime()) ? String(value) : d.toISOString();
+}
+
+/** One tenant-user row as the console sees it. Never a password. */
+function mapAdminUser(r: any): any {
+  return {
+    id: r.id,
+    email: r.email,
+    first_name: r.first_name,
+    last_name: r.last_name,
+    role: r.role,
+    is_active: r.is_active !== false,
+    email_verified: r.email_verified === true,
+    company_id: r.company_id ?? null,
+    company_name: r.company_name ?? null,
+    created_at: toIso(r.created_at),
+    is_debug: r.is_debug === true,
+    debug_owner_id: r.debug_owner_id ?? null,
+    debug_owner_email: r.debug_owner_email ?? null,
+  };
+}
+
+/**
+ * May this caller manage (move, delete) this debug login? OWNER may touch any;
+ * a MEMBER only their own and the shared ones (debug_owner_id NULL) — another
+ * person's debug login is invisible to them, so the answer there is a 404, not
+ * a 403 that would confirm it exists.
+ */
+function canTouchDebugUser(user: { debug_owner_id?: string | null }, caller?: PortalUser): boolean {
+  if (!caller || caller.role === 'OWNER') return true;
+  return user.debug_owner_id == null || user.debug_owner_id === caller.id;
 }
 
 /**
@@ -902,52 +933,43 @@ const unguardedAdminSecretRoutes = {
 
   /**
    * GET /api/karim-admin-secret/users?companyId=...
-   * Every user account, with the tenant it belongs to. Passwords never leave here.
+   * The vendor's DEBUG logins only — the console's Users page stopped being a
+   * browser of customers' accounts and became the place the debug logins are
+   * parked and moved from. Passwords never leave here.
+   *
+   * Visibility: an OWNER sees every debug login; a MEMBER sees their own
+   * (debug_owner_id = them) and the shared ones (debug_owner_id NULL, which is
+   * where master@master.com lives). Every debug login is listed WHEREVER it
+   * currently sits — even inside an ACTIVE tenant for a trial-capped caller:
+   * hiding it there would strand it where that caller can never retrieve it.
+   * (Which tenant it is in is disclosed; that is the price of the move working.)
    */
   listUsers: async ({ query: q, portalUser }: { query: { companyId?: string }; portalUser?: PortalUser }) => {
     try {
+      await ensureDebugUserColumns();
       const params: any[] = [];
-      const where: string[] = [];
+      const where: string[] = ['u.is_debug = true'];
       let sql = `
         SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.is_active,
                u.email_verified, u.created_at,
-               u.company_id, c.name AS company_name
+               u.company_id, c.name AS company_name,
+               u.is_debug, u.debug_owner_id, p.email AS debug_owner_email
           FROM users u
-          LEFT JOIN companies c ON c.id = u.company_id`;
+          LEFT JOIN companies c ON c.id = u.company_id
+          LEFT JOIN admin_secret_users p ON p.id = u.debug_owner_id`;
       if (q?.companyId) {
         params.push(q.companyId);
         where.push(`u.company_id = $${params.length}`);
       }
-      // A trial-capped caller has no business browsing tenant accounts at all —
-      // their Users page exists for one job: find the debug login and park it in
-      // a trial tenant. So they get exactly one row, master@master.com, and they
-      // get it WHEREVER it currently sits: hiding it while it is parked in a
-      // paying tenant would strand it where a capped caller can never retrieve
-      // it. (Which tenant it is in is disclosed; that one name is the price of
-      // the toggle working.)
-      if (isTrialCapped(portalUser)) {
-        params.push(DEBUG_ACCOUNT_EMAIL);
-        where.push(`LOWER(TRIM(u.email)) = $${params.length}`);
+      if (portalUser && portalUser.role !== 'OWNER') {
+        params.push(portalUser.id);
+        where.push(`(u.debug_owner_id IS NULL OR u.debug_owner_id = $${params.length})`);
       }
-      if (where.length) sql += ' WHERE ' + where.join(' AND ');
+      sql += ' WHERE ' + where.join(' AND ');
       sql += ' ORDER BY c.name NULLS LAST, u.created_at DESC';
 
       const rows = await query<any>(sql, params);
-      return {
-        status: 200 as const,
-        body: rows.map((r) => ({
-          id: r.id,
-          email: r.email,
-          first_name: r.first_name,
-          last_name: r.last_name,
-          role: r.role,
-          is_active: r.is_active !== false,
-          email_verified: r.email_verified === true,
-          company_id: r.company_id ?? null,
-          company_name: r.company_name ?? null,
-          created_at: toIso(r.created_at),
-        })),
-      };
+      return { status: 200 as const, body: rows.map(mapAdminUser) };
     } catch (error: any) {
       console.error('karim-admin-secret list users failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'List users failed' } };
@@ -958,17 +980,27 @@ const unguardedAdminSecretRoutes = {
    * POST /api/karim-admin-secret/users
    * Create a user inside a tenant. Verified on the spot — a vendor-created account
    * has nobody to click an OTP, and an unverified account cannot log in.
+   *
+   * `isDebug: true` creates a vendor DEBUG login instead of a customer account:
+   * hidden from the tenant's own user list, movable between tenants. Ownership:
+   * an OWNER may hand it to any portal user via `debugOwnerId` (or leave it
+   * shared); a MEMBER always owns what they create — whatever they sent.
    */
   createUser: async ({ body, portalUser }: {
-    body: { companyId: string; email: string; password: string; firstName: string; lastName: string; role: string };
+    body: {
+      companyId: string; email: string; password: string; firstName: string; lastName: string; role: string;
+      isDebug?: boolean; debugOwnerId?: string | null;
+    };
     portalUser?: PortalUser;
   }) => {
     try {
+      await ensureDebugUserColumns();
       const email = (body?.email || '').trim().toLowerCase();
       const password = body?.password || '';
       const firstName = (body?.firstName || '').trim();
       const lastName = (body?.lastName || '').trim();
       const role = (body?.role || '').trim().toUpperCase();
+      const isDebug = body?.isDebug === true;
 
       if (!email || !password || !firstName || !lastName) {
         return { status: 400 as const, body: { message: 'Email, password, first and last name are required' } };
@@ -978,6 +1010,20 @@ const unguardedAdminSecretRoutes = {
       }
       if (!ADMIN_ROLES.includes(role)) {
         return { status: 400 as const, body: { message: `Role must be one of: ${ADMIN_ROLES.join(', ')}` } };
+      }
+
+      let debugOwnerId: string | null = null;
+      if (isDebug) {
+        if (portalUser?.role === 'OWNER') {
+          // null / absent = shared, like master@master.com.
+          debugOwnerId = body?.debugOwnerId ?? null;
+          if (debugOwnerId) {
+            const owner = await queryOne<any>('SELECT id FROM admin_secret_users WHERE id = $1', [debugOwnerId]);
+            if (!owner) return { status: 400 as const, body: { message: 'That portal user does not exist' } };
+          }
+        } else {
+          debugOwnerId = portalUser?.id ?? null;
+        }
       }
 
       const company = await queryOne<any>('SELECT id FROM companies WHERE id = $1', [body?.companyId]);
@@ -995,27 +1041,15 @@ const unguardedAdminSecretRoutes = {
 
       const hashed = await bcrypt.hash(password, 10);
       const row = await queryOne<any>(
-        `INSERT INTO users (email, password, first_name, last_name, role, company_id, is_active, email_verified)
-         VALUES ($1, $2, $3, $4, $5, $6, true, true)
-         RETURNING id, email, first_name, last_name, role, is_active, email_verified, company_id, created_at`,
-        [email, hashed, firstName, lastName, role, body.companyId],
+        `INSERT INTO users (email, password, first_name, last_name, role, company_id,
+                            is_active, email_verified, is_debug, debug_owner_id)
+         VALUES ($1, $2, $3, $4, $5, $6, true, true, $7, $8)
+         RETURNING id, email, first_name, last_name, role, is_active, email_verified,
+                   company_id, created_at, is_debug, debug_owner_id`,
+        [email, hashed, firstName, lastName, role, body.companyId, isDebug, debugOwnerId],
       );
 
-      return {
-        status: 201 as const,
-        body: {
-          id: row.id,
-          email: row.email,
-          first_name: row.first_name,
-          last_name: row.last_name,
-          role: row.role,
-          is_active: row.is_active !== false,
-          email_verified: row.email_verified === true,
-          company_id: row.company_id ?? null,
-          company_name: null,
-          created_at: toIso(row.created_at),
-        },
-      };
+      return { status: 201 as const, body: mapAdminUser(row) };
     } catch (error: any) {
       console.error('karim-admin-secret create user failed:', error);
       return { status: 500 as const, body: { message: error?.message || 'Create user failed' } };
@@ -1029,16 +1063,23 @@ const unguardedAdminSecretRoutes = {
    */
   deleteUser: async ({ params, portalUser }: { params: { id: string }; portalUser?: PortalUser }) => {
     try {
-      const user = await queryOne<any>('SELECT id, email, role, company_id FROM users WHERE id = $1', [params.id]);
+      await ensureDebugUserColumns();
+      const user = await queryOne<any>(
+        'SELECT id, email, role, company_id, is_debug, debug_owner_id FROM users WHERE id = $1', [params.id]);
       if (!user) return { status: 404 as const, body: { message: 'User not found' } };
-      // A trial-capped caller sees exactly one account (the debug login), and
-      // even that one is move-only for them: anything else is a 404, the same
-      // answer as a bad id, so nothing invisible can be probed for.
-      if (isTrialCapped(portalUser)) {
-        if (!isDebugAccount(user.email)) {
+      // A MEMBER's Users page lists only the debug logins they can see, so
+      // deletion follows the same lines: a non-debug account, or another
+      // person's debug login, answers 404 — the same as a bad id, so nothing
+      // invisible can be probed for. The SHARED debug login (master@master.com)
+      // stays move-only for members; deleting the one login everyone relies on
+      // is an owner's call. A member may delete their OWN debug login.
+      if (portalUser && portalUser.role !== 'OWNER') {
+        if (user.is_debug !== true || (user.debug_owner_id && user.debug_owner_id !== portalUser.id)) {
           return { status: 404 as const, body: { message: 'User not found' } };
         }
-        return { status: 403 as const, body: { message: 'The debug account can be moved between tenants, not deleted.' } };
+        if (!user.debug_owner_id) {
+          return { status: 403 as const, body: { message: 'The shared debug account can be moved between tenants, not deleted.' } };
+        }
       }
 
       if (user.company_id && ['ADMIN', 'GLOBAL_ADMIN'].includes(user.role)) {
@@ -1077,14 +1118,14 @@ const unguardedAdminSecretRoutes = {
    * rows record who did something, and rewriting them to fit a debug move would
    * falsify the customer's records.
    *
-   * Only the debug account may be moved. Everything this does is right for a
-   * login that is meant to hop tenants and wrong for a real one: a customer's
-   * user would be stripped of their branch, linked employee and permissions, and
-   * land in a company that is not theirs, with their old token still working
-   * against the old tenant. There is no legitimate reason to do that to someone,
-   * so the endpoint refuses rather than trusting the caller to aim carefully.
-   * These routes have no auth at all — the obscure path is the only gate — which
-   * makes the guard belong here and not only on the button.
+   * Only DEBUG logins (users.is_debug) may be moved. Everything this does is
+   * right for a login that is meant to hop tenants and wrong for a real one: a
+   * customer's user would be stripped of their branch, linked employee and
+   * permissions, and land in a company that is not theirs, with their old token
+   * still working against the old tenant. There is no legitimate reason to do
+   * that to someone, so the endpoint refuses rather than trusting the caller to
+   * aim carefully. A MEMBER may move their own debug login and the shared one;
+   * another person's is a 404 to them, same as the list.
    *
    * NOTE: the caller's existing JWT still carries the OLD companyId and is good
    * for up to a year — tokens are stateless with no revocation list. The moved
@@ -1097,14 +1138,19 @@ const unguardedAdminSecretRoutes = {
   }) => {
     const client = await getClient();
     try {
-      const user = await queryOne<any>('SELECT id, email, role, company_id FROM users WHERE id = $1', [params.id]);
+      await ensureDebugUserColumns();
+      const user = await queryOne<any>(
+        'SELECT id, email, role, company_id, is_debug, debug_owner_id FROM users WHERE id = $1', [params.id]);
       if (!user) return { status: 404 as const, body: { message: 'User not found' } };
 
-      if (!isDebugAccount(user.email)) {
+      if (user.is_debug !== true) {
         return {
           status: 403 as const,
-          body: { message: `Only ${DEBUG_ACCOUNT_EMAIL} can be moved between tenants` },
+          body: { message: 'Only debug logins can be moved between tenants' },
         };
+      }
+      if (!canTouchDebugUser(user, portalUser)) {
+        return { status: 404 as const, body: { message: 'User not found' } };
       }
 
       const target = await queryOne<any>('SELECT id, name FROM companies WHERE id = $1', [body?.companyId]);
@@ -1141,26 +1187,14 @@ const unguardedAdminSecretRoutes = {
                 permissions = NULL, updated_at = CURRENT_TIMESTAMP
           WHERE id = $2
           RETURNING id, email, first_name, last_name, role, is_active,
-                    email_verified, company_id, created_at`,
+                    email_verified, company_id, created_at, is_debug, debug_owner_id`,
         [target.id, user.id],
       );
       await client.query('COMMIT');
 
-      const r = moved.rows[0];
       return {
         status: 200 as const,
-        body: {
-          id: r.id,
-          email: r.email,
-          first_name: r.first_name,
-          last_name: r.last_name,
-          role: r.role,
-          is_active: r.is_active !== false,
-          email_verified: r.email_verified === true,
-          company_id: r.company_id ?? null,
-          company_name: target.name ?? null,
-          created_at: toIso(r.created_at),
-        },
+        body: { ...mapAdminUser(moved.rows[0]), company_name: target.name ?? null },
       };
     } catch (error: any) {
       await client.query('ROLLBACK').catch(() => {});

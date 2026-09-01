@@ -357,7 +357,12 @@ export class AuthService {
    * route or endpoint.
    */
   isDebugUser(): boolean {
-    return (this.currentUser()?.email ?? '').trim().toLowerCase() === 'master@master.com';
+    const user = this.currentUser();
+    // The flag rides on the login payload (users.is_debug) now that every
+    // portal user can hold their own debug login; the email check keeps the
+    // original shared login working against a cached pre-flag payload.
+    return user?.isDebug === true
+      || (user?.email ?? '').trim().toLowerCase() === 'master@master.com';
   }
 
   /**

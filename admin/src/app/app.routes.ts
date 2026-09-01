@@ -19,7 +19,9 @@ import { PortalUsersComponent } from './portal-users/portal-users.component';
 export const SECTIONS = [
   // read_trial opens the same section; the API then only serves TRIAL tenants.
   { path: 'companies', label: 'Companies', permission: ['companies.read', 'companies.read_trial'] },
-  { path: 'users', label: 'Users', permission: 'tenant_users.read' },
+  // Lists the vendor's DEBUG logins only — the console stopped browsing
+  // customers' real accounts.
+  { path: 'users', label: 'Debug users', permission: 'tenant_users.read' },
   { path: 'cards', label: 'Cards', permission: 'cards.read' },
   { path: 'bots', label: 'Telegram bots', permission: 'bots.read' },
   // No permission: it renders images from text typed into the page and reads
@@ -65,7 +67,7 @@ export const routes: Routes = [
   {
     path: 'users',
     component: TenantUsersPageComponent,
-    title: 'Users · Netrofit Admin',
+    title: 'Debug users · Netrofit Admin',
     canActivate: [sectionGuard],
     data: { permission: 'tenant_users.read' },
   },

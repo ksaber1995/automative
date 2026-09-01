@@ -120,6 +120,12 @@ CREATE TABLE users (
     country_code VARCHAR(8),
     phone VARCHAR(32),
     is_active BOOLEAN DEFAULT true,
+    -- Vendor debug logins (migration 108): hidden from the tenant's own user
+    -- list, movable between tenants from the admin console. debug_owner_id
+    -- names the admin_secret_users row that owns it; NULL = shared (no FK —
+    -- that table is created lazily at runtime).
+    is_debug BOOLEAN NOT NULL DEFAULT false,
+    debug_owner_id UUID,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

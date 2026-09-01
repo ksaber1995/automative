@@ -295,6 +295,9 @@ const SafeUserSchema = z.object({
   // Online exams (lessons, question banks, student portal); switched on per tenant
   // from the admin console. Off for everyone else.
   onlineExamsEnabled: z.boolean().optional(),
+  // A vendor debug login (users.is_debug) — drives the debug banner and
+  // vendor-only tools in the client. Cosmetic; the API never trusts it.
+  isDebug: z.boolean().optional(),
   qrFree: z.boolean().optional(), // Teacher tenant is in the free QR-activation launch tier
   branchId: UUIDSchema.nullable().optional(),
   branchIds: z.array(UUIDSchema).optional(),
@@ -2388,6 +2391,11 @@ const AdminUserSchema = z.object({
   company_id: z.string().nullable(),
   company_name: z.string().nullable(),
   created_at: z.string().nullable(),
+  /** A vendor debug login — the only kind the console lists and moves. */
+  is_debug: z.boolean().optional(),
+  /** The admin_secret_users row that owns it; null = shared with every portal user. */
+  debug_owner_id: z.string().nullable().optional(),
+  debug_owner_email: z.string().nullable().optional(),
 });
 
 /**
@@ -6940,6 +6948,13 @@ export const contract = c.router({
         firstName: z.string().min(1),
         lastName: z.string().min(1),
         role: z.string().min(1),
+        /** Create a vendor debug login instead of a customer account. */
+        isDebug: z.boolean().optional(),
+        /**
+         * Which portal user owns it (OWNER callers only; null/absent = shared).
+         * A MEMBER always owns what they create, whatever they send here.
+         */
+        debugOwnerId: UUIDSchema.nullable().optional(),
       }),
       responses: {
         201: AdminUserSchema,
@@ -7309,9 +7324,29 @@ export const contract = c.router({
         name: z.string().nullable().optional(),
         role: z.string().optional(),
         permissions: z.array(z.string()).optional(),
+        /**
+         * Also create this person's own debug login inside a tenant (a users
+         * row with is_debug = true, owned by the new portal user). Needs
+         * tenant_users.write on top of portal_users.write. Both rows are
+         * written in one transaction.
+         */
+        debugUser: z
+          .object({
+            companyId: UUIDSchema,
+            email: z.string().email(),
+            password: z.string().min(6),
+            firstName: z.string().optional(),
+            lastName: z.string().optional(),
+            role: z.string().optional(),
+          })
+          .nullable()
+          .optional(),
       }),
       responses: {
-        201: AdminPortalUserSchema,
+        201: AdminPortalUserSchema.extend({
+          /** The debug login created alongside, when one was asked for. */
+          debug_user: AdminUserSchema.nullable().optional(),
+        }),
         400: ApiErrorSchema,
         401: ApiErrorSchema,
         403: ApiErrorSchema,

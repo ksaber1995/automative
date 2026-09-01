@@ -5,7 +5,7 @@ import {
   isGlobalAdmin,
 } from '../middleware/tenant-isolation';
 import { apiError, mapThrownError } from '../utils/api-error';
-import { DEBUG_ACCOUNT_EMAIL } from '../utils/debug-account';
+import { DEBUG_ACCOUNT_EMAIL, ensureDebugUserColumns } from '../utils/debug-account';
 
 /**
  * users.role carries a CHECK listing every allowed value, so a new role is
@@ -139,13 +139,18 @@ export const usersRoutes = {
         return apiError(403, 'ERRORS.USERS.GLOBAL_ADMIN_ONLY_MANAGE', 'Only Global Admins can manage users');
       }
 
+      // The is_debug column must exist before the SELECT below reads it.
+      await ensureDebugUserColumns();
+
       let sql = `
         SELECT u.*, array_agg(ub.branch_id) FILTER (WHERE ub.branch_id IS NOT NULL) as branch_ids
         FROM users u
         LEFT JOIN user_branches ub ON ub.user_id = u.id AND ub.company_id = u.company_id
         WHERE u.company_id = $1
-          -- The vendor's debug login is parked in this tenant to reproduce what
+          -- A vendor debug login is parked in this tenant to reproduce what
           -- they see; it is not their staff and must not appear in their list.
+          -- The email check is belt-and-braces for the original shared login.
+          AND u.is_debug = false
           AND LOWER(u.email) <> $2
       `;
       const params: any[] = [context.companyId, DEBUG_ACCOUNT_EMAIL];

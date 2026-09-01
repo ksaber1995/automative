@@ -47,7 +47,11 @@ export interface CompanySubscription {
 // old one.
 export const ADMIN_ENDPOINT = environment.adminEndpoint;
 
-/** A user account inside a tenant, as this console sees it. Never a password. */
+/**
+ * A user account inside a tenant, as this console sees it. Never a password.
+ * The Users section lists DEBUG logins only, so is_debug is true on every row
+ * it renders; the flag still travels so the table can say so explicitly.
+ */
 export interface TenantUser {
   id: string;
   email: string;
@@ -59,6 +63,11 @@ export interface TenantUser {
   company_id: string | null;
   company_name: string | null;
   created_at: string | null;
+  /** A vendor debug login — hidden from the tenant, movable between tenants. */
+  is_debug?: boolean;
+  /** The portal user that owns it; null = shared with every portal user. */
+  debug_owner_id?: string | null;
+  debug_owner_email?: string | null;
 }
 
 /** Mirrors the users.role CHECK constraint in the database. */
@@ -66,6 +75,12 @@ export const USER_ROLES = [
   'ADMIN', 'ACADEMIC_MANAGER', 'SALES_MANAGER',
   'BRANCH_ADMIN', 'BRANCH_MANAGER', 'ACCOUNTANT', 'VIEWER',
 ];
+
+/**
+ * A debug login should see the whole tenant, like master@master.com does, so
+ * GLOBAL_ADMIN joins the list (and is the default) when creating one.
+ */
+export const DEBUG_USER_ROLES = ['GLOBAL_ADMIN', ...USER_ROLES];
 
 @Injectable({ providedIn: 'root' })
 export class SubscriptionsService {
@@ -206,14 +221,22 @@ export class SubscriptionsService {
     );
   }
 
-  /** Every user account, or just one tenant's. */
+  /**
+   * The vendor's debug logins (all of them for an OWNER; a member's own plus
+   * the shared ones otherwise), or just one tenant's.
+   */
   listUsers(companyId?: string): Observable<TenantUser[]> {
     const qs = companyId ? `?companyId=${encodeURIComponent(companyId)}` : '';
     return this.http.get<TenantUser[]>(`${ADMIN_ENDPOINT}/users${qs}`);
   }
 
+  /**
+   * Create an account inside a tenant. `isDebug` makes it a vendor debug login;
+   * `debugOwnerId` (owners only) says whose — null/absent means shared.
+   */
   createUser(body: {
     companyId: string; email: string; password: string; firstName: string; lastName: string; role: string;
+    isDebug?: boolean; debugOwnerId?: string | null;
   }): Observable<TenantUser> {
     return this.http.post<TenantUser>(`${ADMIN_ENDPOINT}/users`, body);
   }

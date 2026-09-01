@@ -141,6 +141,13 @@ async function buildSafeUser(user: any, branchIds: string[]) {
      * before the client notices.
      */
     onlineExamsEnabled: user.company_online_exams === true,
+    /**
+     * A vendor debug login (users.is_debug — no longer only master@master.com).
+     * The client shows its tenant warning banner and vendor-only tools off this.
+     * Undefined until the column exists (it is added lazily from the admin
+     * console routes), which safely reads as false.
+     */
+    isDebug: user.is_debug === true,
     qrFree,
     branchId: user.branch_id,
     branchIds,

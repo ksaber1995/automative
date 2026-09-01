@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { ADMIN_ENDPOINT } from '../subscriptions.service';
+import { ADMIN_ENDPOINT, TenantUser } from '../subscriptions.service';
 import { PortalUser } from '../auth/portal-auth.service';
 
 /** Who can sign in to this console. Separate from tenant users entirely. */
@@ -14,11 +14,19 @@ export class PortalUsersService {
     return this.http.get<{ users: PortalUser[]; allPermissions: string[] }>(this.base);
   }
 
+  /**
+   * `debugUser` also creates the person's own debug login inside a tenant,
+   * owned by the new portal user — one call, one transaction on the server.
+   */
   create(body: {
     email: string; password: string; name?: string | null;
     role?: string; permissions?: string[];
-  }): Observable<PortalUser> {
-    return this.http.post<PortalUser>(this.base, body);
+    debugUser?: {
+      companyId: string; email: string; password: string;
+      firstName?: string; lastName?: string; role?: string;
+    } | null;
+  }): Observable<PortalUser & { debug_user?: TenantUser | null }> {
+    return this.http.post<PortalUser & { debug_user?: TenantUser | null }>(this.base, body);
   }
 
   /** Everything optional — only what is sent changes. */

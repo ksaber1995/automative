@@ -51,6 +51,12 @@ export interface SafeUser {
    * Deliberately absent from RegisterDto: this is not a signup choice.
    */
   onlineExamsEnabled?: boolean;
+  /**
+   * A vendor debug login (users.is_debug — no longer only master@master.com).
+   * Drives the debug tenant banner and vendor-only tools. Cosmetic: the API
+   * never trusts it.
+   */
+  isDebug?: boolean;
   qrFree?: boolean;                  // Teacher tenant in the free QR-activation launch tier
   branchId?: string | null;
   branchIds?: string[];              // All branch IDs (for BRANCH_ADMIN multi-branch)
