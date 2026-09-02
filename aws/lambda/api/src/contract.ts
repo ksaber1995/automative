@@ -1,4 +1,4 @@
-import { initContract } from '@ts-rest/core';
+﻿import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
 const c = initContract();
@@ -2408,9 +2408,13 @@ const ExamModelSchema = z.object({
   id: UUIDSchema,
   name: z.string(),
   orderIndex: z.number(),
+  /** The course whose lessons and bank this model draws on. */
+  courseId: UUIDSchema.nullable().optional(),
   questionCount: z.number(),
-  /** How many students have been handed this model. Non-zero locks the models. */
+  /** How many students have been handed this model. Non-zero locks it. */
   attemptCount: z.number(),
+  /** How many exams use it — library view only. */
+  usedByExams: z.number().optional(),
   questions: z.array(z.object({
     questionId: UUIDSchema,
     orderIndex: z.number(),
@@ -3782,42 +3786,39 @@ export const contract = c.router({
   },
 
   /**
-   * EXAM MODELS — the variants ("Model A / B / C") of one online exam.
+   * EXAM MODELS — a LIBRARY of ready-made papers, built per course.
    *
-   * An exam with no models keeps its original behaviour: a pooled random paper
-   * per student. With models, each model is a FIXED question list and a student
-   * is handed one of them — at random (balanced) or by their class.
+   * Models are their own thing, like the question bank: built once for a course
+   * and reusable by any exam on it. An online exam then declares how it gets its
+   * paper (`questionSource`): RANDOM draws a fresh random paper per student from
+   * its lessons (the default, and what every existing exam does), FIXED hands
+   * out the library models linked to it.
    *
    * Every route is gated on companies.online_exams_enabled and on academy
-   * read/write, and every mutation refuses once anybody has started the exam
-   * (409 ERRORS.EXAMS.ALREADY_STARTED) — the same freeze the lesson scope has.
+   * read/write. A model locks as soon as any exam using it has been started —
+   * editing it would rewrite a paper already handed out.
    */
   examModels: {
-    list: {
+    /** The library for one course. Without courseId there is nothing to list. */
+    library: {
       method: 'GET',
-      path: '/api/exams/:examId/models',
-      pathParams: z.object({ examId: UUIDSchema }),
+      path: '/api/exam-models',
+      query: z.object({ courseId: OptionalUUIDSchema }),
       responses: {
         200: z.object({
-          /** null = no models yet, so the exam still draws a pooled paper. */
-          distribution: z.enum(['RANDOM', 'BY_CLASS']).nullable(),
-          /** Somebody has started: the models are frozen. */
-          locked: z.boolean(),
           models: z.array(ExamModelSchema),
-          /** The classes on this exam's course, for per-class assignment. */
-          classes: z.array(z.object({ id: UUIDSchema, name: z.string() })),
+          /** Ids that may no longer be edited, because an exam has sat them. */
+          locked: z.array(UUIDSchema),
         }),
         403: ApiErrorSchema,
         404: ApiErrorSchema,
       },
     },
-    // The bank a model is built from: every usable question of the exam's
-    // course, optionally narrowed to some lessons. Never carries the answer key.
+    // The bank a model is built from. Never carries the answer key.
     questionPool: {
       method: 'GET',
-      path: '/api/exams/:examId/question-pool',
-      pathParams: z.object({ examId: UUIDSchema }),
-      query: z.object({ lessonIds: z.string().optional() }),
+      path: '/api/exam-models/question-pool',
+      query: z.object({ courseId: OptionalUUIDSchema, lessonIds: z.string().optional() }),
       responses: {
         200: z.array(z.object({
           id: UUIDSchema,
@@ -3831,7 +3832,7 @@ export const contract = c.router({
     },
     /**
      * The model as a printable paper: its questions in order WITH their
-     * options, which the list route omits. `withAnswers=true` marks the correct
+     * options, which the list routes omit. `withAnswers=true` marks the correct
      * one for the marking copy.
      *
      * Option order here is the bank order; a student on screen gets them
@@ -3840,7 +3841,7 @@ export const contract = c.router({
      */
     paper: {
       method: 'GET',
-      path: '/api/exams/models/:modelId/paper',
+      path: '/api/exam-models/:modelId/paper',
       pathParams: z.object({ modelId: UUIDSchema }),
       query: z.object({ withAnswers: z.string().optional() }),
       responses: {
@@ -3869,11 +3870,11 @@ export const contract = c.router({
     },
     create: {
       method: 'POST',
-      path: '/api/exams/:examId/models',
-      pathParams: z.object({ examId: UUIDSchema }),
+      path: '/api/exam-models',
       // Either hand-pick `questionIds` (the order IS the paper order), or give
       // `lessonIds` + `questionCount` to draw that many at random ONCE, now.
       body: z.object({
+        courseId: UUIDSchema,
         name: z.string().nullable().optional(),
         questionIds: z.array(UUIDSchema).optional(),
         lessonIds: z.array(UUIDSchema).optional(),
@@ -3884,12 +3885,11 @@ export const contract = c.router({
         400: ApiErrorSchema,
         403: ApiErrorSchema,
         404: ApiErrorSchema,
-        409: ApiErrorSchema,
       },
     },
     update: {
       method: 'PATCH',
-      path: '/api/exams/models/:modelId',
+      path: '/api/exam-models/:modelId',
       pathParams: z.object({ modelId: UUIDSchema }),
       body: z.object({
         name: z.string().nullable().optional(),
@@ -3902,12 +3902,13 @@ export const contract = c.router({
         400: ApiErrorSchema,
         403: ApiErrorSchema,
         404: ApiErrorSchema,
+        // 409: an exam using this model has already been started.
         409: ApiErrorSchema,
       },
     },
     remove: {
       method: 'DELETE',
-      path: '/api/exams/models/:modelId',
+      path: '/api/exam-models/:modelId',
       pathParams: z.object({ modelId: UUIDSchema }),
       body: z.object({}).optional(),
       responses: {
@@ -3917,19 +3918,42 @@ export const contract = c.router({
         409: ApiErrorSchema,
       },
     },
-    setDistribution: {
+
+    // ── Per exam: which library models it hands out, and to whom ───────────
+    forExam: {
+      method: 'GET',
+      path: '/api/exams/:examId/models',
+      pathParams: z.object({ examId: UUIDSchema }),
+      responses: {
+        200: z.object({
+          questionSource: z.enum(['RANDOM', 'FIXED']),
+          distribution: z.enum(['RANDOM', 'BY_CLASS']).nullable(),
+          /** Somebody has started: the choice is frozen. */
+          locked: z.boolean(),
+          models: z.array(ExamModelSchema),
+          /** The whole course library, to choose from. */
+          available: z.array(ExamModelSchema),
+          classes: z.array(z.object({ id: UUIDSchema, name: z.string() })),
+        }),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    // Replaced wholesale: this is the state, not a patch. Empty modelIds puts
+    // the exam back to a random pooled paper.
+    setForExam: {
       method: 'PUT',
-      path: '/api/exams/:examId/model-distribution',
+      path: '/api/exams/:examId/models',
       pathParams: z.object({ examId: UUIDSchema }),
       body: z.object({
-        distribution: z.enum(['RANDOM', 'BY_CLASS']),
-        // Replaced wholesale. Kept when switching to RANDOM, so flipping back
-        // does not lose a mapping somebody typed in.
+        modelIds: z.array(UUIDSchema).optional(),
+        distribution: z.enum(['RANDOM', 'BY_CLASS']).optional(),
         assignments: z.array(z.object({ classId: UUIDSchema, modelId: UUIDSchema })).optional(),
       }),
       responses: {
         200: z.object({
-          distribution: z.enum(['RANDOM', 'BY_CLASS']),
+          questionSource: z.enum(['RANDOM', 'FIXED']),
+          distribution: z.enum(['RANDOM', 'BY_CLASS']).nullable(),
           models: z.array(ExamModelSchema),
         }),
         400: ApiErrorSchema,
@@ -3939,6 +3963,7 @@ export const contract = c.router({
       },
     },
   },
+
 
   // Pre-printed QR cards — a pool, printed blank, linked to a student by scanning
   qrCards: {

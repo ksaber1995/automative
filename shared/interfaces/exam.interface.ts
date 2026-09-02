@@ -93,13 +93,41 @@ export interface ExamPaperModel {
   id: string;
   name: string;
   orderIndex: number;
+  /** The course whose lessons and bank this model draws on. */
+  courseId?: string | null;
   /** Counted server-side on read, never stored — a saved count would go stale. */
   questionCount: number;
-  /** How many students have been handed it. Non-zero freezes every model. */
+  /** How many students have been handed it. */
   attemptCount: number;
+  /** How many exams use it — library view only. */
+  usedByExams?: number;
   questions: ExamPaperModelQuestion[];
   /** Classes pinned to this model, when distribution is BY_CLASS. */
   classIds: string[];
+}
+
+/** The models of one course — the sidebar library screen. */
+export interface ExamModelLibrary {
+  models: ExamPaperModel[];
+  /**
+   * Ids that may no longer be edited, because an exam using them has been
+   * started. Per model, not per library: one course can hold both a model
+   * already sat and a fresh one.
+   */
+  locked: string[];
+}
+
+/** How ONE exam gets its paper, and which library models it hands out. */
+export interface ExamModelsForExam {
+  /** RANDOM = a fresh random paper per student. FIXED = hand out `models`. */
+  questionSource: 'RANDOM' | 'FIXED';
+  distribution: ExamModelDistribution | null;
+  /** Somebody has started: the choice is frozen. */
+  locked: boolean;
+  models: ExamPaperModel[];
+  /** The whole course library, to choose from. */
+  available: ExamPaperModel[];
+  classes: { id: string; name: string }[];
 }
 
 export interface ExamPaperModelQuestion {

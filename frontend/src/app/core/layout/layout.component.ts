@@ -257,6 +257,9 @@ export class LayoutComponent implements OnInit, OnDestroy {
       // Lessons are the base of the online-exams feature, switched on per tenant
       // from the admin console — hidden entirely for everyone else.
       { labelKey: 'NAV.LESSONS', icon: 'pi pi-list-check', routerLink: ['/lessons'], visible: auth.canRead('academy') && auth.canUseOnlineExams() },
+      // The exam-model library sits beside the lessons it draws on. Write-gated:
+      // it exists to build papers, so a read-only account has nothing to do here.
+      { labelKey: 'NAV.EXAM_MODELS', icon: 'pi pi-clone', routerLink: ['/exam-models'], visible: auth.canWrite('academy') && auth.canUseOnlineExams() },
       { labelKey: 'NAV.EDUCATIONAL_BOOKS', icon: 'pi pi-book', routerLink: ['/educational-books'], visible: auth.canRead('product_sales') },
     ].filter(c => c.visible);
     if (academic.length) {

@@ -16,14 +16,12 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import {
-  ExamModelDistribution,
-  ExamModel as Exam,
   ExamPaperModel,
   ExamPoolQuestion,
   ExamPrintablePaper,
 } from '@shared/interfaces/exam.interface';
 import { ExamModelsService } from '../services/exam-models.service';
-import { ExamService } from '../services/exam.service';
+import { CourseService } from '../../courses/services/course.service';
 import { LessonService } from '../../lessons/services/lesson.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { LanguageService } from '../../../core/services/language.service';
@@ -63,16 +61,16 @@ const PAPER_CSS = `
 `;
 
 /**
- * The models (variants) of one online exam — "Test 1" with Model A / B / C.
+ * THE EXAM MODEL LIBRARY — ready-made papers, built per course.
  *
- * Its own screen rather than a section of the exam form, for two reasons: a
- * model needs the exam to exist before it can reference it, and picking
- * questions out of a bank of a hundred needs the whole width.
+ * Its own sidebar screen, like the question bank: you build "Model A / B / C"
+ * for a course once, and any exam on that course can hand them out (an exam
+ * picks its type and models on the exam itself). A retake reuses them instead
+ * of rebuilding them.
  *
- * Everything here is frozen once a single student has started (`locked`), the
- * same rule the exam's lesson scope already has — papers already drawn came
- * from these models, and editing them afterwards would leave two students
- * marked against different things under one exam name.
+ * A model locks as soon as an exam using it has been started — editing it then
+ * would rewrite a paper already handed out. The lock is per model, so a course
+ * can hold both a model already sat and a fresh one being worked on.
  */
 @Component({
   selector: 'app-exam-models',
@@ -89,7 +87,7 @@ export class ExamModelsComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private service = inject(ExamModelsService);
-  private examService = inject(ExamService);
+  private courseService = inject(CourseService);
   private lessonService = inject(LessonService);
   private notify = inject(NotificationService);
   private confirm = inject(ConfirmationService);
@@ -99,16 +97,16 @@ export class ExamModelsComponent implements OnInit {
   /** Which print is being fetched — `<modelId>` or `<modelId>:key`. */
   protected printingId = signal<string | null>(null);
 
-  protected examId = '';
-  protected exam = signal<Exam | null>(null);
+  protected courses = signal<{ id: string; name: string }[]>([]);
+  protected courseId = signal<string | null>(null);
   protected models = signal<ExamPaperModel[]>([]);
-  protected classes = signal<{ id: string; name: string }[]>([]);
-  protected distribution = signal<ExamModelDistribution | null>(null);
-  protected locked = signal(false);
-  protected loading = signal(true);
+  /** Ids an exam has already sat — not editable. */
+  protected lockedIds = signal<string[]>([]);
+  protected loading = signal(false);
+  protected loadingCourses = signal(true);
   protected saving = signal(false);
 
-  /** Lessons of this exam's course, for the "draw from lessons" mode. */
+  /** Lessons of the chosen course, for the "draw from lessons" mode. */
   protected lessons = signal<{ id: string; name: string; questionCount?: number }[]>([]);
 
   // ── The add / edit dialog ────────────────────────────────────────────────
@@ -125,24 +123,18 @@ export class ExamModelsComponent implements OnInit {
   protected poolLessonFilter = signal<string[]>([]);
   protected formError = signal<string | null>(null);
 
-  /** Per-class model choice, edited locally then saved in one call. */
-  protected assignments = signal<Record<string, string>>({});
-
-  protected readonly distributionOptions = computed(() => [
-    { label: this.translate.instant('EXAMS.MODELS.DIST_RANDOM'), value: 'RANDOM' },
-    { label: this.translate.instant('EXAMS.MODELS.DIST_BY_CLASS'), value: 'BY_CLASS' },
-  ]);
-
-  protected modelOptions = computed(() =>
-    this.models().map((m) => ({ label: `${m.name} (${m.questionCount})`, value: m.id })));
-
   /** Models differ in length — worth saying plainly, since marks then differ too. */
   protected uneven = computed(() => {
     const counts = new Set(this.models().map((m) => m.questionCount));
     return this.models().length > 1 && counts.size > 1;
   });
 
-  protected canAdd = computed(() => !this.locked() && this.models().length < 6);
+  /** A library has no ceiling; the 2–6 limit is on what ONE exam hands out. */
+  protected canAdd = computed(() => !!this.courseId());
+
+  protected isLocked(m: ExamPaperModel): boolean {
+    return this.lockedIds().includes(m.id);
+  }
 
   /** The pool, after the dialog's own search and lesson filter. */
   protected visiblePool = computed(() => {
@@ -155,33 +147,36 @@ export class ExamModelsComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.examId = this.route.snapshot.paramMap.get('id') ?? '';
-    if (!this.examId) {
-      this.router.navigate(['/exams']);
-      return;
-    }
-    this.examService.getById(this.examId).subscribe({
-      next: (e) => {
-        this.exam.set(e);
-        this.loadLessons(e.courseId);
+    this.courseService.getAllCourses().subscribe({
+      next: (rows: any[]) => {
+        this.courses.set(rows.map((c) => ({ id: c.id, name: c.name })));
+        this.loadingCourses.set(false);
+        // A models library only means anything beside one course's bank, so it
+        // opens on the first course rather than on an empty page.
+        const first = this.route.snapshot.queryParamMap.get('courseId') || rows[0]?.id;
+        if (first) this.onCourseChange(first);
       },
-      error: () => {},
+      error: () => this.loadingCourses.set(false),
     });
+  }
+
+  protected onCourseChange(courseId: string | null): void {
+    this.courseId.set(courseId);
+    this.models.set([]);
+    this.lockedIds.set([]);
+    if (!courseId) return;
+    this.loadLessons(courseId);
     this.load();
   }
 
   private load(): void {
+    const courseId = this.courseId();
+    if (!courseId) return;
     this.loading.set(true);
-    this.service.list(this.examId).subscribe({
+    this.service.library(courseId).subscribe({
       next: (res) => {
         this.models.set(res.models);
-        this.classes.set(res.classes);
-        this.distribution.set(res.distribution);
-        this.locked.set(res.locked);
-        // Rebuild the local per-class picks from what the server holds.
-        const map: Record<string, string> = {};
-        for (const m of res.models) for (const c of m.classIds) map[c] = m.id;
-        this.assignments.set(map);
+        this.lockedIds.set(res.locked ?? []);
         this.loading.set(false);
       },
       error: (err) => {
@@ -233,8 +228,10 @@ export class ExamModelsComponent implements OnInit {
   }
 
   private loadPool(): void {
+    const courseId = this.courseId();
+    if (!courseId) return;
     this.poolLoading.set(true);
-    this.service.questionPool(this.examId).subscribe({
+    this.service.questionPool(courseId).subscribe({
       next: (rows) => { this.pool.set(rows); this.poolLoading.set(false); },
       error: () => this.poolLoading.set(false),
     });
@@ -303,9 +300,10 @@ export class ExamModelsComponent implements OnInit {
 
     this.saving.set(true);
     const editing = this.editing();
+    const courseId = this.courseId()!;
     const call = editing
       ? this.service.update(editing.id, body)
-      : this.service.create(this.examId, body);
+      : this.service.create({ courseId, ...body });
 
     call.subscribe({
       next: (res) => {
@@ -314,8 +312,8 @@ export class ExamModelsComponent implements OnInit {
         this.models.set(res.models);
         this.notify.success(this.translate.instant(
           editing ? 'EXAMS.MODELS.SAVED' : 'EXAMS.MODELS.ADDED'));
-        // The first model turns the exam into a model exam server-side, and a
-        // redraw changes the counts — re-read rather than guess.
+        // Re-read rather than guess: a redraw changes counts, and the lock list
+        // is computed server-side.
         this.load();
       },
       error: (err) => {
@@ -343,43 +341,6 @@ export class ExamModelsComponent implements OnInit {
       },
     });
   }
-
-  // ── Distribution ─────────────────────────────────────────────────────────
-
-  protected setDistribution(value: ExamModelDistribution): void {
-    this.distribution.set(value);
-    this.saveDistribution();
-  }
-
-  protected assignClass(classId: string, modelId: string): void {
-    this.assignments.update((m) => ({ ...m, [classId]: modelId }));
-  }
-
-  protected saveDistribution(): void {
-    const distribution = this.distribution();
-    if (!distribution || !this.models().length) return;
-
-    const assignments = Object.entries(this.assignments())
-      .filter(([, modelId]) => !!modelId)
-      .map(([classId, modelId]) => ({ classId, modelId }));
-
-    this.saving.set(true);
-    this.service.setDistribution(this.examId, { distribution, assignments }).subscribe({
-      next: (res) => {
-        this.saving.set(false);
-        this.models.set(res.models);
-        this.notify.success(this.translate.instant('EXAMS.MODELS.DIST_SAVED'));
-      },
-      error: (err) => {
-        this.saving.set(false);
-        this.notify.error(err?.error?.message || this.translate.instant('EXAMS.MODELS.SAVE_ERROR'));
-      },
-    });
-  }
-
-  /** Classes with no model chosen — they fall back to a random one. */
-  protected unassignedClasses = computed(() =>
-    this.classes().filter((c) => !this.assignments()[c.id]));
 
   // ── Printing ─────────────────────────────────────────────────────────────
 
@@ -460,6 +421,6 @@ export class ExamModelsComponent implements OnInit {
   }
 
   protected back(): void {
-    this.router.navigate(['/exams', this.examId]);
+    this.router.navigate(['/exams']);
   }
 }

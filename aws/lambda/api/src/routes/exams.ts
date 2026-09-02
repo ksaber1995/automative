@@ -269,6 +269,10 @@ async function resolveOnlineSettings(
     return { error: 'ERRORS.EXAMS.QUESTION_COUNT_REQUIRED' };
   }
 
+  // A FIXED exam hands out library models, so its paper length comes from the
+  // model a student is given, not from this count. The count and the lesson
+  // scope are still stored and still validated: they are what the exam falls
+  // back to if its models are later removed, and what a RANDOM exam runs on.
   const pool = await lessonPoolSize(lessonIds, companyId);
   if (questionCount > pool) {
     // The pool size rides on the message so the form can say "only 14 available"

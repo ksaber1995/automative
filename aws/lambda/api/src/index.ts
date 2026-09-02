@@ -189,15 +189,17 @@ const router = {
   // rather than folded into the block above so the freeze/permission rules of
   // the models live in one file.
   examModels: {
-    list: examModelsRoutes.list,
+    // Order matters — the static `/question-pool` before `/:modelId`, and
+    // `/:modelId/paper` before the bare `/:modelId` verbs.
     questionPool: examModelsRoutes.questionPool,
-    // Before `update`/`remove`: those match /api/exams/models/:modelId, and this
-    // one is the more specific /api/exams/models/:modelId/paper.
+    library: examModelsRoutes.library,
     paper: examModelsRoutes.paper,
     create: examModelsRoutes.create,
     update: examModelsRoutes.update,
     remove: examModelsRoutes.remove,
-    setDistribution: examModelsRoutes.setDistribution,
+    // Which library models one exam hands out.
+    forExam: examModelsRoutes.forExam,
+    setForExam: examModelsRoutes.setForExam,
   },
   classes: {
     create: classesRoutes.create,

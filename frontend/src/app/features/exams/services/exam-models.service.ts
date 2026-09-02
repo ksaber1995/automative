@@ -3,48 +3,52 @@ import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import {
   ExamModelDistribution,
-  ExamModelsResponse,
+  ExamModelLibrary,
+  ExamModelsForExam,
   ExamPaperModel,
   ExamPoolQuestion,
   ExamPrintablePaper,
 } from '@shared/interfaces/exam.interface';
 
 /**
- * The models (variants) of one online exam.
+ * Exam models: a LIBRARY of ready-made papers per course, plus which of them a
+ * given exam hands out.
  *
- * Every mutation answers with the WHOLE model list rather than the one row it
- * touched, so the editor never has to patch its own state and can never drift
- * from the server — the counts, the class pinning and the lock all move
- * together.
+ * Every mutation answers with the whole list rather than the row it touched, so
+ * the screens never patch their own state and cannot drift from the server —
+ * counts, locks and class pinning all move together.
  */
 @Injectable({ providedIn: 'root' })
 export class ExamModelsService {
   private api = inject(ApiService);
 
-  list(examId: string): Observable<ExamModelsResponse> {
-    return this.api.get<ExamModelsResponse>(`exams/${examId}/models`);
+  // ── The library ───────────────────────────────────────────────────────────
+
+  library(courseId: string): Observable<ExamModelLibrary> {
+    return this.api.get<ExamModelLibrary>('exam-models', { courseId });
   }
 
   /** The bank to build from, optionally narrowed to some lessons. */
-  questionPool(examId: string, lessonIds?: string[]): Observable<ExamPoolQuestion[]> {
-    return this.api.get<ExamPoolQuestion[]>(
-      `exams/${examId}/question-pool`,
-      lessonIds?.length ? { lessonIds: lessonIds.join(',') } : undefined,
-    );
+  questionPool(courseId: string, lessonIds?: string[]): Observable<ExamPoolQuestion[]> {
+    return this.api.get<ExamPoolQuestion[]>('exam-models/question-pool', {
+      courseId,
+      ...(lessonIds?.length ? { lessonIds: lessonIds.join(',') } : {}),
+    });
   }
 
   /**
-   * Add a model. Either hand-pick `questionIds` (their order is the paper
-   * order), or pass `lessonIds` + `questionCount` to draw that many at random
-   * once, now — after which the model is fixed.
+   * Add a model to a course's library. Either hand-pick `questionIds` (their
+   * order is the paper order), or pass `lessonIds` + `questionCount` to draw
+   * that many at random once, now — after which the model is fixed.
    */
-  create(examId: string, body: {
+  create(body: {
+    courseId: string;
     name?: string | null;
     questionIds?: string[];
     lessonIds?: string[];
     questionCount?: number;
   }): Observable<{ models: ExamPaperModel[] }> {
-    return this.api.post<{ models: ExamPaperModel[] }>(`exams/${examId}/models`, body);
+    return this.api.post<{ models: ExamPaperModel[] }>('exam-models', body);
   }
 
   update(modelId: string, body: {
@@ -53,32 +57,45 @@ export class ExamModelsService {
     lessonIds?: string[];
     questionCount?: number;
   }): Observable<{ models: ExamPaperModel[] }> {
-    return this.api.patch<{ models: ExamPaperModel[] }>(`exams/models/${modelId}`, body);
+    return this.api.patch<{ models: ExamPaperModel[] }>(`exam-models/${modelId}`, body);
+  }
+
+  remove(modelId: string): Observable<{ models: ExamPaperModel[] }> {
+    return this.api.delete<{ models: ExamPaperModel[] }>(`exam-models/${modelId}`);
   }
 
   /**
    * The model as a printable paper — questions in order WITH their options,
-   * which `list` omits. `withAnswers` marks the correct one, for the marking
-   * copy; the plain sheet is what gets handed to students.
+   * which the list routes omit. `withAnswers` marks the correct one, for the
+   * marking copy; the plain sheet is what gets handed to students.
    */
   paper(modelId: string, withAnswers = false): Observable<ExamPrintablePaper> {
     return this.api.get<ExamPrintablePaper>(
-      `exams/models/${modelId}/paper`,
+      `exam-models/${modelId}/paper`,
       withAnswers ? { withAnswers: 'true' } : undefined,
     );
   }
 
-  remove(modelId: string): Observable<{ models: ExamPaperModel[] }> {
-    return this.api.delete<{ models: ExamPaperModel[] }>(`exams/models/${modelId}`);
+  // ── Per exam ──────────────────────────────────────────────────────────────
+
+  forExam(examId: string): Observable<ExamModelsForExam> {
+    return this.api.get<ExamModelsForExam>(`exams/${examId}/models`);
   }
 
-  setDistribution(examId: string, body: {
-    distribution: ExamModelDistribution;
+  /**
+   * Everything about how this exam hands out models, in one call. Replaced
+   * wholesale — it is the state, not a patch. An empty `modelIds` puts the exam
+   * back to a random pooled paper.
+   */
+  setForExam(examId: string, body: {
+    modelIds: string[];
+    distribution?: ExamModelDistribution;
     assignments?: { classId: string; modelId: string }[];
-  }): Observable<{ distribution: ExamModelDistribution; models: ExamPaperModel[] }> {
-    return this.api.put<{ distribution: ExamModelDistribution; models: ExamPaperModel[] }>(
-      `exams/${examId}/model-distribution`,
-      body,
-    );
+  }): Observable<{
+    questionSource: 'RANDOM' | 'FIXED';
+    distribution: ExamModelDistribution | null;
+    models: ExamPaperModel[];
+  }> {
+    return this.api.put(`exams/${examId}/models`, body);
   }
 }

@@ -1,0 +1,190 @@
+<div class="container mx-auto p-6">
+  <div class="flex items-start justify-between flex-wrap gap-3 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">{{ 'EXAMS.MODELS.ASSIGN_TITLE' | translate }}</h1>
+      <p class="text-sm text-gray-500 mt-1">
+        {{ exam()?.name }} · {{ 'EXAMS.MODELS.ASSIGN_SUBTITLE' | translate }}
+      </p>
+    </div>
+    <div class="flex gap-2">
+      <p-button
+        [label]="'EXAMS.MODELS.BACK' | translate"
+        icon="pi pi-arrow-left"
+        severity="secondary"
+        [outlined]="true"
+        (onClick)="back()"
+      ></p-button>
+      <p-button
+        [label]="'EXAMS.MODELS.OPEN_LIBRARY' | translate"
+        icon="pi pi-clone"
+        severity="secondary"
+        [outlined]="true"
+        (onClick)="openLibrary()"
+      ></p-button>
+    </div>
+  </div>
+
+  @if (locked()) {
+    <div class="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-4 flex items-start gap-3">
+      <i class="pi pi-lock text-amber-600 mt-0.5"></i>
+      <div class="text-sm text-amber-800">{{ 'EXAMS.MODELS.LOCKED' | translate }}</div>
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="text-center py-16 text-gray-400"><i class="pi pi-spin pi-spinner text-2xl"></i></div>
+  } @else {
+
+    <!-- Where the paper comes from -->
+    <p-card styleClass="mb-5">
+      <h2 class="text-base font-semibold text-gray-800 mb-1">{{ 'EXAMS.MODELS.SOURCE_TITLE' | translate }}</h2>
+      <p class="text-sm text-gray-500 mb-4">{{ 'EXAMS.MODELS.SOURCE_HINT' | translate }}</p>
+
+      <div class="flex flex-col gap-3">
+        <label class="flex items-start gap-3 cursor-pointer">
+          <input type="radio" name="src" class="mt-1" value="RANDOM"
+            [checked]="source() === 'RANDOM'" [disabled]="locked()"
+            (change)="source.set('RANDOM')" />
+          <span>
+            <span class="text-sm font-medium text-gray-800">{{ 'EXAMS.MODELS.SRC_RANDOM' | translate }}</span>
+            <small class="block text-gray-500">{{ 'EXAMS.MODELS.SRC_RANDOM_HINT' | translate }}</small>
+          </span>
+        </label>
+        <label class="flex items-start gap-3 cursor-pointer">
+          <input type="radio" name="src" class="mt-1" value="FIXED"
+            [checked]="source() === 'FIXED'" [disabled]="locked()"
+            (change)="source.set('FIXED')" />
+          <span>
+            <span class="text-sm font-medium text-gray-800">{{ 'EXAMS.MODELS.SRC_FIXED' | translate }}</span>
+            <small class="block text-gray-500">{{ 'EXAMS.MODELS.SRC_FIXED_HINT' | translate }}</small>
+          </span>
+        </label>
+      </div>
+    </p-card>
+
+    @if (source() === 'FIXED') {
+      <!-- Which library models this exam hands out -->
+      <p-card styleClass="mb-5">
+        <h2 class="text-base font-semibold text-gray-800 mb-1">{{ 'EXAMS.MODELS.CHOOSE_TITLE' | translate }}</h2>
+        <p class="text-sm text-gray-500 mb-4">
+          {{ 'EXAMS.MODELS.CHOOSE_HINT' | translate: { max: MAX } }}
+        </p>
+
+        @if (!available().length) {
+          <div class="text-center py-8">
+            <p class="text-gray-500 mb-4">{{ 'EXAMS.MODELS.NONE_IN_LIBRARY' | translate }}</p>
+            <p-button [label]="'EXAMS.MODELS.OPEN_LIBRARY' | translate" icon="pi pi-clone"
+              (onClick)="openLibrary()"></p-button>
+          </div>
+        } @else {
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            @for (m of available(); track m.id) {
+              <label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer"
+                [class.border-indigo-400]="isChosen(m.id)"
+                [class.bg-indigo-50]="isChosen(m.id)"
+                [class.border-gray-200]="!isChosen(m.id)">
+                <input type="checkbox" class="mt-1" [checked]="isChosen(m.id)"
+                  [disabled]="locked()" (change)="toggleModel(m.id)" />
+                <span class="flex-1">
+                  <span class="text-sm font-medium text-gray-900">{{ m.name }}</span>
+                  <span class="block text-xs text-gray-500">
+                    {{ 'EXAMS.MODELS.N_QUESTIONS' | translate: { count: m.questionCount } }}
+                  </span>
+                </span>
+              </label>
+            }
+          </div>
+
+          @if (uneven()) {
+            <div class="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+              {{ 'EXAMS.MODELS.UNEVEN' | translate }}
+            </div>
+          }
+        }
+      </p-card>
+
+      @if (chosen().length) {
+        <!-- How they are handed out -->
+        <p-card styleClass="mb-5">
+          <h2 class="text-base font-semibold text-gray-800 mb-1">{{ 'EXAMS.MODELS.DIST_TITLE' | translate }}</h2>
+          <p class="text-sm text-gray-500 mb-4">{{ 'EXAMS.MODELS.DIST_HINT' | translate }}</p>
+
+          <div class="flex flex-col gap-3">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="radio" name="dist" class="mt-1" value="RANDOM"
+                [checked]="distribution() === 'RANDOM'" [disabled]="locked()"
+                (change)="distribution.set('RANDOM')" />
+              <span>
+                <span class="text-sm font-medium text-gray-800">{{ 'EXAMS.MODELS.DIST_RANDOM' | translate }}</span>
+                <small class="block text-gray-500">{{ 'EXAMS.MODELS.DIST_RANDOM_HINT' | translate }}</small>
+              </span>
+            </label>
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="radio" name="dist" class="mt-1" value="BY_CLASS"
+                [checked]="distribution() === 'BY_CLASS'" [disabled]="locked()"
+                (change)="distribution.set('BY_CLASS')" />
+              <span>
+                <span class="text-sm font-medium text-gray-800">{{ 'EXAMS.MODELS.DIST_BY_CLASS' | translate }}</span>
+                <small class="block text-gray-500">{{ 'EXAMS.MODELS.DIST_BY_CLASS_HINT' | translate }}</small>
+              </span>
+            </label>
+          </div>
+
+          @if (distribution() === 'BY_CLASS') {
+            <div class="mt-5 pt-5 border-t border-gray-100">
+              @if (!classes().length) {
+                <small class="text-amber-600">{{ 'EXAMS.MODELS.NO_CLASSES' | translate }}</small>
+              } @else {
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead>
+                      <tr class="text-gray-500">
+                        <th class="py-2">{{ 'EXAMS.MODELS.COL_CLASS' | translate }}</th>
+                        <th class="py-2">{{ 'EXAMS.MODELS.COL_MODEL' | translate }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (c of classes(); track c.id) {
+                        <tr class="border-t border-gray-100">
+                          <td class="py-2 font-medium text-gray-800">{{ c.name }}</td>
+                          <td class="py-2">
+                            <p-select
+                              [options]="modelOptions()"
+                              optionLabel="label"
+                              optionValue="value"
+                              [ngModel]="assignments()[c.id] || null"
+                              (ngModelChange)="assignClass(c.id, $event)"
+                              [disabled]="locked()"
+                              [placeholder]="'EXAMS.MODELS.PICK_MODEL' | translate"
+                              [style]="{ minWidth: '220px' }"
+                            ></p-select>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+
+                @if (unassignedClasses().length) {
+                  <small class="block text-amber-600 mt-3">
+                    {{ 'EXAMS.MODELS.UNASSIGNED_FALLBACK' | translate: { count: unassignedClasses().length } }}
+                  </small>
+                }
+              }
+            </div>
+          }
+        </p-card>
+      }
+    }
+
+    <div class="flex justify-end">
+      <p-button
+        [label]="'EXAMS.MODELS.SAVE' | translate"
+        icon="pi pi-check"
+        [loading]="saving()"
+        [disabled]="!canSave()"
+        (onClick)="save()"
+      ></p-button>
+    </div>
+  }
+</div>

@@ -22,12 +22,15 @@ export const EXAMS_ROUTES: Routes = [
       import('./exam-form/exam-form.component').then((m) => m.ExamFormComponent),
   },
   // Before ':id', so the literal segment is not read as an exam id.
+  // This is the per-exam choice (type + which models + per-class); the models
+  // themselves are built in the library at /exam-models.
   {
     path: ':id/models',
     canActivate: [permissionGuard('academy', 'write')],
     data: { breadcrumb: 'BREADCRUMBS.EDIT' },
     loadComponent: () =>
-      import('./exam-models/exam-models.component').then((m) => m.ExamModelsComponent),
+      import('./exam-model-assign/exam-model-assign.component')
+        .then((m) => m.ExamModelAssignComponent),
   },
   {
     path: ':id',

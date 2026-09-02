@@ -1,37 +1,37 @@
-<div class="container mx-auto p-6">
+﻿<div class="container mx-auto p-6">
   <div class="flex items-start justify-between flex-wrap gap-3 mb-6">
     <div>
       <h1 class="text-2xl font-bold text-gray-900">{{ 'EXAMS.MODELS.TITLE' | translate }}</h1>
-      <p class="text-sm text-gray-500 mt-1">
-        {{ exam()?.name }} · {{ 'EXAMS.MODELS.SUBTITLE' | translate }}
-      </p>
+      <p class="text-sm text-gray-500 mt-1">{{ 'EXAMS.MODELS.LIBRARY_SUBTITLE' | translate }}</p>
     </div>
-    <div class="flex gap-2">
+    @if (canAdd()) {
       <p-button
-        [label]="'EXAMS.MODELS.BACK' | translate"
-        icon="pi pi-arrow-left"
-        severity="secondary"
-        [outlined]="true"
-        (onClick)="back()"
+        [label]="'EXAMS.MODELS.ADD' | translate"
+        icon="pi pi-plus"
+        (onClick)="openAdd()"
       ></p-button>
-      @if (canAdd()) {
-        <p-button
-          [label]="'EXAMS.MODELS.ADD' | translate"
-          icon="pi pi-plus"
-          (onClick)="openAdd()"
-        ></p-button>
-      }
-    </div>
+    }
   </div>
 
-  @if (locked()) {
-    <!-- Same freeze the lesson scope has: a paper already drawn came from these
-         models, so changing them now would mark two students differently. -->
-    <div class="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-4 flex items-start gap-3">
-      <i class="pi pi-lock text-amber-600 mt-0.5"></i>
-      <div class="text-sm text-amber-800">{{ 'EXAMS.MODELS.LOCKED' | translate }}</div>
-    </div>
-  }
+  <!-- A model draws on ONE course's lessons and bank, so the course comes first. -->
+  <div class="mb-6 max-w-md">
+    <label for="course" class="block text-sm font-medium text-gray-700 mb-2">
+      {{ 'EXAMS.MODELS.COURSE' | translate }}
+    </label>
+    <p-select
+      inputId="course"
+      [ngModel]="courseId()"
+      (ngModelChange)="onCourseChange($event)"
+      [options]="courses()"
+      optionLabel="name"
+      optionValue="id"
+      [filter]="true"
+      filterBy="name"
+      [loading]="loadingCourses()"
+      [placeholder]="'EXAMS.MODELS.COURSE_PLACEHOLDER' | translate"
+      styleClass="w-full"
+    ></p-select>
+  </div>
 
   @if (loading()) {
     <div class="text-center py-16 text-gray-400"><i class="pi pi-spin pi-spinner text-2xl"></i></div>
@@ -52,85 +52,6 @@
       </p-card>
     } @else {
 
-      <!-- How the models are handed out -->
-      <p-card styleClass="mb-5">
-        <h2 class="text-base font-semibold text-gray-800 mb-1">{{ 'EXAMS.MODELS.DIST_TITLE' | translate }}</h2>
-        <p class="text-sm text-gray-500 mb-4">{{ 'EXAMS.MODELS.DIST_HINT' | translate }}</p>
-
-        <div class="flex flex-col gap-3">
-          @for (opt of distributionOptions(); track opt.value) {
-            <label class="flex items-start gap-3 cursor-pointer">
-              <input type="radio" name="dist" class="mt-1"
-                [value]="opt.value"
-                [checked]="distribution() === opt.value"
-                [disabled]="locked() || saving()"
-                (change)="setDistribution($any(opt.value))" />
-              <span>
-                <span class="text-sm font-medium text-gray-800">{{ opt.label }}</span>
-                <small class="block text-gray-500">
-                  {{ (opt.value === 'RANDOM' ? 'EXAMS.MODELS.DIST_RANDOM_HINT' : 'EXAMS.MODELS.DIST_BY_CLASS_HINT') | translate }}
-                </small>
-              </span>
-            </label>
-          }
-        </div>
-
-        @if (distribution() === 'BY_CLASS') {
-          <div class="mt-5 pt-5 border-t border-gray-100">
-            @if (!classes().length) {
-              <small class="text-amber-600">{{ 'EXAMS.MODELS.NO_CLASSES' | translate }}</small>
-            } @else {
-              <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                  <thead>
-                    <tr class="text-gray-500">
-                      <th class="py-2">{{ 'EXAMS.MODELS.COL_CLASS' | translate }}</th>
-                      <th class="py-2">{{ 'EXAMS.MODELS.COL_MODEL' | translate }}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (c of classes(); track c.id) {
-                      <tr class="border-t border-gray-100">
-                        <td class="py-2 font-medium text-gray-800">{{ c.name }}</td>
-                        <td class="py-2">
-                          <p-select
-                            [options]="modelOptions()"
-                            optionLabel="label"
-                            optionValue="value"
-                            [ngModel]="assignments()[c.id] || null"
-                            (ngModelChange)="assignClass(c.id, $event)"
-                            [disabled]="locked() || saving()"
-                            [placeholder]="'EXAMS.MODELS.PICK_MODEL' | translate"
-                            [style]="{ minWidth: '220px' }"
-                          ></p-select>
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-
-              @if (unassignedClasses().length) {
-                <small class="block text-amber-600 mt-3">
-                  {{ 'EXAMS.MODELS.UNASSIGNED_FALLBACK' | translate: { count: unassignedClasses().length } }}
-                </small>
-              }
-
-              <div class="mt-4">
-                <p-button
-                  [label]="'EXAMS.MODELS.SAVE_DIST' | translate"
-                  icon="pi pi-check"
-                  size="small"
-                  [loading]="saving()"
-                  [disabled]="locked()"
-                  (onClick)="saveDistribution()"
-                ></p-button>
-              </div>
-            }
-          </div>
-        }
-      </p-card>
-
       @if (uneven()) {
         <div class="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-4 flex items-start gap-3">
           <i class="pi pi-info-circle text-blue-600 mt-0.5"></i>
@@ -145,10 +66,16 @@
             <div class="flex items-start justify-between gap-3 mb-3">
               <div>
                 <h3 class="text-base font-semibold text-gray-900">{{ m.name }}</h3>
-                <div class="flex items-center gap-2 mt-1">
+                <div class="flex items-center gap-2 mt-1 flex-wrap">
                   <p-tag [value]="'EXAMS.MODELS.N_QUESTIONS' | translate: { count: m.questionCount }" severity="info"></p-tag>
+                  @if (m.usedByExams) {
+                    <p-tag [value]="'EXAMS.MODELS.N_EXAMS' | translate: { count: m.usedByExams }" severity="secondary"></p-tag>
+                  }
                   @if (m.attemptCount > 0) {
                     <p-tag [value]="'EXAMS.MODELS.N_SAT' | translate: { count: m.attemptCount }" severity="secondary"></p-tag>
+                  }
+                  @if (isLocked(m)) {
+                    <p-tag icon="pi pi-lock" [value]="'EXAMS.MODELS.IN_USE' | translate" severity="warn"></p-tag>
                   }
                 </div>
               </div>
@@ -163,7 +90,9 @@
                   [loading]="printingId() === m.id + ':key'"
                   [pTooltip]="'EXAMS.MODELS.PRINT_KEY' | translate"
                   (onClick)="print(m, true)"></p-button>
-                @if (!locked()) {
+                <!-- A model in use by a started exam is read-only: editing it
+                     would rewrite a paper already handed out. -->
+                @if (!isLocked(m)) {
                   <p-button icon="pi pi-pencil" [rounded]="true" [text]="true" severity="warn"
                     [pTooltip]="'EXAMS.MODELS.EDIT' | translate" (onClick)="openEdit(m)"></p-button>
                   <p-button icon="pi pi-trash" [rounded]="true" [text]="true" severity="danger"
@@ -171,12 +100,6 @@
                 }
               </div>
             </div>
-
-            @if (distribution() === 'BY_CLASS' && m.classIds.length) {
-              <div class="text-xs text-gray-500 mb-2">
-                {{ 'EXAMS.MODELS.N_CLASSES' | translate: { count: m.classIds.length } }}
-              </div>
-            }
 
             <ol class="text-sm text-gray-700 space-y-1 max-h-64 overflow-y-auto ps-5 list-decimal">
               @for (q of m.questions; track q.questionId) {

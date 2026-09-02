@@ -156,6 +156,16 @@ export const routes: Routes = [
         loadChildren: () => import('./features/lessons/lessons.routes').then(m => m.LESSONS_ROUTES)
       },
       {
+        // The exam-model LIBRARY: ready-made papers per course, built like the
+        // question bank and reused by any exam on that course. Same gate as
+        // lessons — it is part of the online-exams feature.
+        path: 'exam-models',
+        canActivate: [permissionGuard('academy', 'write'), onlineExamsGuard],
+        data: { breadcrumb: 'BREADCRUMBS.EXAM_MODELS' },
+        loadComponent: () => import('./features/exams/exam-models/exam-models.component')
+          .then(m => m.ExamModelsComponent)
+      },
+      {
         path: 'classes',
         canActivate: [permissionGuard('academy')],
         data: { breadcrumb: 'BREADCRUMBS.CLASSES' },
