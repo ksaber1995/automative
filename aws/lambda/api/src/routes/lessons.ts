@@ -300,7 +300,11 @@ export const lessonsRoutes = {
         if (branchFilter) sql += ` AND (${branchFilter} OR l.branch_id IS NULL)`;
       }
 
-      sql += ' ORDER BY l.order_index, l.created_at';
+      // Course first, so a list spanning courses (no courseId — the Lessons page
+      // before anything is picked) groups instead of interleaving two curricula
+      // by position. Within one course c.name is constant, so this is the same
+      // order the per-course list always had.
+      sql += ' ORDER BY c.name, l.order_index, l.created_at';
 
       const rows = await query(sql, params);
       return { status: 200 as const, body: rows.map(mapLessonFromDB) };

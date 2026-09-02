@@ -93,6 +93,9 @@ export class LessonListComponent implements OnInit {
 
   ngOnInit() {
     this.loadCourses();
+    // Every lesson the tenant has, before any course is chosen — the course
+    // picker narrows the list rather than being the thing that reveals it.
+    this.loadLessons();
   }
 
   loadCourses() {
@@ -101,11 +104,8 @@ export class LessonListComponent implements OnInit {
       next: (courses) => {
         this.courses.set(courses.map((c) => ({ id: c.id, name: c.name })));
         this.loadingCourses.set(false);
-        // Land on something useful: with one course there is nothing to choose.
-        if (courses.length === 1) {
-          this.selectedCourseId.set(courses[0].id);
-          this.loadLessons();
-        }
+        // No auto-select any more: the list already shows every lesson, so
+        // pre-picking the only course would just re-fetch the same rows.
       },
       error: () => {
         this.notificationService.error(this.translate.instant('LESSONS.LIST.COURSES_LOAD_ERROR'));
@@ -116,15 +116,16 @@ export class LessonListComponent implements OnInit {
 
   onCourseChange(courseId: string | null) {
     this.selectedCourseId.set(courseId);
-    this.lessons.set([]);
-    if (courseId) this.loadLessons();
+    // Clearing the picker goes back to every lesson rather than to an empty
+    // page — the filter is a narrowing, not a prerequisite.
+    this.loadLessons();
   }
 
   loadLessons() {
     const courseId = this.selectedCourseId();
-    if (!courseId) return;
     this.loading.set(true);
-    this.lessonService.getAll({ courseId }).subscribe({
+    // No course = the whole tenant's lessons; the API treats courseId as optional.
+    this.lessonService.getAll(courseId ? { courseId } : {}).subscribe({
       next: (lessons) => {
         this.lessons.set(lessons);
         this.loading.set(false);

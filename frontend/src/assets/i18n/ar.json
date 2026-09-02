@@ -2372,6 +2372,7 @@
       "PICK_COURSE_FIRST": "اختر كورسًا أولاً",
       "NO_COURSE_SELECTED": "اختر كورسًا لعرض دروسه.",
       "COL_NAME": "الدرس",
+      "COL_COURSE": "الكورس",
       "COL_QUESTIONS": "الأسئلة",
       "COL_ACTIONS": "إجراءات",
       "NO_QUESTIONS": "لا يوجد بعد",

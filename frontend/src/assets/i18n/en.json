@@ -2372,6 +2372,7 @@
       "PICK_COURSE_FIRST": "Select a course first",
       "NO_COURSE_SELECTED": "Select a course to see its lessons.",
       "COL_NAME": "Lesson",
+      "COL_COURSE": "Course",
       "COL_QUESTIONS": "Questions",
       "COL_ACTIONS": "Actions",
       "NO_QUESTIONS": "None yet",
