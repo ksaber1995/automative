@@ -454,6 +454,93 @@ export const examModelsRoutes = {
   },
 
   /**
+   * GET /api/exams/models/:modelId/paper?withAnswers=true
+   *
+   * The whole model as a paper: its questions in order, each with its OPTIONS —
+   * which the list route deliberately omits, because it only needs text.
+   *
+   * `withAnswers` marks the correct option, for the marking copy. Off unless
+   * asked: the key is fine on a teacher screen (the question bank editor shows
+   * it to the same permission), but it should travel only when it is wanted,
+   * not by default on every print.
+   *
+   * NOTE ON OPTION ORDER: this is the BANK order. A student sitting on screen
+   * gets their options shuffled per attempt when shuffle_options is on, so a
+   * printed sheet will not match any one student's screen order — which is
+   * correct for a paper handed out on paper, and worth knowing before using
+   * this sheet to mark screens by hand.
+   */
+  paper: async ({ params, query: q, headers }: {
+    params: { modelId: string };
+    query?: { withAnswers?: string };
+    headers: AuthHeaders;
+  }) => {
+    try {
+      const g = await guard(headers, 'read');
+      if (g.denied) return g.denied;
+      const companyId = g.context!.companyId;
+
+      const model = await queryOne<any>(
+        `SELECT m.id, m.name, e.name AS exam_name, e.exam_date, e.duration_minutes
+           FROM exam_models m JOIN exams e ON e.id = m.exam_id
+          WHERE m.id = $1 AND m.company_id = $2`,
+        [params.modelId, companyId],
+      );
+      if (!model) return apiError(404, 'ERRORS.EXAM_MODELS.NOT_FOUND', 'Model not found');
+
+      const withAnswers = q?.withAnswers === 'true';
+
+      const rows = await query<any>(
+        `SELECT emq.order_index, q.id AS question_id, q.question_text, q.explanation,
+                l.name AS lesson_name
+           FROM exam_model_questions emq
+           JOIN lesson_questions q ON q.id = emq.question_id
+           LEFT JOIN lessons l ON l.id = q.lesson_id
+          WHERE emq.model_id = $1
+          ORDER BY emq.order_index`,
+        [model.id],
+      );
+
+      const optionRows = rows.length
+        ? await query<any>(
+            `SELECT question_id, option_text, is_correct, order_index
+               FROM lesson_question_options
+              WHERE question_id = ANY($1::uuid[])
+              ORDER BY question_id, order_index`,
+            [rows.map((r) => r.question_id)],
+          )
+        : [];
+
+      return {
+        status: 200 as const,
+        body: {
+          examName: model.exam_name,
+          examDate: model.exam_date ? new Date(model.exam_date).toISOString().slice(0, 10) : null,
+          durationMinutes: model.duration_minutes ?? null,
+          modelName: model.name,
+          questionCount: rows.length,
+          withAnswers,
+          questions: rows.map((r) => ({
+            orderIndex: r.order_index,
+            questionText: r.question_text,
+            lessonName: r.lesson_name ?? null,
+            explanation: withAnswers ? (r.explanation ?? null) : null,
+            options: optionRows
+              .filter((o) => o.question_id === r.question_id)
+              .map((o) => ({
+                text: o.option_text,
+                ...(withAnswers ? { isCorrect: o.is_correct === true } : {}),
+              })),
+          })),
+        },
+      };
+    } catch (error) {
+      console.error('Exam model paper error:', error);
+      return mapThrownError(error, 'ERRORS.EXAM_MODELS.LIST_FAILED', 'Failed to load the paper');
+    }
+  },
+
+  /**
    * POST /api/exams/:examId/models
    * Add a model, built one of two ways:
    *   { questionIds: [...] }                  — hand-picked from the bank, in order

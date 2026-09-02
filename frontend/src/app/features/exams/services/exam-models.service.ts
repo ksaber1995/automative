@@ -6,6 +6,7 @@ import {
   ExamModelsResponse,
   ExamPaperModel,
   ExamPoolQuestion,
+  ExamPrintablePaper,
 } from '@shared/interfaces/exam.interface';
 
 /**
@@ -53,6 +54,18 @@ export class ExamModelsService {
     questionCount?: number;
   }): Observable<{ models: ExamPaperModel[] }> {
     return this.api.patch<{ models: ExamPaperModel[] }>(`exams/models/${modelId}`, body);
+  }
+
+  /**
+   * The model as a printable paper — questions in order WITH their options,
+   * which `list` omits. `withAnswers` marks the correct one, for the marking
+   * copy; the plain sheet is what gets handed to students.
+   */
+  paper(modelId: string, withAnswers = false): Observable<ExamPrintablePaper> {
+    return this.api.get<ExamPrintablePaper>(
+      `exams/models/${modelId}/paper`,
+      withAnswers ? { withAnswers: 'true' } : undefined,
+    );
   }
 
   remove(modelId: string): Observable<{ models: ExamPaperModel[] }> {

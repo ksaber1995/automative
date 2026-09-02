@@ -37,8 +37,16 @@ export function section(title: string, head: string, body: string, empty: string
     : `<p class="empty">${esc(empty)}</p>`);
 }
 
-export function openPrintWindow(opts: { title: string; rtl: boolean; body: string; landscape?: boolean }): void {
-  const { title, rtl, body, landscape } = opts;
+/**
+ * `extraCss` is appended AFTER the house rules, so a page that is not a report
+ * can override them — an exam paper needs readable body text and room between
+ * questions, where the reports want a dense 11px table. Everything else (page
+ * margins, the heading and meta line, Arabic direction) stays shared.
+ */
+export function openPrintWindow(opts: {
+  title: string; rtl: boolean; body: string; landscape?: boolean; extraCss?: string;
+}): void {
+  const { title, rtl, body, landscape, extraCss } = opts;
   const w = window.open('', '_blank', 'width=900,height=700');
   if (!w) return;
 
@@ -73,6 +81,7 @@ export function openPrintWindow(opts: { title: string; rtl: boolean; body: strin
           /* Keep a row whole and repeat the header when a table spans pages. */
           thead { display: table-header-group; }
           tr { page-break-inside: avoid; }
+          ${extraCss ?? ''}
         </style>
       </head>
       <body>${body}</body>

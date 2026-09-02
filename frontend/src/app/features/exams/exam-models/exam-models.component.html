@@ -152,14 +152,24 @@
                   }
                 </div>
               </div>
-              @if (!locked()) {
-                <div class="flex gap-1">
+              <div class="flex gap-1">
+                <!-- Printing stays available after the exam is locked: that is
+                     exactly when somebody wants the paper or the marking copy. -->
+                <p-button icon="pi pi-print" [rounded]="true" [text]="true" severity="info"
+                  [loading]="printingId() === m.id"
+                  [pTooltip]="'EXAMS.MODELS.PRINT' | translate"
+                  (onClick)="print(m)"></p-button>
+                <p-button icon="pi pi-check-square" [rounded]="true" [text]="true" severity="success"
+                  [loading]="printingId() === m.id + ':key'"
+                  [pTooltip]="'EXAMS.MODELS.PRINT_KEY' | translate"
+                  (onClick)="print(m, true)"></p-button>
+                @if (!locked()) {
                   <p-button icon="pi pi-pencil" [rounded]="true" [text]="true" severity="warn"
                     [pTooltip]="'EXAMS.MODELS.EDIT' | translate" (onClick)="openEdit(m)"></p-button>
                   <p-button icon="pi pi-trash" [rounded]="true" [text]="true" severity="danger"
                     [pTooltip]="'EXAMS.MODELS.DELETE' | translate" (onClick)="confirmRemove(m)"></p-button>
-                </div>
-              }
+                }
+              </div>
             </div>
 
             @if (distribution() === 'BY_CLASS' && m.classIds.length) {

@@ -3829,6 +3829,44 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    /**
+     * The model as a printable paper: its questions in order WITH their
+     * options, which the list route omits. `withAnswers=true` marks the correct
+     * one for the marking copy.
+     *
+     * Option order here is the bank order; a student on screen gets them
+     * shuffled per attempt, so this sheet is the paper, not a mirror of any one
+     * student's screen.
+     */
+    paper: {
+      method: 'GET',
+      path: '/api/exams/models/:modelId/paper',
+      pathParams: z.object({ modelId: UUIDSchema }),
+      query: z.object({ withAnswers: z.string().optional() }),
+      responses: {
+        200: z.object({
+          examName: z.string(),
+          examDate: z.string().nullable(),
+          durationMinutes: z.number().nullable(),
+          modelName: z.string(),
+          questionCount: z.number(),
+          withAnswers: z.boolean(),
+          questions: z.array(z.object({
+            orderIndex: z.number(),
+            questionText: z.string(),
+            lessonName: z.string().nullable(),
+            explanation: z.string().nullable(),
+            options: z.array(z.object({
+              text: z.string(),
+              /** Only present when withAnswers was asked for. */
+              isCorrect: z.boolean().optional(),
+            })),
+          })),
+        }),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
     create: {
       method: 'POST',
       path: '/api/exams/:examId/models',

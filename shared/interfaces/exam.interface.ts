@@ -123,6 +123,31 @@ export interface ExamModelsResponse {
   classes: { id: string; name: string }[];
 }
 
+/**
+ * A model rendered as a paper: questions in order WITH their options, which the
+ * model list omits.
+ *
+ * Option order is the BANK order. A student sitting on screen gets them shuffled
+ * per attempt when shuffle_options is on, so this sheet is the paper in its own
+ * right, not a mirror of any one student's screen.
+ */
+export interface ExamPrintablePaper {
+  examName: string;
+  examDate: string | null;
+  durationMinutes: number | null;
+  modelName: string;
+  questionCount: number;
+  /** Whether the correct options are marked — the marking copy. */
+  withAnswers: boolean;
+  questions: {
+    orderIndex: number;
+    questionText: string;
+    lessonName: string | null;
+    explanation: string | null;
+    options: { text: string; isCorrect?: boolean }[];
+  }[];
+}
+
 /** A bank question as the model builder browses it. Never carries the key. */
 export interface ExamPoolQuestion {
   id: string;

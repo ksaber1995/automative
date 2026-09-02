@@ -191,6 +191,9 @@ const router = {
   examModels: {
     list: examModelsRoutes.list,
     questionPool: examModelsRoutes.questionPool,
+    // Before `update`/`remove`: those match /api/exams/models/:modelId, and this
+    // one is the more specific /api/exams/models/:modelId/paper.
+    paper: examModelsRoutes.paper,
     create: examModelsRoutes.create,
     update: examModelsRoutes.update,
     remove: examModelsRoutes.remove,
