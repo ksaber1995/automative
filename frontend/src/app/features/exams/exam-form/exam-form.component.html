@@ -118,6 +118,41 @@
 
           @if (isOnline()) {
             <div class="grid grid-cols-1 gap-5 mt-5 pt-5 border-t border-indigo-100">
+              <!-- Where the paper comes from. A fixed exam needs nothing but a
+                   name here: its models are attached afterwards. -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  {{ 'EXAMS.MODELS.SOURCE_TITLE' | translate }}
+                </label>
+                <div class="flex flex-col gap-2">
+                  <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="radio" class="mt-1" value="RANDOM" formControlName="questionSource"
+                      [attr.disabled]="scopeLocked() ? true : null" />
+                    <span>
+                      <span class="text-sm font-medium text-gray-800">{{ 'EXAMS.MODELS.SRC_RANDOM' | translate }}</span>
+                      <small class="block text-gray-500">{{ 'EXAMS.MODELS.SRC_RANDOM_HINT' | translate }}</small>
+                    </span>
+                  </label>
+                  <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="radio" class="mt-1" value="FIXED" formControlName="questionSource"
+                      [attr.disabled]="scopeLocked() ? true : null" />
+                    <span>
+                      <span class="text-sm font-medium text-gray-800">{{ 'EXAMS.MODELS.SRC_FIXED' | translate }}</span>
+                      <small class="block text-gray-500">{{ 'EXAMS.MODELS.SRC_FIXED_HINT' | translate }}</small>
+                    </span>
+                  </label>
+                </div>
+                @if (isFixed()) {
+                  <div class="mt-3 rounded-md bg-white border border-indigo-200 p-3 text-sm text-gray-600">
+                    {{ 'EXAMS.MODELS.FIXED_NEXT_STEP' | translate }}
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- Random only: the pool it draws from, and how much of it. -->
+            @if (!isFixed()) {
+            <div class="grid grid-cols-1 gap-5 mt-5 pt-5 border-t border-indigo-100">
               <!-- Which lessons the paper is drawn from. Stored as ids, never as a
                    rule, so the scope can't widen after the fact. -->
               <div>
@@ -192,8 +227,11 @@
                 }
                 <small class="block text-gray-400">{{ 'EXAMS.ONLINE.QUESTION_COUNT_HINT' | translate }}</small>
               </div>
+            </div>
+            }
 
-              <!-- Duration + window -->
+            <!-- Duration and window apply to both kinds: a fixed paper is timed too. -->
+            <div class="grid grid-cols-1 gap-5 mt-5 pt-5 border-t border-indigo-100">
               <div>
                 <label for="durationMinutes" class="block text-sm font-medium text-gray-700 mb-2">
                   {{ 'EXAMS.ONLINE.DURATION' | translate }} <span class="text-red-500">*</span>

@@ -80,6 +80,12 @@
                 </div>
               </div>
               <div class="flex gap-1">
+                <!-- Read it on screen first: "which one is Model B again?" should
+                     not cost a print dialog. -->
+                <p-button icon="pi pi-eye" [rounded]="true" [text]="true" severity="secondary"
+                  [loading]="viewLoadingId() === m.id"
+                  [pTooltip]="'EXAMS.MODELS.VIEW' | translate"
+                  (onClick)="view(m)"></p-button>
                 <!-- Printing stays available after the exam is locked: that is
                      exactly when somebody wants the paper or the marking copy. -->
                 <p-button icon="pi pi-print" [rounded]="true" [text]="true" severity="info"
@@ -247,6 +253,75 @@
         [loading]="saving()" (onClick)="save()"></p-button>
     </ng-template>
   </p-dialog>
+
+  <!-- Read a model on screen: the whole paper, with the answers behind a toggle -->
+  @if (viewing(); as p) {
+    <p-dialog
+      [visible]="true"
+      (visibleChange)="!$event && viewing.set(null)"
+      [modal]="true"
+      [style]="{ width: '760px' }"
+      [header]="viewingName()"
+    >
+      <div class="flex items-center justify-between gap-3 flex-wrap pb-3 mb-4 border-b border-gray-200">
+        <div class="text-sm text-gray-500">
+          {{ 'EXAMS.MODELS.N_QUESTIONS' | translate: { count: p.questionCount } }}
+        </div>
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" [checked]="showAnswers()" (change)="showAnswers.set(!showAnswers())" />
+          <span>{{ 'EXAMS.MODELS.SHOW_ANSWERS' | translate }}</span>
+        </label>
+      </div>
+
+      @if (!p.questions.length) {
+        <p class="text-gray-500 py-6 text-center">{{ 'EXAMS.MODELS.PRINT_EMPTY' | translate }}</p>
+      }
+
+      <ol class="space-y-5 list-none p-0 m-0">
+        @for (q of p.questions; track q.orderIndex) {
+          <li>
+            <div class="flex gap-3">
+              <span class="shrink-0 w-6 h-6 rounded-full bg-gray-100 text-gray-700 text-xs font-bold flex items-center justify-center">
+                {{ q.orderIndex }}
+              </span>
+              <div class="flex-1">
+                <div class="font-medium text-gray-900">{{ q.questionText }}</div>
+                <ul class="mt-2 space-y-1 list-none p-0">
+                  @for (o of q.options; track $index) {
+                    <li class="flex items-baseline gap-2 text-sm"
+                        [class.font-bold]="showAnswers() && o.isCorrect"
+                        [class.text-green-700]="showAnswers() && o.isCorrect">
+                      <span class="text-gray-500 font-semibold w-4 shrink-0">{{ optionLetter($index) }}.</span>
+                      <span>{{ o.text }}</span>
+                      @if (showAnswers() && o.isCorrect) {
+                        <i class="pi pi-check text-green-600 text-xs"></i>
+                      }
+                    </li>
+                  }
+                </ul>
+                @if (showAnswers() && q.explanation) {
+                  <div class="mt-2 text-xs text-gray-600 bg-gray-50 border-s-2 border-gray-300 px-3 py-2">
+                    {{ q.explanation }}
+                  </div>
+                }
+                @if (q.lessonName) {
+                  <div class="mt-1 text-xs text-gray-400">{{ q.lessonName }}</div>
+                }
+              </div>
+            </div>
+          </li>
+        }
+      </ol>
+
+      <ng-template pTemplate="footer">
+        <p-button [label]="'EXAMS.MODELS.PRINT' | translate" icon="pi pi-print"
+          severity="secondary" [outlined]="true" (onClick)="printFromView(false)"></p-button>
+        <p-button [label]="'EXAMS.MODELS.PRINT_KEY' | translate" icon="pi pi-check-square"
+          severity="secondary" [outlined]="true" (onClick)="printFromView(true)"></p-button>
+        <p-button [label]="'EXAMS.MODELS.CLOSE' | translate" (onClick)="viewing.set(null)"></p-button>
+      </ng-template>
+    </p-dialog>
+  }
 
   <p-confirmDialog></p-confirmDialog>
 </div>

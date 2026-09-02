@@ -93,6 +93,15 @@ export class ExamFormComponent implements OnInit {
   private isOnlineKind = signal(false);
   isOnline = computed(() => this.isOnlineKind());
 
+  /**
+   * The exam hands out ready-made models instead of drawing a random paper. Its
+   * lessons and question count are then irrelevant, so the form stops asking
+   * for them — the exam is created with just a name and set up afterwards on its
+   * Models screen.
+   */
+  private fixedModels = signal(false);
+  isFixed = computed(() => this.fixedModels());
+
   /** Lessons of the selected course, each carrying its question count. */
   lessons = signal<LessonModel[]>([]);
   loadingLessons = signal(false);
@@ -153,6 +162,9 @@ export class ExamFormComponent implements OnInit {
       status: ['SCHEDULED', [Validators.required]],
       // ── Online exam ──────────────────────────────────────────────────────
       isOnline: [false],
+      // RANDOM draws a paper per student from the lessons below; FIXED hands out
+      // exam models attached to the exam after it is saved.
+      questionSource: ['RANDOM'],
       lessonIds: [[] as string[]],
       questionCount: [10],
       durationMinutes: [30],
@@ -163,6 +175,8 @@ export class ExamFormComponent implements OnInit {
     });
 
     this.form.get('isOnline')!.valueChanges.subscribe((v: boolean) => this.isOnlineKind.set(v === true));
+    this.form.get('questionSource')!.valueChanges
+      .subscribe((v: string) => this.fixedModels.set(v === 'FIXED'));
     this.form.get('lessonIds')!.valueChanges.subscribe((ids: string[]) => this.selectedLessonIds.set(ids ?? []));
     this.form.get('questionCount')!.valueChanges.subscribe((v: unknown) => this.askedQuestionCount.set(Number(v ?? 0)));
     this.askedQuestionCount.set(Number(this.form.get('questionCount')!.value ?? 0));
@@ -278,6 +292,7 @@ export class ExamFormComponent implements OnInit {
           maxGrade: row.maxGrade ?? null,
           status: row.status,
           isOnline: row.isOnline === true,
+          questionSource: row.questionSource === 'FIXED' ? 'FIXED' : 'RANDOM',
           questionCount: row.questionCount ?? 10,
           durationMinutes: row.durationMinutes ?? 30,
           opensAt: row.opensAt ? new Date(row.opensAt) : null,
@@ -310,7 +325,10 @@ export class ExamFormComponent implements OnInit {
     const v = this.form.value;
     // Both are enforced server-side; blocking here means the teacher is told at the
     // field rather than by a failed save.
-    if (v.isOnline === true) {
+    // A FIXED exam's paper comes from the models attached to it afterwards, so
+    // it needs no lessons and no count — the point of it is to create the exam
+    // first and decide what is on it later.
+    if (v.isOnline === true && v.questionSource !== 'FIXED') {
       if (!v.lessonIds?.length) {
         this.notifications.error(this.translate.instant('ERRORS.EXAMS.LESSONS_REQUIRED'));
         return;
@@ -334,9 +352,13 @@ export class ExamFormComponent implements OnInit {
     };
 
     if (v.isOnline === true) {
+      const fixed = v.questionSource === 'FIXED';
       payload.isOnline = true;
-      payload.lessonIds = v.lessonIds ?? [];
-      payload.questionCount = Number(v.questionCount);
+      payload.questionSource = fixed ? 'FIXED' : 'RANDOM';
+      // A fixed exam sends neither: its paper is whichever model a student is
+      // handed, and sending a stale count would put a wrong "out of" on the row.
+      payload.lessonIds = fixed ? [] : (v.lessonIds ?? []);
+      if (!fixed) payload.questionCount = Number(v.questionCount);
       payload.durationMinutes = Number(v.durationMinutes);
       payload.opensAt = v.opensAt ? new Date(v.opensAt).toISOString() : null;
       payload.closesAt = v.closesAt ? new Date(v.closesAt).toISOString() : null;

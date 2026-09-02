@@ -34,30 +34,75 @@ type BuildMode = 'PICK' | 'DRAW';
  * An exam paper is not a report: it needs readable body text and room to write,
  * where the shared print stylesheet is a dense 11px table. Appended after the
  * house rules, so it overrides only what it must.
+ *
+ * The `@media screen` block is the important one. The shared sheet sets
+ * `body { margin: 0 }` and leaves the page edges to `@page`, which only applies
+ * to actual printing — so in the popup (and in the browser's own print preview)
+ * the paper sat flush against the window with nothing around it and looked
+ * unstyled. Screen gets its own padding and a readable measure; print keeps the
+ * @page margins so the two do not stack.
  */
 const PAPER_CSS = `
-  body { font-size: 13px; line-height: 1.5; }
-  h1 { font-size: 20px; }
-  .model-line { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
-  .model-name { font-size: 15px; font-weight: 700; }
-  .key-badge {
-    border: 1px solid #b91c1c; color: #b91c1c; border-radius: 4px;
-    padding: 1px 6px; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  @media screen {
+    body {
+      padding: 32px 36px 48px;
+      max-width: 820px;
+      margin: 0 auto;
+      background: #fff;
+    }
   }
-  /* Name / class / mark, for the copy that gets handed out. */
-  .fields { display: flex; gap: 14px; margin: 12px 0 18px; }
-  .field { flex: 1; border-bottom: 1px solid #9ca3af; padding-bottom: 2px; color: #6b7280; font-size: 11px; }
-  .field.short { flex: 0 0 90px; }
-  /* A question is never split across a page break — half a question is useless. */
-  .q { page-break-inside: avoid; margin: 0 0 14px; }
-  .q-head { display: flex; gap: 6px; font-weight: 600; }
-  .q-n { min-width: 18px; }
-  .opts { list-style: none; margin: 6px 0 0; padding: 0 0 0 24px; }
-  .opts li { display: flex; gap: 6px; padding: 2px 0; }
-  .opts .letter { min-width: 16px; color: #6b7280; }
-  .opts li.correct { font-weight: 700; }
-  .opts .tick { color: #047857; }
-  .expl { margin: 4px 0 0 24px; color: #6b7280; font-size: 11px; font-style: italic; }
+  body { font-size: 13.5px; line-height: 1.6; color: #111827; }
+
+  /* ── Header ─────────────────────────────────────────────── */
+  .head { border-bottom: 2px solid #111827; padding-bottom: 10px; margin-bottom: 4px; }
+  h1 { font-size: 19px; margin: 0 0 6px; }
+  .model-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .model-name {
+    font-size: 14px; font-weight: 700; background: #111827; color: #fff;
+    border-radius: 4px; padding: 3px 12px;
+  }
+  .key-badge {
+    border: 1.5px solid #b91c1c; color: #b91c1c; border-radius: 4px;
+    padding: 2px 8px; font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .meta { color: #6b7280; font-size: 11.5px; margin: 8px 0 0; }
+
+  /* ── Name / class / mark, on the copy that gets handed out ── */
+  .fields { display: flex; gap: 18px; margin: 18px 0 26px; }
+  .field {
+    flex: 1; border-bottom: 1px solid #9ca3af; padding: 0 2px 4px;
+    color: #6b7280; font-size: 11px;
+  }
+  .field.short { flex: 0 0 110px; }
+
+  /* ── Questions ──────────────────────────────────────────── */
+  /* Never split a question across a page break — half a question is useless. */
+  .q { page-break-inside: avoid; break-inside: avoid; margin: 0 0 18px; }
+  .q-head { display: flex; gap: 10px; align-items: baseline; }
+  .q-n {
+    flex: 0 0 24px; height: 24px; border-radius: 50%; background: #f3f4f6;
+    color: #374151; font-weight: 700; font-size: 12px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .q-t { font-weight: 600; flex: 1; }
+  .opts { list-style: none; margin: 8px 0 0; padding: 0; }
+  /* Indent under the number bubble, on whichever side the page reads from. */
+  .opts li {
+    display: flex; gap: 8px; padding: 3px 0; margin-inline-start: 34px;
+    align-items: baseline;
+  }
+  .opts .letter {
+    flex: 0 0 auto; min-width: 20px; color: #6b7280; font-weight: 600;
+  }
+  .opts li.correct { font-weight: 700; color: #065f46; }
+  .opts .tick { color: #047857; font-weight: 700; }
+  .expl {
+    margin: 6px 0 0 34px; padding: 6px 10px; background: #f9fafb;
+    border-inline-start: 3px solid #d1d5db;
+    color: #4b5563; font-size: 11.5px;
+  }
+  .empty { color: #6b7280; }
 `;
 
 /**
@@ -342,6 +387,64 @@ export class ExamModelsComponent implements OnInit {
     });
   }
 
+  // ── Viewing ──────────────────────────────────────────────────────────────
+
+  /**
+   * Read the paper on screen before committing it to paper — the common case is
+   * "which one is Model B again?", which should not cost a print dialog.
+   *
+   * Fetched WITH the answers and toggled client-side, so ticking the box does
+   * not go back to the server. It is a teacher screen; the question bank editor
+   * already shows the key to the same permission.
+   */
+  protected viewing = signal<ExamPrintablePaper | null>(null);
+  protected viewingName = signal('');
+  protected showAnswers = signal(false);
+  protected viewLoadingId = signal<string | null>(null);
+
+  protected view(m: ExamPaperModel): void {
+    this.viewLoadingId.set(m.id);
+    this.showAnswers.set(false);
+    this.service.paper(m.id, true).subscribe({
+      next: (paper) => {
+        this.viewLoadingId.set(null);
+        this.viewingName.set(m.name);
+        this.viewing.set(paper);
+      },
+      error: (err) => {
+        this.viewLoadingId.set(null);
+        this.notify.error(err?.error?.message || this.translate.instant('EXAMS.MODELS.PRINT_ERROR'));
+      },
+    });
+  }
+
+  /** A..J for the option letters, matching the printed sheet. */
+  protected optionLetter(index: number): string {
+    return 'ABCDEFGHIJ'[index] ?? String(index + 1);
+  }
+
+  /** Print straight from the preview, without hunting for the row again. */
+  protected printFromView(withAnswers: boolean): void {
+    const paper = this.viewing();
+    if (!paper) return;
+    openPrintWindow({
+      title: `${paper.examName} — ${paper.modelName}`,
+      rtl: this.language.isRtl(),
+      extraCss: PAPER_CSS,
+      // The preview holds the answers whether or not they are on screen, so the
+      // printed copy is built from a filtered view of the same paper.
+      body: this.paperHtml(withAnswers ? paper : {
+        ...paper,
+        withAnswers: false,
+        questions: paper.questions.map((q) => ({
+          ...q,
+          explanation: null,
+          options: q.options.map((o) => ({ text: o.text })),
+        })),
+      }),
+    });
+  }
+
   // ── Printing ─────────────────────────────────────────────────────────────
 
   /**
@@ -410,12 +513,14 @@ export class ExamModelsComponent implements OnInit {
     }).join('');
 
     return `
-      <h1>${esc(p.examName)}</h1>
-      <div class="model-line">
-        <span class="model-name">${esc(p.modelName)}</span>
-        ${p.withAnswers ? `<span class="key-badge">${esc(t('EXAMS.MODELS.PRINT_KEY_BADGE'))}</span>` : ''}
+      <div class="head">
+        <h1>${esc(p.examName)}</h1>
+        <div class="model-line">
+          <span class="model-name">${esc(p.modelName)}</span>
+          ${p.withAnswers ? `<span class="key-badge">${esc(t('EXAMS.MODELS.PRINT_KEY_BADGE'))}</span>` : ''}
+        </div>
+        ${meta ? `<div class="meta">${esc(meta)}</div>` : ''}
       </div>
-      <div class="meta">${esc(meta)}</div>
       ${nameFields}
       ${questions || `<p class="empty">${esc(t('EXAMS.MODELS.PRINT_EMPTY'))}</p>`}`;
   }

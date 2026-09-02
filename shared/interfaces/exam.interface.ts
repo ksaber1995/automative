@@ -29,7 +29,15 @@ export interface ExamModel {
    * computed on submit. Same table, same results feed — see online_exams.md.
    */
   isOnline: boolean;
-  /** How many questions to draw. Equals `maxGrade`: one mark per question. */
+  /**
+   * RANDOM = a fresh random paper per student, drawn from this exam's lessons.
+   * FIXED = hand out the exam models attached to it.
+   */
+  questionSource?: 'RANDOM' | 'FIXED';
+  /**
+   * How many questions to draw. Equals `maxGrade`: one mark per question. NULL
+   * on a FIXED exam, whose length is whichever model the student is handed.
+   */
   questionCount: number | null;
   /** The clock each student gets, counted from when THEY start. */
   durationMinutes: number | null;
@@ -209,9 +217,16 @@ export interface ExamCreateDto {
   sessionId?: string | null;
   // ── Online exam ───────────────────────────────────────────────────────────
   isOnline?: boolean;
-  /** Required when `isOnline`. Must all belong to the exam's course. */
+  /**
+   * Where the paper comes from. RANDOM (the default) draws it per student from
+   * `lessonIds`, which are then required along with `questionCount`. FIXED means
+   * the exam hands out models attached afterwards, so both become optional — an
+   * exam can be created with just its name, course and date and set up later.
+   */
+  questionSource?: 'RANDOM' | 'FIXED';
+  /** Required for a RANDOM online exam. Must all belong to the exam's course. */
   lessonIds?: string[];
-  /** Required when `isOnline`, and never more than the selected lessons hold. */
+  /** Required for a RANDOM online exam, and never more than its lessons hold. */
   questionCount?: number;
   durationMinutes?: number;
   opensAt?: string | null;

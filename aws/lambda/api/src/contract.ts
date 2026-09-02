@@ -1086,6 +1086,13 @@ const OnlineExamFieldsSchema = z.object({
   accessCode: z.string().max(12).nullable().optional(),
   shuffleOptions: z.boolean().optional(),
   showAnswers: z.boolean().optional(),
+  /**
+   * Where the paper comes from. RANDOM (the default) draws it per student from
+   * `lessonIds`, which are then required along with `questionCount`. FIXED means
+   * the exam hands out models attached afterwards, so both become optional — an
+   * exam can be created with just its name, course and date and set up later.
+   */
+  questionSource: z.enum(['RANDOM', 'FIXED']).optional(),
 });
 
 const CreateExamSchema = z.object({

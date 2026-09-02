@@ -159,9 +159,14 @@ function shuffle<T>(items: T[]): T[] {
  * honest. Two simultaneous starts race on UNIQUE (exam_id, student_id); the
  * loser rolls back and resumes the winner's paper.
  */
-async function drawPaper(exam: any, student: StudentContext): Promise<any | 'CONFLICT'> {
+async function drawPaper(exam: any, student: StudentContext): Promise<any | 'CONFLICT' | 'NO_PAPER'> {
   await ensureExamModelSchema();
   const modelId = await pickModel(exam, student.studentId);
+
+  // Nothing to draw FROM: a fixed exam whose models were never attached, or a
+  // pooled one with no question count. Refused rather than dealt as an empty
+  // paper, which would be graded 0/0 and look like the student's fault.
+  if (!modelId && !Number.isFinite(parseInt(exam.question_count, 10))) return 'NO_PAPER';
 
   const drawn = modelId
     ? await loadModelQuestions(modelId, student.companyId)
@@ -406,6 +411,12 @@ export const studentExamsRoutes = {
       }
 
       const result = await drawPaper(exam, s);
+      if (result === 'NO_PAPER') {
+        // The teacher has not finished setting the exam up. Said plainly rather
+        // than handing over a blank paper that would grade 0/0.
+        return apiError(409, 'ERRORS.EXAMS.NOT_READY',
+          'This exam has not been set up yet — ask your teacher');
+      }
       if (result === 'CONFLICT') {
         // A parallel start won the unique constraint — serve their paper.
         attempt = await findAttempt(exam.id, s.studentId);

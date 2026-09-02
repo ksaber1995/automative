@@ -251,6 +251,17 @@ async function resolveOnlineSettings(
   companyId: string,
   existing?: any,
 ): Promise<{ error: string; detail?: string } | { columns: Record<string, any>; lessonIds: string[] }> {
+  /**
+   * FIXED means the paper comes from the models attached afterwards, so an exam
+   * can be created with nothing but its name, course and date — which is how
+   * anybody actually works: name the exam, then decide what is on it.
+   *
+   * A lesson scope and question count are therefore OPTIONAL here, and required
+   * as ever for a RANDOM exam, which has nothing else to draw from.
+   */
+  const source = String(body.questionSource ?? existing?.question_source ?? 'RANDOM').toUpperCase();
+  const fixed = source === 'FIXED';
+
   const requestedLessons: string[] = Array.isArray(body.lessonIds)
     ? body.lessonIds
     : existing
@@ -258,26 +269,30 @@ async function resolveOnlineSettings(
       : [];
 
   const lessonIds = await lessonsInCourse(requestedLessons, courseId, companyId);
-  if (!lessonIds.length) return { error: 'ERRORS.EXAMS.LESSONS_REQUIRED' };
+  if (!fixed && !lessonIds.length) return { error: 'ERRORS.EXAMS.LESSONS_REQUIRED' };
   if (Array.isArray(body.lessonIds) && lessonIds.length !== body.lessonIds.length) {
     return { error: 'ERRORS.EXAMS.LESSON_COURSE_MISMATCH' };
   }
 
   const rawCount = body.questionCount ?? existing?.question_count;
-  const questionCount = rawCount === null || rawCount === undefined ? NaN : parseInt(rawCount, 10);
-  if (!Number.isFinite(questionCount) || questionCount < 1) {
+  const hasCount = rawCount !== null && rawCount !== undefined && String(rawCount) !== '';
+  const questionCount = hasCount ? parseInt(rawCount, 10) : NaN;
+  if (!fixed && (!Number.isFinite(questionCount) || questionCount < 1)) {
+    return { error: 'ERRORS.EXAMS.QUESTION_COUNT_REQUIRED' };
+  }
+  if (fixed && hasCount && (!Number.isFinite(questionCount) || questionCount < 1)) {
     return { error: 'ERRORS.EXAMS.QUESTION_COUNT_REQUIRED' };
   }
 
-  // A FIXED exam hands out library models, so its paper length comes from the
-  // model a student is given, not from this count. The count and the lesson
-  // scope are still stored and still validated: they are what the exam falls
-  // back to if its models are later removed, and what a RANDOM exam runs on.
-  const pool = await lessonPoolSize(lessonIds, companyId);
-  if (questionCount > pool) {
-    // The pool size rides on the message so the form can say "only 14 available"
-    // instead of a flat refusal.
-    return { error: 'ERRORS.EXAMS.NOT_ENOUGH_QUESTIONS', detail: `Only ${pool} questions available` };
+  // Only worth checking against the pool when the exam will actually draw from
+  // it: a count that exceeds the bank is harmless on an exam that never draws.
+  if (Number.isFinite(questionCount) && lessonIds.length) {
+    const pool = await lessonPoolSize(lessonIds, companyId);
+    if (questionCount > pool) {
+      // The pool size rides on the message so the form can say "only 14
+      // available" instead of a flat refusal.
+      return { error: 'ERRORS.EXAMS.NOT_ENOUGH_QUESTIONS', detail: `Only ${pool} questions available` };
+    }
   }
 
   const rawDuration = body.durationMinutes ?? existing?.duration_minutes;
@@ -308,11 +323,15 @@ async function resolveOnlineSettings(
     lessonIds,
     columns: {
       is_online: true,
-      question_count: questionCount,
+      question_source: fixed ? 'FIXED' : 'RANDOM',
+      // NULL on a FIXED exam with no count of its own: its length is whichever
+      // model the student is handed, and exam_attempts.total / exam_results.out_of
+      // carry that per student.
+      question_count: Number.isFinite(questionCount) ? questionCount : null,
       // Every question is worth one mark, so the paper is out of its own length.
       // Mirroring it into max_grade is what makes the existing "17/20" displays,
       // the results feed and the SMS/Telegram blast correct with no changes.
-      max_grade: questionCount,
+      max_grade: Number.isFinite(questionCount) ? questionCount : null,
       duration_minutes: durationMinutes,
       opens_at: opensAt,
       closes_at: closesAt,
@@ -1172,7 +1191,11 @@ export const examsRoutes = {
         const targetCourse = updateData.course_id ?? existing.course_id;
         const scopeChanged =
           (Array.isArray(body.lessonIds) && body.lessonIds.length > 0) ||
-          (body.questionCount !== undefined && parseInt(body.questionCount, 10) !== existing.question_count);
+          (body.questionCount !== undefined && parseInt(body.questionCount, 10) !== existing.question_count) ||
+          // Switching between a random paper and fixed models changes what every
+          // student sits, so it freezes with the rest of the scope.
+          (body.questionSource !== undefined
+            && String(body.questionSource).toUpperCase() !== (existing.question_source ?? 'RANDOM'));
         if (scopeChanged && (await examHasAttempts(params.id))) {
           return apiError(409, 'ERRORS.EXAMS.ALREADY_STARTED', 'Students have already started this exam');
         }
