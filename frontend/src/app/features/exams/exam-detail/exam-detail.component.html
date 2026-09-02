@@ -57,6 +57,18 @@
           [loading]="savingStatus()"
           (onClick)="toggleStatus()"
         ></p-button>
+        <!-- Models (variants A/B/C) live on their own screen: they need the exam
+             to exist first, and picking questions needs the width. -->
+        @if (isOnline()) {
+          <p-button
+            icon="pi pi-clone"
+            severity="secondary"
+            [outlined]="true"
+            [label]="'EXAMS.MODELS.MANAGE' | translate"
+            [pTooltip]="'EXAMS.MODELS.MANAGE_HINT' | translate"
+            (onClick)="manageModels()"
+          ></p-button>
+        }
         <p-button
           icon="pi pi-cog"
           severity="secondary"
@@ -101,6 +113,8 @@
           <ng-template pTemplate="header">
             <tr>
               <th>{{ 'EXAMS.DETAIL.COL_STUDENT' | translate }}</th>
+              <!-- Only on an exam that has models; a pooled exam has nothing to name. -->
+              @if (hasModels()) { <th>{{ 'EXAMS.MODELS.COL_MODEL' | translate }}</th> }
               <th>{{ 'EXAMS.ONLINE.COL_STATUS' | translate }}</th>
               <th>{{ 'EXAMS.ONLINE.COL_STARTED' | translate }}</th>
               <th>{{ 'EXAMS.ONLINE.COL_ANSWERED' | translate }}</th>
@@ -115,6 +129,13 @@
                 {{ row.name }}
                 @if (row.code != null) { <span class="text-gray-400 text-sm ms-1">#{{ row.code }}</span> }
               </td>
+              @if (hasModels()) {
+                <td>
+                  @if (row.modelName) {
+                    <p-tag [value]="row.modelName" severity="secondary"></p-tag>
+                  } @else { <span class="text-gray-400">—</span> }
+                </td>
+              }
               <td>
                 <p-tag [value]="('EXAMS.ONLINE.STATUS.' + row.status) | translate"
                        [severity]="attemptStatusSeverity(row.status)"></p-tag>
@@ -143,7 +164,7 @@
           </ng-template>
           <ng-template pTemplate="emptymessage">
             <tr>
-              <td [attr.colspan]="canDelete() ? 7 : 6" class="text-center py-6 text-gray-500">
+              <td [attr.colspan]="(canDelete() ? 7 : 6) + (hasModels() ? 1 : 0)" class="text-center py-6 text-gray-500">
                 {{ 'EXAMS.ONLINE.MONITOR_EMPTY' | translate }}
               </td>
             </tr>

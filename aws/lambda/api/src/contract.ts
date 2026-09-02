@@ -1156,6 +1156,12 @@ const ExamAttemptRowSchema = z.object({
   score: z.number().nullable(),
   total: z.number().nullable(),
   answeredCount: z.number(),
+  /**
+   * The model this student was handed, on an exam that has models. Null on a
+   * pooled exam, where each paper is its own random draw and there is nothing
+   * to name.
+   */
+  modelName: z.string().nullable().optional(),
 });
 
 // The student's exam-portal credential as the teacher may see it: existence and
@@ -2390,6 +2396,32 @@ const WaMessageSchema = z.object({
 // API Contract
 // =============================================
 /** A user account as the owner's admin console sees it — never a password. */
+/**
+ * One model (variant) of an online exam, with its fixed paper.
+ *
+ * `questionCount` is counted on read rather than stored — a saved count would go
+ * stale the moment a bank question was deleted underneath the model. Models are
+ * allowed to differ in length; exam_attempts.total and exam_results.out_of carry
+ * what each student was actually marked out of.
+ */
+const ExamModelSchema = z.object({
+  id: UUIDSchema,
+  name: z.string(),
+  orderIndex: z.number(),
+  questionCount: z.number(),
+  /** How many students have been handed this model. Non-zero locks the models. */
+  attemptCount: z.number(),
+  questions: z.array(z.object({
+    questionId: UUIDSchema,
+    orderIndex: z.number(),
+    questionText: z.string(),
+    lessonId: UUIDSchema.nullable(),
+    lessonName: z.string().nullable(),
+  })),
+  /** Classes pinned to this model, for BY_CLASS distribution. */
+  classIds: z.array(UUIDSchema),
+});
+
 const AdminUserSchema = z.object({
   id: z.string(),
   email: z.string(),
@@ -3746,6 +3778,127 @@ export const contract = c.router({
       pathParams: z.object({ id: UUIDSchema }),
       body: z.object({}).optional(),
       responses: { 200: z.any(), 403: ApiErrorSchema, 404: ApiErrorSchema },
+    },
+  },
+
+  /**
+   * EXAM MODELS — the variants ("Model A / B / C") of one online exam.
+   *
+   * An exam with no models keeps its original behaviour: a pooled random paper
+   * per student. With models, each model is a FIXED question list and a student
+   * is handed one of them — at random (balanced) or by their class.
+   *
+   * Every route is gated on companies.online_exams_enabled and on academy
+   * read/write, and every mutation refuses once anybody has started the exam
+   * (409 ERRORS.EXAMS.ALREADY_STARTED) — the same freeze the lesson scope has.
+   */
+  examModels: {
+    list: {
+      method: 'GET',
+      path: '/api/exams/:examId/models',
+      pathParams: z.object({ examId: UUIDSchema }),
+      responses: {
+        200: z.object({
+          /** null = no models yet, so the exam still draws a pooled paper. */
+          distribution: z.enum(['RANDOM', 'BY_CLASS']).nullable(),
+          /** Somebody has started: the models are frozen. */
+          locked: z.boolean(),
+          models: z.array(ExamModelSchema),
+          /** The classes on this exam's course, for per-class assignment. */
+          classes: z.array(z.object({ id: UUIDSchema, name: z.string() })),
+        }),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    // The bank a model is built from: every usable question of the exam's
+    // course, optionally narrowed to some lessons. Never carries the answer key.
+    questionPool: {
+      method: 'GET',
+      path: '/api/exams/:examId/question-pool',
+      pathParams: z.object({ examId: UUIDSchema }),
+      query: z.object({ lessonIds: z.string().optional() }),
+      responses: {
+        200: z.array(z.object({
+          id: UUIDSchema,
+          questionText: z.string(),
+          lessonId: UUIDSchema.nullable(),
+          lessonName: z.string().nullable(),
+        })),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+      },
+    },
+    create: {
+      method: 'POST',
+      path: '/api/exams/:examId/models',
+      pathParams: z.object({ examId: UUIDSchema }),
+      // Either hand-pick `questionIds` (the order IS the paper order), or give
+      // `lessonIds` + `questionCount` to draw that many at random ONCE, now.
+      body: z.object({
+        name: z.string().nullable().optional(),
+        questionIds: z.array(UUIDSchema).optional(),
+        lessonIds: z.array(UUIDSchema).optional(),
+        questionCount: z.number().int().min(1).optional(),
+      }),
+      responses: {
+        201: z.object({ models: z.array(ExamModelSchema) }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        409: ApiErrorSchema,
+      },
+    },
+    update: {
+      method: 'PATCH',
+      path: '/api/exams/models/:modelId',
+      pathParams: z.object({ modelId: UUIDSchema }),
+      body: z.object({
+        name: z.string().nullable().optional(),
+        questionIds: z.array(UUIDSchema).optional(),
+        lessonIds: z.array(UUIDSchema).optional(),
+        questionCount: z.number().int().min(1).optional(),
+      }),
+      responses: {
+        200: z.object({ models: z.array(ExamModelSchema) }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        409: ApiErrorSchema,
+      },
+    },
+    remove: {
+      method: 'DELETE',
+      path: '/api/exams/models/:modelId',
+      pathParams: z.object({ modelId: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: {
+        200: z.object({ models: z.array(ExamModelSchema) }),
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        409: ApiErrorSchema,
+      },
+    },
+    setDistribution: {
+      method: 'PUT',
+      path: '/api/exams/:examId/model-distribution',
+      pathParams: z.object({ examId: UUIDSchema }),
+      body: z.object({
+        distribution: z.enum(['RANDOM', 'BY_CLASS']),
+        // Replaced wholesale. Kept when switching to RANDOM, so flipping back
+        // does not lose a mapping somebody typed in.
+        assignments: z.array(z.object({ classId: UUIDSchema, modelId: UUIDSchema })).optional(),
+      }),
+      responses: {
+        200: z.object({
+          distribution: z.enum(['RANDOM', 'BY_CLASS']),
+          models: z.array(ExamModelSchema),
+        }),
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        404: ApiErrorSchema,
+        409: ApiErrorSchema,
+      },
     },
   },
 

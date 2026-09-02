@@ -107,6 +107,13 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   attemptsLoading = signal(false);
   resettingId = signal<string | null>(null);
 
+  /**
+   * Does this exam hand out models? Read off the attempts rather than fetched
+   * separately: the server names the model on every row that has one, so one
+   * named model anywhere means the Model column is worth a place.
+   */
+  hasModels = computed(() => this.attempts().some((a) => !!a.modelName));
+
   /** serverNow − deviceNow at the last poll; the countdown column adds it back. */
   private clockSkewMs = 0;
   /** Re-pulls the attempt list while the sitting can still move. */
@@ -709,6 +716,7 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   }
 
   edit() { this.router.navigate(['/exams', this.examId, 'edit']); }
+  manageModels() { this.router.navigate(['/exams', this.examId, 'models']); }
   back() { this.router.navigate(['/exams']); }
 
   ngOnDestroy() {

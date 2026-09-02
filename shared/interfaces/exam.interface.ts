@@ -66,12 +66,69 @@ export interface ExamAttemptRow {
   score: number | null;
   total: number | null;
   answeredCount: number;
+  /**
+   * The model this student was handed, on an exam that has models. Null on a
+   * pooled exam, where each paper is its own random draw.
+   */
+  modelName?: string | null;
 }
 
 export interface ExamAttemptsResponse {
   /** What the monitor corrects the device clock by. */
   serverNow: string;
   attempts: ExamAttemptRow[];
+}
+
+/**
+ * One MODEL (variant) of an online exam — "Model A" of "Test 1" — and its fixed
+ * paper. Every student handed this model sits exactly these questions.
+ *
+ * Named ExamPaperModel because `ExamModel` above is already this codebase's DTO
+ * name for an exam itself; the API calls these `models`, and so does the UI.
+ *
+ * Models may differ in length. Each student is marked out of the paper they
+ * actually sat (ExamAttemptRow.total, and exam_results.out_of).
+ */
+export interface ExamPaperModel {
+  id: string;
+  name: string;
+  orderIndex: number;
+  /** Counted server-side on read, never stored — a saved count would go stale. */
+  questionCount: number;
+  /** How many students have been handed it. Non-zero freezes every model. */
+  attemptCount: number;
+  questions: ExamPaperModelQuestion[];
+  /** Classes pinned to this model, when distribution is BY_CLASS. */
+  classIds: string[];
+}
+
+export interface ExamPaperModelQuestion {
+  questionId: string;
+  orderIndex: number;
+  questionText: string;
+  lessonId: string | null;
+  lessonName: string | null;
+}
+
+/** How an exam hands its models out. */
+export type ExamModelDistribution = 'RANDOM' | 'BY_CLASS';
+
+export interface ExamModelsResponse {
+  /** null = no models yet, so the exam still draws a pooled random paper. */
+  distribution: ExamModelDistribution | null;
+  /** Somebody has started: the models are frozen. */
+  locked: boolean;
+  models: ExamPaperModel[];
+  /** The classes on this exam's course, for per-class assignment. */
+  classes: { id: string; name: string }[];
+}
+
+/** A bank question as the model builder browses it. Never carries the key. */
+export interface ExamPoolQuestion {
+  id: string;
+  questionText: string;
+  lessonId: string | null;
+  lessonName: string | null;
 }
 
 /**

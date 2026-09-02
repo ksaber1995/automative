@@ -5,6 +5,7 @@ import { enforce, RATE_LIMITS } from '../middleware/rate-limit';
 import { extractStudentContext, StudentContext } from '../middleware/student-context';
 import { ensureExamTables, isRatingCompany, mapStudentExamRow, studentExamFeedSql } from './exams';
 import { gradeAttempt } from '../db/exam-grading';
+import { ensureExamModelSchema, loadModelQuestions, pickModel } from './exam-models';
 
 /**
  * The student side of online exams — what the portal at exams.netrofit.com
@@ -138,29 +139,45 @@ function shuffle<T>(items: T[]): T[] {
 }
 
 /**
- * Draw the paper: `question_count` questions at random from the pooled active
- * questions of the exam's lessons, snapshotted (text + options, in this
- * student's order, each option under a fresh local id) in one transaction.
+ * Draw the paper, snapshotted (text + options, in this student's order, each
+ * option under a fresh local id) in one transaction.
  *
- * Fewer questions in the pool than question_count (bank edited since the exam
- * was saved) → draw what exists; `total` is per-attempt so the mark stays
+ * Two kinds of exam land here:
+ *
+ *  - a MODEL exam: the student is handed one of its models (pickModel — by
+ *    class, or balanced-random) and sits that model's FIXED question list, in
+ *    the model's own order. Everyone on Model A gets the same paper.
+ *  - a pooled exam (no models, the original): `question_count` questions drawn
+ *    at random from the pooled active questions of the exam's lessons, so every
+ *    student gets a different paper.
+ *
+ * Either way the snapshot written below is identical in shape, which is why the
+ * student portal needs no knowledge of models at all.
+ *
+ * Fewer questions available than expected (bank edited since the exam was
+ * saved) → the paper is what exists; `total` is per-attempt so the mark stays
  * honest. Two simultaneous starts race on UNIQUE (exam_id, student_id); the
  * loser rolls back and resumes the winner's paper.
  */
 async function drawPaper(exam: any, student: StudentContext): Promise<any | 'CONFLICT'> {
-  const drawn = await query<any>(
-    `SELECT q.id, q.lesson_id, q.question_text
-       FROM lesson_questions q
-       JOIN exam_lessons el ON el.lesson_id = q.lesson_id
-      WHERE el.exam_id = $1 AND q.is_active = true AND q.company_id = $2
-        -- Never draw a question whose key is unset (imports arrive that way):
-        -- it cannot be marked, so it is not on any paper until a teacher sets it.
-        AND EXISTS (SELECT 1 FROM lesson_question_options o
-                     WHERE o.question_id = q.id AND o.is_correct = true)
-      ORDER BY random()
-      LIMIT $3`,
-    [exam.id, student.companyId, parseInt(exam.question_count, 10)],
-  );
+  await ensureExamModelSchema();
+  const modelId = await pickModel(exam, student.studentId);
+
+  const drawn = modelId
+    ? await loadModelQuestions(modelId, student.companyId)
+    : await query<any>(
+        `SELECT q.id, q.lesson_id, q.question_text
+           FROM lesson_questions q
+           JOIN exam_lessons el ON el.lesson_id = q.lesson_id
+          WHERE el.exam_id = $1 AND q.is_active = true AND q.company_id = $2
+            -- Never draw a question whose key is unset (imports arrive that way):
+            -- it cannot be marked, so it is not on any paper until a teacher sets it.
+            AND EXISTS (SELECT 1 FROM lesson_question_options o
+                         WHERE o.question_id = q.id AND o.is_correct = true)
+          ORDER BY random()
+          LIMIT $3`,
+        [exam.id, student.companyId, parseInt(exam.question_count, 10)],
+      );
 
   const optionRows = drawn.length
     ? await query<any>(
@@ -186,10 +203,10 @@ async function drawPaper(exam: any, student: StudentContext): Promise<any | 'CON
   try {
     await client.query('BEGIN');
     const inserted = await client.query(
-      `INSERT INTO exam_attempts (exam_id, company_id, student_id, expires_at, total)
+      `INSERT INTO exam_attempts (exam_id, company_id, student_id, expires_at, total, model_id)
        VALUES ($1, $2, $3,
                LEAST(NOW() + make_interval(mins => $4), $5::timestamptz),
-               $6)
+               $6, $7)
        RETURNING *`,
       [
         exam.id,
@@ -198,6 +215,9 @@ async function drawPaper(exam: any, student: StudentContext): Promise<any | 'CON
         parseInt(exam.duration_minutes, 10),
         exam.closes_at ?? null,   // LEAST ignores a NULL, so no window = duration alone
         askable.length,
+        // Which model this student was given; NULL on a pooled exam. Recorded so
+        // the teacher can see who sat what, and so a resumed attempt keeps it.
+        modelId,
       ],
     );
     const attempt = inserted.rows[0];

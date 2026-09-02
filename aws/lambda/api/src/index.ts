@@ -28,6 +28,7 @@ import { masterClassEnrollmentsRoutes } from './routes/master-class-enrollments'
 import { eventsRoutes } from './routes/events';
 import { eventSubscriptionsRoutes } from './routes/event-subscriptions';
 import { examsRoutes } from './routes/exams';
+import { examModelsRoutes } from './routes/exam-models';
 import { lessonsRoutes } from './routes/lessons';
 import { studentAuthRoutes } from './routes/student-auth';
 import { studentExamsRoutes } from './routes/student-exams';
@@ -182,6 +183,18 @@ const router = {
     getById: examsRoutes.getById,
     update: examsRoutes.update,
     delete: examsRoutes.delete,
+  },
+  // Exam models (variants A/B/C). Their paths carry an extra segment, so they
+  // cannot be swallowed by `/api/exams/:id` — but they are kept together here
+  // rather than folded into the block above so the freeze/permission rules of
+  // the models live in one file.
+  examModels: {
+    list: examModelsRoutes.list,
+    questionPool: examModelsRoutes.questionPool,
+    create: examModelsRoutes.create,
+    update: examModelsRoutes.update,
+    remove: examModelsRoutes.remove,
+    setDistribution: examModelsRoutes.setDistribution,
   },
   classes: {
     create: classesRoutes.create,

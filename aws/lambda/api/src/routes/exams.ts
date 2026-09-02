@@ -826,6 +826,9 @@ export const examsRoutes = {
       const rows = await query<any>(
         `SELECT s.id AS student_id, s.name, s.student_code,
                 a.status, a.started_at, a.submitted_at, a.expires_at, a.score, a.total,
+                -- Which model this student was handed, on a model exam. NULL on a
+                -- pooled one, where every paper is its own random draw.
+                (SELECT m.name FROM exam_models m WHERE m.id = a.model_id) AS model_name,
                 (SELECT COUNT(*) FROM exam_attempt_questions q
                   WHERE q.attempt_id = a.id AND q.selected_option_id IS NOT NULL) AS answered_count
          FROM students s
@@ -854,6 +857,8 @@ export const examsRoutes = {
             answeredCount: row.answered_count !== null && row.answered_count !== undefined
               ? parseInt(row.answered_count, 10)
               : 0,
+            /** The model they were handed, or null on a pooled exam. */
+            modelName: row.model_name ?? null,
           })),
         },
       };

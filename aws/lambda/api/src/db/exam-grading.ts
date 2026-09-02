@@ -73,12 +73,18 @@ export async function gradeAttempt(
       'SELECT course_id FROM exams WHERE id = $1',
       [attempt.exam_id],
     );
+    // `out_of` is what THIS student's paper held. It matters once an exam has
+    // models of different lengths: the exam's own max_grade is one number, so a
+    // 15 off an 18-question model would otherwise be shown as 15/20. For a
+    // pooled exam it equals max_grade anyway, so nothing changes there.
     await client.query(
-      `INSERT INTO exam_results (exam_id, company_id, course_id, student_id, grade, is_absent)
-       VALUES ($1, $2, $3, $4, $5, false)
+      `INSERT INTO exam_results (exam_id, company_id, course_id, student_id, grade, out_of, is_absent)
+       VALUES ($1, $2, $3, $4, $5, $6, false)
        ON CONFLICT (exam_id, student_id)
-       DO UPDATE SET grade = EXCLUDED.grade, is_absent = false, recorded_at = NOW(), updated_at = NOW()`,
-      [attempt.exam_id, attempt.company_id, exam.rows[0].course_id, attempt.student_id, String(attempt.score)],
+       DO UPDATE SET grade = EXCLUDED.grade, out_of = EXCLUDED.out_of,
+                     is_absent = false, recorded_at = NOW(), updated_at = NOW()`,
+      [attempt.exam_id, attempt.company_id, exam.rows[0].course_id, attempt.student_id,
+       String(attempt.score), attempt.total],
     );
 
     await client.query('COMMIT');
