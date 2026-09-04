@@ -188,9 +188,10 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
   /** Telegram connect link, pre-fetched on load so window.open stays inside the click gesture. */
   telegramParentUrl = signal<string | null>(null);
 
-  sendFollowupToParent(): void {
+  /** The follow-up body both send paths share — null while the student has no link. */
+  private followupText(): string | null {
     const s = this.student();
-    if (!s?.qrToken) return;
+    if (!s?.qrToken) return null;
     let text = renderWhatsappTemplate(this.templatesSvc.get('FOLLOWUP_PARENT'), {
       studentName: s.name,
       parentName: s.parentName || s.name,
@@ -199,8 +200,36 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
     });
     const tg = this.telegramParentUrl();
     if (tg) text += '\n\n' + this.translate.instant('WHATSAPP.TELEGRAM_CONNECT_LINE', { link: tg });
-    if (!openWhatsappChat(s.parentPhone, text)) {
+    return text;
+  }
+
+  sendFollowupToParent(): void {
+    const text = this.followupText();
+    if (!text) return;
+    if (!openWhatsappChat(this.student()?.parentPhone, text)) {
       this.notificationService.error(this.translate.instant('STUDENT_QR.NO_PARENT_PHONE'));
+    }
+  }
+
+  // ── The same follow-up link, but to someone who isn't the parent ───────────
+  // A grandparent, an aunt, a second phone — staff type the number and wa.me
+  // opens with the same body the parent would get.
+  followupOtherDialogOpen = signal(false);
+  followupOtherPhone = signal('');
+
+  openFollowupOtherDialog(): void {
+    if (!this.student()?.qrToken) return;
+    this.followupOtherPhone.set('');
+    this.followupOtherDialogOpen.set(true);
+  }
+
+  sendFollowupToOther(): void {
+    const text = this.followupText();
+    if (!text) return;
+    if (openWhatsappChat(this.followupOtherPhone(), text)) {
+      this.followupOtherDialogOpen.set(false);
+    } else {
+      this.notificationService.error(this.translate.instant('STUDENTS.DETAIL.FOLLOWUP_OTHER_BAD_PHONE'));
     }
   }
 
@@ -248,6 +277,7 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
     const s = this.student();
     const items: MenuItem[] = [
       { label: this.translate.instant('STUDENT_QR.SEND_FOLLOWUP_PARENT'), icon: 'pi pi-whatsapp', command: () => this.sendFollowupToParent() },
+      { label: this.translate.instant('STUDENT_QR.SEND_FOLLOWUP_OTHER'), icon: 'pi pi-whatsapp', command: () => this.openFollowupOtherDialog() },
       // Only for paid tenants with the platform number configured — the
       // capability probe keeps the entry away from everyone else.
       ...(this.parentLinkCapable() ? [{

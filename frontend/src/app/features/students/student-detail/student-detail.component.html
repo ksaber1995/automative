@@ -209,6 +209,32 @@
       </ng-template>
     </p-dialog>
 
+    <!-- Follow-up link to a number that isn't the parent's — staff type it here. -->
+    <p-dialog
+      [visible]="followupOtherDialogOpen()"
+      (visibleChange)="followupOtherDialogOpen.set($event)"
+      [modal]="true"
+      [draggable]="false"
+      [dismissableMask]="true"
+      [style]="{ width: '28rem', maxWidth: '95vw' }"
+      [header]="'STUDENTS.DETAIL.FOLLOWUP_OTHER_TITLE' | translate"
+    >
+      <p class="text-sm text-gray-500 mb-3">
+        {{ 'STUDENTS.DETAIL.FOLLOWUP_OTHER_HINT' | translate: { student: s.name } }}
+      </p>
+
+      <input pInputText type="tel" dir="ltr" class="w-full"
+        [ngModel]="followupOtherPhone()" (ngModelChange)="followupOtherPhone.set($event)"
+        [placeholder]="'STUDENTS.DETAIL.FOLLOWUP_OTHER_PLACEHOLDER' | translate" />
+
+      <ng-template pTemplate="footer">
+        <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" [text]="true" (onClick)="followupOtherDialogOpen.set(false)"></p-button>
+        <p-button icon="pi pi-whatsapp" [label]="'STUDENTS.DETAIL.FOLLOWUP_OTHER_SEND' | translate"
+          [disabled]="!followupOtherPhone().trim()"
+          (onClick)="sendFollowupToOther()"></p-button>
+      </ng-template>
+    </p-dialog>
+
 
     <!-- Student Information Card -->
     <p-card>
