@@ -22,7 +22,7 @@ class NetrofitApp extends StatefulWidget {
   State<NetrofitApp> createState() => _NetrofitAppState();
 }
 
-class _NetrofitAppState extends State<NetrofitApp> {
+class _NetrofitAppState extends State<NetrofitApp> with WidgetsBindingObserver {
   /// Two clients on purpose: the parent flow is tokenless and must never
   /// accidentally carry a student Bearer token (and vice versa).
   final _parentApi = ApiClient();
@@ -36,23 +36,38 @@ class _NetrofitAppState extends State<NetrofitApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _children.restore();
     _session.restore();
 
     // Parent notifications: permission + the Android background worker, then a
-    // foreground check every minute while the app is open. Both funnel through
-    // checkAndNotifyAllChildren, so the two paths can never disagree on what
-    // was already announced.
-    initParentNotifications();
-    _notifications.refresh();
-    _poller = Timer.periodic(const Duration(seconds: 60), (_) async {
-      await checkAndNotifyAllChildren();
-      await _notifications.refresh();
-    });
+    // foreground check while the app is open. The FIRST check runs immediately —
+    // it sets each child's high-water mark, so an event that lands a moment
+    // later is "new" on the next tick instead of drowning in the backlog.
+    _startNotifications();
+    _poller = Timer.periodic(const Duration(seconds: 30), (_) => _checkNow());
+  }
+
+  Future<void> _startNotifications() async {
+    await initParentNotifications();
+    await _checkNow();
+  }
+
+  Future<void> _checkNow() async {
+    await checkAndNotifyAllChildren();
+    await _notifications.refresh();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Coming back to the app checks straight away — the foreground timer was
+    // paused while backgrounded, and the badge should be honest on arrival.
+    if (state == AppLifecycleState.resumed) _checkNow();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _poller?.cancel();
     super.dispose();
   }

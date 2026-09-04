@@ -21,8 +21,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void initState() {
     super.initState();
     final ctrl = context.read<NotificationsController>();
-    _seenAtOpen = ctrl.lastSeen;
-    ctrl.refresh().then((_) => ctrl.markSeen());
+    // Capture "seen up to" AFTER refresh loads it from storage (the controller
+    // may not have run yet on a cold open), THEN mark everything seen.
+    ctrl.refresh().then((_) {
+      if (mounted) setState(() => _seenAtOpen = ctrl.lastSeen);
+      return ctrl.markSeen();
+    });
   }
 
   @override

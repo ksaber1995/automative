@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +8,7 @@ import '../core/qr.dart';
 import '../core/theme.dart';
 import 'child_dashboard.dart';
 import 'children_store.dart';
+import 'notifications.dart';
 
 /// Scan the card (or paste its link) to add a child. The scanner fills the
 /// screen; the manual entry lives under it for the card-less moment — a photo
@@ -42,6 +45,10 @@ class _AddChildScreenState extends State<AddChildScreen> {
     try {
       final store = context.read<ChildrenStore>();
       final profile = await store.addByToken(token);
+      // Set this child's notification high-water mark right away, so events
+      // from the very next minute announce themselves instead of being read
+      // as pre-install backlog on the first poll.
+      unawaited(checkAndNotifyAllChildren());
       if (!mounted) return;
       Navigator.of(context).pushReplacement(MaterialPageRoute(
         builder: (_) => ChildDashboard(token: token, initial: profile),
