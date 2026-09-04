@@ -5,6 +5,8 @@ import '../core/theme.dart';
 import 'add_child_screen.dart';
 import 'child_dashboard.dart';
 import 'children_store.dart';
+import 'notifications.dart';
+import 'notifications_screen.dart';
 
 /// The parent's front door: the children saved on this phone, one tap from the
 /// dashboard. The web page starts from a scan every single time — keeping the
@@ -24,6 +26,22 @@ class ParentHome extends StatelessWidget {
             pinned: true,
             expandedHeight: 150,
             automaticallyImplyLeading: true,
+            actions: [
+              // The notification centre, with the unread count since the last
+              // time it was opened.
+              Consumer<NotificationsController>(
+                builder: (context, notifs, _) => IconButton(
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const NotificationsScreen())),
+                  icon: Badge(
+                    isLabelVisible: notifs.unread > 0,
+                    label: Text('${notifs.unread}'),
+                    child: const Icon(Icons.notifications_none,
+                        color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
             flexibleSpace: Container(
               decoration: const BoxDecoration(gradient: AppTheme.headerGradient),
               child: const FlexibleSpaceBar(

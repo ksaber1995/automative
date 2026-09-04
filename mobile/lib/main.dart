@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -5,6 +7,7 @@ import 'core/api.dart';
 import 'core/theme.dart';
 import 'landing.dart';
 import 'parent/children_store.dart';
+import 'parent/notifications.dart';
 import 'student/student_session.dart';
 
 void main() {
@@ -27,12 +30,31 @@ class _NetrofitAppState extends State<NetrofitApp> {
 
   late final ChildrenStore _children = ChildrenStore(_parentApi);
   late final StudentSession _session = StudentSession(_studentApi);
+  final _notifications = NotificationsController();
+  Timer? _poller;
 
   @override
   void initState() {
     super.initState();
     _children.restore();
     _session.restore();
+
+    // Parent notifications: permission + the Android background worker, then a
+    // foreground check every minute while the app is open. Both funnel through
+    // checkAndNotifyAllChildren, so the two paths can never disagree on what
+    // was already announced.
+    initParentNotifications();
+    _notifications.refresh();
+    _poller = Timer.periodic(const Duration(seconds: 60), (_) async {
+      await checkAndNotifyAllChildren();
+      await _notifications.refresh();
+    });
+  }
+
+  @override
+  void dispose() {
+    _poller?.cancel();
+    super.dispose();
   }
 
   @override
@@ -41,6 +63,7 @@ class _NetrofitAppState extends State<NetrofitApp> {
       providers: [
         ChangeNotifierProvider.value(value: _children),
         ChangeNotifierProvider.value(value: _session),
+        ChangeNotifierProvider.value(value: _notifications),
       ],
       child: MaterialApp(
         title: 'نتروفت',

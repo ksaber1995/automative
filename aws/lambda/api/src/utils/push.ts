@@ -49,12 +49,51 @@ export async function ensurePushSchema(): Promise<void> {
         UNIQUE (endpoint)
       )`);
       await query(`CREATE INDEX IF NOT EXISTS idx_push_subs_student ON push_subscriptions(student_id)`);
+
+      // Every parent event, kept as a row as well as pushed. Two consumers: the
+      // mobile app's notification feed (it has no service worker, so it reads
+      // this and raises its own device notifications), and any future channel
+      // (FCM) that wants the same events. Written BEFORE web-push is attempted,
+      // so the feed is whole even for a student with no browser subscription.
+      await query(`CREATE TABLE IF NOT EXISTS parent_notifications (
+        id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+        title      TEXT NOT NULL,
+        body       TEXT NOT NULL,
+        url        TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`);
+      await query(`CREATE INDEX IF NOT EXISTS idx_parent_notifs_student
+                     ON parent_notifications(student_id, created_at DESC)`);
     })().catch((e) => {
       schemaPromise = null;
       throw e;
     });
   }
   return schemaPromise;
+}
+
+/** The feed for one student, newest first. Same shape the push payload carries. */
+export async function listParentNotifications(
+  companyId: string,
+  studentId: string,
+  limit = 50,
+): Promise<{ id: string; title: string; body: string; url: string | null; createdAt: string }[]> {
+  await ensurePushSchema();
+  const rows = await query<any>(
+    `SELECT id, title, body, url, created_at FROM parent_notifications
+      WHERE student_id = $1 AND company_id = $2
+      ORDER BY created_at DESC LIMIT $3`,
+    [studentId, companyId, Math.min(Math.max(limit, 1), 100)],
+  );
+  return rows.map((r: any) => ({
+    id: r.id,
+    title: r.title,
+    body: r.body,
+    url: r.url ?? null,
+    createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
+  }));
 }
 
 /**
@@ -90,9 +129,19 @@ export async function sendPushToStudent(
   payload: { title: string; body: string; url?: string },
 ): Promise<void> {
   try {
+    await ensurePushSchema();
+
+    // The durable feed row comes FIRST, unconditionally: the mobile app polls
+    // this even when the family never enabled browser push, and a web-push
+    // failure must not erase the event's record.
+    await query(
+      `INSERT INTO parent_notifications (company_id, student_id, title, body, url)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [companyId, studentId, payload.title, payload.body, payload.url ?? null],
+    ).catch((e) => console.error('push: feed insert failed (ignored):', e));
+
     const c = await vapid();
     if (!c) return;
-    await ensurePushSchema();
     const subs = await query<any>(
       `SELECT id, endpoint, p256dh, auth FROM push_subscriptions
         WHERE student_id = $1 AND company_id = $2`,

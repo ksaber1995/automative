@@ -11,7 +11,7 @@ import {
 import { joinedBySession } from '../db/enrollment-start';
 import { resolveStatus } from './monthly-subscriptions';
 import { isRatingCompany, mapStudentExamRow, studentExamFeedSql } from './exams';
-import { getPushPublicKey, savePushSubscription } from '../utils/push';
+import { getPushPublicKey, listParentNotifications, savePushSubscription } from '../utils/push';
 
 type AuthHeaders = { authorization?: string };
 
@@ -138,6 +138,36 @@ export const publicStudentsRoutes = {
     } catch (error) {
       console.error('Public push subscribe error:', error);
       return apiError(400, 'ERRORS.STUDENTS.NOT_FOUND', 'Failed to subscribe');
+    }
+  },
+
+  /**
+   * The parent-event feed behind the scanned token — every row the push funnel
+   * recorded (check-ins, absences, payments, marks). The mobile app polls this
+   * and raises its own device notifications from it, since a native app has no
+   * service worker to receive web-push. Same credential, same rate limit, same
+   * generic 404 as the profile.
+   */
+  notifications: async ({ params }: { params: { qrToken: string }; headers: AuthHeaders }) => {
+    enforceByIp(RATE_LIMITS.PUBLIC_PROFILE_IP);
+    try {
+      const token = (params.qrToken || '').trim();
+      if (!/^[a-f0-9]{16,64}$/i.test(token)) {
+        return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Not found');
+      }
+      await ensureQrCardSchema();
+      const student = await queryOne<any>(
+        `SELECT s.id, s.company_id FROM students s
+          WHERE ${qrStudentMatchPublic('$1')} AND s.is_active = true`,
+        [token],
+      );
+      if (!student) return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Not found');
+
+      const rows = await listParentNotifications(student.company_id, student.id);
+      return { status: 200 as const, body: rows };
+    } catch (error) {
+      console.error('Public notifications error:', error);
+      return apiError(404, 'ERRORS.STUDENTS.NOT_FOUND', 'Not found');
     }
   },
 

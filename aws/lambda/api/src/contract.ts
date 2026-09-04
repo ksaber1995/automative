@@ -4684,6 +4684,27 @@ export const contract = c.router({
         404: ApiErrorSchema,
       },
     },
+    /**
+     * The parent-event feed the push funnel records — what the mobile app polls
+     * to raise its own notifications. Registered above `profile` because this
+     * path carries an extra segment.
+     */
+    notifications: {
+      method: 'GET',
+      path: '/api/public/students/:qrToken/notifications',
+      pathParams: z.object({ qrToken: z.string().min(16).max(64) }),
+      responses: {
+        200: z.array(z.object({
+          id: UUIDSchema,
+          title: z.string(),
+          body: z.string(),
+          url: z.string().nullable(),
+          createdAt: z.string(),
+        })),
+        404: ApiErrorSchema,
+        429: ApiErrorSchema,
+      },
+    },
     profile: {
       method: 'GET',
       path: '/api/public/students/:qrToken',
