@@ -53,29 +53,29 @@ export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasI
   ctx.fill();
   fitText(ctx, d.code || '—', 139, 437, 160, 22, 'bold', T.accentDeep, 'center', 'ltr');
 
-  // ---- header (RTL, right-aligned) ----
-  const hR = 968;
+  // ---- header (LTR, left-aligned against the content column) ----
+  const hL = 300;
   if (d.companyName) {
-    fitText(ctx, d.companyName, hR, 52, 380, 18, 'bold', T.accent, 'right', 'rtl');
+    fitText(ctx, d.companyName, hL, 52, 380, 18, 'bold', T.accent, 'left', 'ltr');
   }
-  fitText(ctx, 'بطاقة تعريف الطالب', hR, 92, 420, 33, 'bold', T.ink, 'right', 'rtl');
+  fitText(ctx, 'Student ID Card', hL, 92, 420, 33, 'bold', T.ink, 'left', 'ltr');
 
   ctx.save();
   ctx.direction = 'ltr';
-  ctx.textAlign = 'right';
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.letterSpacing = '3px';
   ctx.font = `900 14px ${T.font}`;
   ctx.fillStyle = T.muted;
-  ctx.fillText('STUDENT ID CARD', hR, 122);
+  ctx.fillText('OFFICIAL IDENTIFICATION', hL, 122);
   ctx.restore();
 
   ctx.strokeStyle = T.accent;
   ctx.lineWidth = 3;
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(hR - 130, 142);
-  ctx.lineTo(hR, 142);
+  ctx.moveTo(hL, 142);
+  ctx.lineTo(hL + 130, 142);
   ctx.stroke();
 
   // ---- detail rows: label above value, hairline rule, no icons ----
@@ -84,11 +84,11 @@ export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasI
   // printed card reads as a mistake.
   const f = clampFields(d.fields);
   const rows = [
-    ...(f.studentName && d.name ? [{ label: 'اسم الطالب', value: d.name, dir: 'rtl' as const }] : []),
-    ...(d.level ? [{ label: 'الصف الدراسي', value: d.level, dir: 'rtl' as const }] : []),
-    ...(f.school && d.school ? [{ label: 'المدرسة', value: d.school, dir: 'rtl' as const }] : []),
-    ...(f.className && d.group ? [{ label: 'المجموعة', value: d.group, dir: 'rtl' as const }] : []),
-    ...(f.year && d.year ? [{ label: 'العام الدراسي', value: d.year, dir: 'ltr' as const }] : []),
+    ...(f.studentName && d.name ? [{ label: 'Student Name', value: d.name, dir: 'rtl' as const }] : []),
+    ...(d.level ? [{ label: 'Grade', value: d.level, dir: 'rtl' as const }] : []),
+    ...(f.school && d.school ? [{ label: 'School', value: d.school, dir: 'rtl' as const }] : []),
+    ...(f.className && d.group ? [{ label: 'Group', value: d.group, dir: 'rtl' as const }] : []),
+    ...(f.year && d.year ? [{ label: 'Academic Year', value: d.year, dir: 'ltr' as const }] : []),
   ];
   const rR = 700;      // right edge of the rows column
   const rL = 300;      // left edge
@@ -99,17 +99,17 @@ export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasI
 
   rows.forEach((row, i) => {
     const y = top + i * rowH;
-    fitText(ctx, row.label, rR, y, rR - rL, 15, 'bold', T.muted, 'right', 'rtl');
+    fitText(ctx, row.label, rL, y, rR - rL, 15, 'bold', T.muted, 'left', 'ltr');
     fitText(
       ctx,
       row.value || '—',
-      row.dir === 'ltr' ? rR : rR,
+      rL,
       y + 28,
       rR - rL,
       22,
       'bold',
       T.ink,
-      'right',
+      'left',
       row.dir,
     );
     ctx.strokeStyle = T.line;
@@ -127,7 +127,7 @@ export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasI
     roundRect(ctx, rL, 528, rR - rL, 58, 12);
     ctx.fillStyle = T.accent;
     ctx.fill();
-    fitText(ctx, d.subject, (rL + rR) / 2, 557, rR - rL - 40, 23, 'bold', T.onAccent, 'center', 'rtl');
+    fitText(ctx, d.subject, (rL + rR) / 2, 557, rR - rL - 40, 23, 'bold', T.onAccent, 'center', 'ltr');
   }
 
   // ---- QR ----
@@ -140,8 +140,8 @@ export function drawStudentCardMinimal(ctx: Ctx, d: StudentCardData, qr: CanvasI
   ctx.stroke();
   ctx.drawImage(qr, qx + 12, qy + 12, qs - 24, qs - 24);
 
-  fitText(ctx, 'امسح الرمز', qx + qs / 2, qy + qs + 30, qs, 17, 'bold', T.accent, 'center', 'rtl');
-  fitText(ctx, 'للحضور والانصراف', qx + qs / 2, qy + qs + 54, qs, 14, 'bold', T.muted, 'center', 'rtl');
+  fitText(ctx, 'Scan the code', qx + qs / 2, qy + qs + 30, qs, 17, 'bold', T.accent, 'center', 'ltr');
+  fitText(ctx, 'for attendance', qx + qs / 2, qy + qs + 54, qs, 14, 'bold', T.muted, 'center', 'ltr');
 
   ctx.restore();
   border(ctx);
@@ -258,7 +258,7 @@ export function drawCardBackMinimal(ctx: Ctx, d: CardDesign, qr: CanvasImageSour
   ctx.stroke();
 
   // ---- instructions (middle) ----
-  fitText(ctx, 'تعليمات للطالب', 646, 56, 240, 19, 'bold', T.accent, 'right', 'rtl');
+  fitText(ctx, 'Student Guidelines', 646, 56, 240, 19, 'bold', T.accent, 'right', 'ltr');
   ctx.beginPath();
   ctx.moveTo(536, 74);
   ctx.lineTo(646, 74);
@@ -306,8 +306,8 @@ export function drawCardBackMinimal(ctx: Ctx, d: CardDesign, qr: CanvasImageSour
     ctx.stroke();
     ctx.drawImage(qr, qx + 10, qy + 10, qs - 20, qs - 20);
 
-    fitText(ctx, 'امسح الرمز', qx + qs / 2, qy + qs + 26, qs, 16, 'bold', T.accent, 'center', 'rtl');
-    fitText(ctx, 'للاطلاع على المعلومات', qx + qs / 2, qy + qs + 48, qs + 20, 13, 'bold', T.muted, 'center', 'rtl');
+    fitText(ctx, 'Scan the code', qx + qs / 2, qy + qs + 26, qs, 16, 'bold', T.accent, 'center', 'ltr');
+    fitText(ctx, 'to view student info', qx + qs / 2, qy + qs + 48, qs + 20, 13, 'bold', T.muted, 'center', 'ltr');
   }
 
   // ---- bottom ----

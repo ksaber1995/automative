@@ -436,15 +436,23 @@ export const DEFAULT_CARD_DESIGN: CardDesign = {
   email: '',
   location: '',
   qrLink: '',
-  slogan: 'التفوق لا يأتي صدفة\nبل هو نتيجة الإجتهاد والثقة بالله',
+  // English defaults — the card design is English. Mirrors the frontend copy in
+  // shared/interfaces/card-design.interface.ts; a tenant's own saved wording
+  // always wins over these.
+  slogan: 'Excellence is never an accident.\nIt is the result of hard work and dedication.',
   instructions: [
-    'يحافظ الطالب على البطاقة وعدم إعارتها.',
-    'في حالة فقدان البطاقة يتم إبلاغ المعلم فوراً.',
-    'تُستخدم البطاقة في الحضور والانصراف.',
-    'المحافظة على البطاقة وعدم العبث بها.',
-    'الالتزام بالقوانين دليل على احترامك لنفسك وللآخرين.',
+    'Keep this card safe and do not lend it to anyone.',
+    'Report a lost card to your teacher immediately.',
+    'This card is used for check-in and check-out.',
+    'Take good care of the card and do not tamper with it.',
+    'Following the rules shows respect for yourself and others.',
   ],
-  highlights: ['شرح مبسط وفهم عميق', 'مراجعات نهائية', 'اختبارات دورية', 'متابعة مستمرة وتقييم شامل'],
+  highlights: [
+    'Clear explanations, deep understanding',
+    'Final revisions',
+    'Regular quizzes',
+    'Continuous follow-up and assessment',
+  ],
   photo: '',
   logo: '',
   student: { ...DEFAULT_CARD_ADJUST },

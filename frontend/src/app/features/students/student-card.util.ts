@@ -544,9 +544,9 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   // --- header ---
   const hcx = 626;
   if (data.companyName) {
-    fitText(ctx, data.companyName, hcx, 46, 400, 19, 'bold', T.accent, 'center', 'rtl');
+    fitText(ctx, data.companyName, hcx, 46, 400, 19, 'bold', T.accent, 'center', 'ltr');
   }
-  fitText(ctx, 'بطاقة تعريف الطالب', hcx, 88, 440, 40, 'bold', T.panel, 'center', 'rtl');
+  fitText(ctx, 'Student ID Card', hcx, 88, 440, 40, 'bold', T.panel, 'center', 'ltr');
 
   ctx.save();
   ctx.direction = 'ltr';
@@ -555,8 +555,8 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   ctx.letterSpacing = '3px';
   ctx.font = `900 19px ${T.font}`;
   ctx.fillStyle = T.muted;
-  ctx.fillText('STUDENT ID CARD', hcx, 124);
-  const tw = ctx.measureText('STUDENT ID CARD').width;
+  ctx.fillText('OFFICIAL IDENTIFICATION', hcx, 124);
+  const tw = ctx.measureText('OFFICIAL IDENTIFICATION').width;
   ctx.restore();
 
   ctx.save();
@@ -582,29 +582,30 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   // The code has no toggle on purpose: the card exists to be scanned, and its
   // number is the fallback when a camera will not read the QR.
   const f = clampFields(data.fields);
+  // English card: labels read left-to-right beside the icon chip; values keep
+  // their own direction (an Arabic name still shapes correctly under 'rtl').
   const rows: { icon: RowIcon; label: string; value: string; dir: Dir; gold?: boolean }[] = [
     ...(f.studentName && data.name
-      ? [{ icon: 'user' as RowIcon, label: 'اسم الطالب', value: data.name, dir: 'rtl' as Dir }] : []),
-    { icon: 'id', label: 'كود الطالب', value: data.code, dir: 'ltr', gold: true },
-    ...(data.level ? [{ icon: 'cap' as RowIcon, label: 'الصف الدراسي', value: data.level, dir: 'rtl' as Dir }] : []),
+      ? [{ icon: 'user' as RowIcon, label: 'Student Name', value: data.name, dir: 'rtl' as Dir }] : []),
+    { icon: 'id', label: 'Student Code', value: data.code, dir: 'ltr', gold: true },
+    ...(data.level ? [{ icon: 'cap' as RowIcon, label: 'Grade', value: data.level, dir: 'rtl' as Dir }] : []),
     ...(f.school && data.school
-      ? [{ icon: 'school' as RowIcon, label: 'المدرسة', value: data.school, dir: 'rtl' as Dir }] : []),
+      ? [{ icon: 'school' as RowIcon, label: 'School', value: data.school, dir: 'rtl' as Dir }] : []),
     ...(f.className && data.group
-      ? [{ icon: 'group' as RowIcon, label: 'المجموعة', value: data.group, dir: 'rtl' as Dir }] : []),
+      ? [{ icon: 'group' as RowIcon, label: 'Group', value: data.group, dir: 'rtl' as Dir }] : []),
     ...(f.year && data.year
-      ? [{ icon: 'cal' as RowIcon, label: 'العام الدراسي', value: data.year, dir: 'ltr' as Dir }] : []),
+      ? [{ icon: 'cal' as RowIcon, label: 'Academic Year', value: data.year, dir: 'ltr' as Dir }] : []),
   ];
 
   const rx = 300;      // left edge — clears the (now narrower) gold ribbon on the navy panel
   const chip = 46;
-  const labelR = 766;
-  // The label runs right-to-left from labelR and is capped at 124 wide, so it can
-  // reach x=642. valueR must leave a real gutter before that: label and value are
-  // now the same navy (see `muted` in card-theme.ts), and at 640 a long value like
-  // "الثالث الثانوي" butted straight onto "الصف الدراسي" and read as one word. The
-  // grey used to hide this; the gutter has to do it now.
-  const valueR = 626;
-  const valueMaxW = valueR - (rx + chip + 14);
+  // LTR layout: the label reads left-to-right beside the icon chip, and the
+  // value is right-justified against the row's right edge. The gutter between
+  // the label's cap (labelL + 150) and the value's window keeps a long Arabic
+  // value from butting into the label and reading as one run of text.
+  const labelL = rx + chip + 14;
+  const rowR = 766;
+  const valueMaxW = rowR - (labelL + 150 + 12);
   // The rows must end before the subject banner at y=544. Five fit at 66 (last
   // chip ends at 478); a sixth — level AND school both set — would end at 544,
   // exactly on the banner, so the block tightens instead of overrunning it. At
@@ -619,17 +620,17 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
     ctx.fill();
     rowIcon(ctx, row.icon, rx + chip / 2, cy);
 
-    fitText(ctx, row.label, labelR, cy, 124, 19, 'bold', T.muted, 'right', 'rtl');
+    fitText(ctx, row.label, labelL, cy, 150, 19, 'bold', T.muted, 'left', 'ltr');
     fitText(
       ctx,
       row.value || '—',
-      row.dir === 'ltr' ? valueR - valueMaxW / 2 : valueR,
+      rowR,
       cy,
       valueMaxW,
       23,
       'bold',
       row.gold ? T.accentInk : T.panel,
-      row.dir === 'ltr' ? 'center' : 'right',
+      'right',
       row.dir,
     );
 
@@ -637,8 +638,8 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
       ctx.strokeStyle = T.line;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(rx + chip + 14, cy + 33);
-      ctx.lineTo(labelR, cy + 33);
+      ctx.moveTo(labelL, cy + 33);
+      ctx.lineTo(rowR, cy + 33);
       ctx.stroke();
     }
   });
@@ -662,7 +663,7 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
     ctx.fill();
     ctx.restore();
 
-    fitText(ctx, data.subject, TEXT_R, 579, TEXT_R - TEXT_L, 27, 'bold', T.accentOnPanel, 'right', 'rtl');
+    fitText(ctx, data.subject, TEXT_L, 579, TEXT_R - TEXT_L, 27, 'bold', T.accentOnPanel, 'left', 'ltr');
 
     ctx.save();
     ctx.strokeStyle = goldGrad(ctx, 310, 560, 354, 598);
@@ -700,8 +701,8 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   ctx.lineWidth = 1.6;
   ctx.stroke();
 
-  fitText(ctx, 'امسح الرمز', qx + qs - 14, capTop + 22, 130, 18, 'bold', T.accentOnPanel, 'right', 'rtl');
-  fitText(ctx, 'للحضور والانصراف', qx + qs - 14, capTop + 45, 130, 14, 'bold', T.onPanel, 'right', 'rtl');
+  fitText(ctx, 'Scan the code', qx + qs - 14, capTop + 22, 130, 18, 'bold', T.accentOnPanel, 'right', 'ltr');
+  fitText(ctx, 'for attendance', qx + qs - 14, capTop + 45, 130, 14, 'bold', T.onPanel, 'right', 'ltr');
 
   ctx.save();
   ctx.strokeStyle = goldGrad(ctx, qx + 14, capTop + 14, qx + 50, capTop + 50);
@@ -722,13 +723,13 @@ export function drawStudentCard(ctx: Ctx, data: StudentCardData, qr: CanvasImage
   // --- footer values ---
   // Centred under the QR column (qx .. qx + qs).
   const feet: { icon: 'book' | 'target' | 'star'; label: string; cx: number }[] = [
-    { icon: 'star', label: 'تميز', cx: 942 },
-    { icon: 'target', label: 'تطور', cx: 880 },
-    { icon: 'book', label: 'تعلم', cx: 818 },
+    { icon: 'book', label: 'Learn', cx: 942 },
+    { icon: 'target', label: 'Grow', cx: 880 },
+    { icon: 'star', label: 'Excel', cx: 818 },
   ];
   for (const f of feet) {
     footIcon(ctx, f.icon, f.cx, 544);
-    fitText(ctx, f.label, f.cx, 588, 60, 17, 'bold', T.panel, 'center', 'rtl');
+    fitText(ctx, f.label, f.cx, 588, 60, 17, 'bold', T.panel, 'center', 'ltr');
   }
 
   ctx.restore();

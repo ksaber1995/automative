@@ -205,7 +205,7 @@ export function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | nu
   ctx.fillStyle = goldGrad(ctx, pillCx - 100, 44, pillCx + 100, 80);
   ctx.fill();
   ctx.restore();
-  fitText(ctx, 'تعليمات للطالب', pillCx + 62, 62, 130, 19, 'bold', T.onAccent, 'right', 'rtl');
+  fitText(ctx, 'Student Guidelines', pillCx + 62, 62, 130, 19, 'bold', T.onAccent, 'right', 'ltr');
   highlightIcon(ctx, 'clipboard', pillCx - 74, 62);
 
   ctx.save();
@@ -276,8 +276,8 @@ export function drawCardBack(ctx: Ctx, d: CardDesign, qr: CanvasImageSource | nu
     ctx.lineWidth = 1.6;
     ctx.stroke();
 
-    fitText(ctx, 'امسح الرمز', qx + qs - 14, capTop + 20, 130, 17, 'bold', T.accentOnPanel, 'right', 'rtl');
-    fitText(ctx, 'للاطلاع على المعلومات', qx + qs - 14, capTop + 41, 130, 13, 'bold', T.onPanel, 'right', 'rtl');
+    fitText(ctx, 'Scan the code', qx + qs - 14, capTop + 20, 130, 17, 'bold', T.accentOnPanel, 'right', 'ltr');
+    fitText(ctx, 'to view student info', qx + qs - 14, capTop + 41, 130, 13, 'bold', T.onPanel, 'right', 'ltr');
 
     // globe glyph
     ctx.save();

@@ -97,7 +97,7 @@ export function drawCustomFront(
   const L = layoutOf(design);
   ctx.save();
   const has = layArt(ctx, images.artFront);
-  if (!has) missingArt(ctx, 'ارفع تصميم وجه الطالب');
+  if (!has) missingArt(ctx, 'Upload the student-side artwork');
 
   // Still in bgTransform: the QR is placed against the ARTWORK, so it has to share
   // the artwork's coordinate space rather than the inset one the other faces use.
@@ -166,6 +166,6 @@ function inkIsDark(hex: string): boolean {
 export function drawCustomBack(ctx: Ctx, _design: CardDesign, images: CardImages = {}): void {
   ctx.save();
   const has = layArt(ctx, images.artBack);
-  if (!has) missingArt(ctx, 'ارفع تصميم وجه المدرس');
+  if (!has) missingArt(ctx, 'Upload the teacher-side artwork');
   ctx.restore();
 }
