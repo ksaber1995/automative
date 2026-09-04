@@ -383,10 +383,9 @@ export const routes: Routes = [
         loadComponent: () => import('./features/settings/settings.component').then(m => m.SettingsComponent)
       },
       {
-        // The pool of pre-printed blank QR cards, and which student each is on.
-        // Vendor tool: hidden from the sidebar and blocked by URL for everyone but
-        // the debug login and the vendor's own test tenants, matching that nav
-        // entry's visibility.
+        // The pool of pre-printed QR cards, and which student each is on. Open to
+        // every tenant the feature is enabled for (they view the pool and request
+        // new runs here); the guard matches the nav entry's visibility.
         path: 'qr-cards',
         canActivate: [qrPoolGuard],
         data: { breadcrumb: 'BREADCRUMBS.QR_CARDS' },

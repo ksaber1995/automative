@@ -366,13 +366,17 @@ export class AuthService {
   }
 
   /**
-   * Who sees the pre-printed QR card pool (the page and its sidebar entry): the
-   * debug login, plus every user in the vendor's own test tenants, so the pool can
-   * be worked with while logged in as those. Still hidden from real customers.
+   * Who sees the QR card pool (the page and its sidebar entry): every tenant the
+   * feature is switched on for, plus the debug login and the vendor's own test
+   * tenants. The page stopped being a vendor tool when minting moved behind card
+   * requests — a client's pool view and their "request new cards" button live
+   * here, so a client who bought cards must be able to reach it.
    */
   canSeeQrCardPool(): boolean {
     const companyId = this.currentUser()?.companyId;
-    return this.isDebugUser() || (!!companyId && VENDOR_TEST_COMPANIES.includes(companyId));
+    return this.canUseQrCards()
+      || this.isDebugUser()
+      || (!!companyId && VENDOR_TEST_COMPANIES.includes(companyId));
   }
 
   canUseCrm(): boolean {

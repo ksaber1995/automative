@@ -403,9 +403,9 @@ export class LayoutComponent implements OnInit, OnDestroy {
       // is exactly what gates the group, so the entry cannot appear to someone
       // the page would then refuse.
       { labelKey: 'NAV.CARD_DESIGN', icon: 'pi pi-id-card', routerLink: ['/card-design'], visible: auth.isDebugUser() },
-      // The pool of pre-printed blank QR cards, and which student each one is on.
-      // Hidden from customer tenants on request — shown to the vendor's debug login
-      // and to the vendor's own test tenants, same check the route guard uses.
+      // The pool of pre-printed QR cards, and which student each one is on. Shown
+      // to every tenant with the feature enabled — this is where they see their
+      // pool and request new runs — same check the route guard uses.
       { labelKey: 'NAV.QR_CARDS', icon: 'pi pi-qrcode', routerLink: ['/qr-cards'], visible: auth.canSeeQrCardPool() },
     ].filter(c => c.visible) : [];
     if (admin.length) {
