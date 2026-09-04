@@ -80,6 +80,25 @@ export async function ensureQrCardSchema(): Promise<void> {
   // number was never recorded anywhere.
   await query(`ALTER TABLE qr_cards ADD COLUMN IF NOT EXISTS prev_student_code INTEGER`);
 
+  // Tenants no longer mint their own runs — they ASK for cards, and the owner
+  // accepts or refuses from the admin console. One row per ask; the decision
+  // overwrites status in place, so the tenant's history is the whole story.
+  await query(`
+    CREATE TABLE IF NOT EXISTS qr_card_requests (
+      id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      company_id   UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      requested_by UUID REFERENCES users(id) ON DELETE SET NULL,
+      count        INTEGER NOT NULL,
+      notes        TEXT,
+      status       VARCHAR(10) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ACCEPTED', 'REFUSED')),
+      decided_at   TIMESTAMP WITH TIME ZONE,
+      created_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_qr_card_requests_company ON qr_card_requests(company_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_qr_card_requests_pending
+                 ON qr_card_requests(created_at) WHERE status = 'PENDING'`);
+
   // Cards generated before the reserved range existed carry serials 1..N, which
   // collide head-on with the students' own codes. Lift them out of the way. The
   // predicate is self-limiting, so this is a no-op on every later boot.
@@ -365,59 +384,21 @@ export const qrCardsRoutes = {
     }
   },
 
-  /** Print run: mint `count` blank cards, numbered on from the last serial. */
-  generate: async ({ body, headers }: { body: { count: number; startFrom?: number | null }; headers: AuthHeaders }) => {
+  /**
+   * Print run: mint `count` blank cards, numbered on from the last serial.
+   *
+   * VENDOR-ONLY since card requests landed: tenants ask via requestCards and the
+   * run is minted from the admin console. The tenant token can never pass this
+   * gate — the handler stays because the contract route does, and because the
+   * refusal must live server-side, not just as a removed button.
+   */
+  generate: async ({ headers }: { body: { count: number; startFrom?: number | null }; headers: AuthHeaders }) => {
     try {
-      const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'students', 'write')) {
-        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
-      }
-      await ensureQrCardSchema();
-      const denied = await qrCardsDenied(context.companyId);
-      if (denied) return denied;
-
-      const count = Math.floor(Number(body?.count ?? 0));
-      if (!Number.isFinite(count) || count < 1 || count > MAX_BATCH) {
-        return apiError(400, 'ERRORS.QR_CARDS.BAD_COUNT', `Ask for between 1 and ${MAX_BATCH} cards`);
-      }
-
-      // New cards are minted in the V2 range (they print "0N"); the number continues
-      // from the last card so a reprint never collides with one already in a pocket.
-      //
-      // startFrom overrides where the run begins — the PRINTED number, not the
-      // serial, so 500 makes the first card read "0500". Used to start a batch on
-      // a round number, or to leave room after cards already held. The whole
-      // window is vetted first, against card numbers rather than serials: an old
-      // "A50" and a new "050" are the same number in two reserved ranges, so a
-      // serial-only check would mint a run printing numbers already handed out.
-      let from = await nextCardSerial(context.companyId);
-      const rawStart = body?.startFrom;
-      if (rawStart !== undefined && rawStart !== null && String(rawStart) !== '') {
-        const startN = Math.floor(Number(rawStart));
-        if (!Number.isFinite(startN) || startN < 1 || startN > 999999) {
-          return apiError(400, 'ERRORS.QR_CARDS.BAD_START', 'Start number must be between 1 and 999999');
-        }
-        const taken = await firstTakenCardNumber(context.companyId, startN, startN + count - 1);
-        if (taken !== null) {
-          return apiError(
-            400,
-            'ERRORS.QR_CARDS.START_TAKEN',
-            `Card ${taken} already exists — choose a start that leaves the whole run free`,
-          );
-        }
-        from = CARD_SERIAL_BASE_V2 + startN;
-      }
-
-      // One statement: generate_series makes the serials, uuid makes the tokens.
-      const rows = await query<any>(
-        `INSERT INTO qr_cards (company_id, token, serial)
-         SELECT $1, REPLACE(uuid_generate_v4()::text, '-', ''), g
-         FROM generate_series($2::int, $3::int) AS g
-         RETURNING *`,
-        [context.companyId, from, from + count - 1],
-      );
-
-      return { status: 201 as const, body: rows.map(mapCard) };
+      await extractTenantContext(headers.authorization);
+      // Minting lives in the admin console now (admin-secret.ts generateQrCards,
+      // which owns serials and price). An unauthenticated caller still gets 401
+      // from the line above; an authenticated one gets the honest refusal.
+      return apiError(403, 'ERRORS.QR_CARDS.VENDOR_ONLY', 'Cards are printed by the vendor — send a card request instead');
     } catch (error) {
       console.error('QR cards generate error:', error);
       return mapThrownError(error, 'ERRORS.QR_CARDS.GENERATE_FAILED', 'Failed to generate the cards', 400);
@@ -469,33 +450,12 @@ export const qrCardsRoutes = {
    * Already-printed cards are left untouched rather than re-stamped, so a second
    * click can't rewrite the date of an earlier run.
    */
-  markPrinted: async ({ body, headers }: { body: { ids?: string[] }; headers: AuthHeaders }) => {
+  markPrinted: async ({ headers }: { body: { ids?: string[] }; headers: AuthHeaders }) => {
     try {
-      const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'students', 'write')) {
-        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
-      }
-      await ensureQrCardSchema();
-      const denied = await qrCardsDenied(context.companyId);
-      if (denied) return denied;
-
-      const ids = Array.isArray(body?.ids) ? body.ids.filter(Boolean) : null;
-
-      const rows = ids
-        ? await query<any>(
-            `UPDATE qr_cards SET printed_at = NOW()
-              WHERE company_id = $1 AND printed_at IS NULL AND id = ANY($2::uuid[])
-              RETURNING *`,
-            [context.companyId, ids],
-          )
-        : await query<any>(
-            `UPDATE qr_cards SET printed_at = NOW()
-              WHERE company_id = $1 AND printed_at IS NULL AND student_id IS NULL
-              RETURNING *`,
-            [context.companyId],
-          );
-
-      return { status: 200 as const, body: { marked: rows.length } };
+      await extractTenantContext(headers.authorization);
+      // Print tracking moved to the admin console with minting — the vendor is
+      // the one who knows what actually went to a printer.
+      return apiError(403, 'ERRORS.QR_CARDS.VENDOR_ONLY', 'Print tracking is managed by the vendor');
     } catch (error) {
       console.error('QR cards mark-printed error:', error);
       return mapThrownError(error, 'ERRORS.QR_CARDS.MARK_PRINTED_FAILED', 'Failed to mark the cards as printed', 400);
@@ -506,27 +466,11 @@ export const qrCardsRoutes = {
    * Undo a mark — a run that never actually reached the printer goes back into
    * the next download rather than being stranded as "printed" forever.
    */
-  unmarkPrinted: async ({ body, headers }: { body: { ids?: string[] }; headers: AuthHeaders }) => {
+  unmarkPrinted: async ({ headers }: { body: { ids?: string[] }; headers: AuthHeaders }) => {
     try {
-      const context = await extractTenantContext(headers.authorization);
-      if (!checkGranularPermission(context, 'students', 'write')) {
-        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
-      }
-      await ensureQrCardSchema();
-      const denied = await qrCardsDenied(context.companyId);
-      if (denied) return denied;
-
-      const ids = Array.isArray(body?.ids) ? body.ids.filter(Boolean) : [];
-      if (!ids.length) return apiError(400, 'ERRORS.QR_CARDS.NO_IDS', 'No cards given');
-
-      // Linked cards stay printed: the card is physically out there.
-      const rows = await query<any>(
-        `UPDATE qr_cards SET printed_at = NULL
-          WHERE company_id = $1 AND student_id IS NULL AND id = ANY($2::uuid[])
-          RETURNING *`,
-        [context.companyId, ids],
-      );
-      return { status: 200 as const, body: { marked: rows.length } };
+      await extractTenantContext(headers.authorization);
+      // Same story as markPrinted: the vendor owns print state now.
+      return apiError(403, 'ERRORS.QR_CARDS.VENDOR_ONLY', 'Print tracking is managed by the vendor');
     } catch (error) {
       console.error('QR cards unmark-printed error:', error);
       return mapThrownError(error, 'ERRORS.QR_CARDS.MARK_PRINTED_FAILED', 'Failed to update the cards', 400);
@@ -719,4 +663,82 @@ export const qrCardsRoutes = {
       return mapThrownError(error, 'ERRORS.QR_CARDS.LIST_FAILED', 'Failed to load the cards');
     }
   },
+
+  /**
+   * POST /api/qr-cards/requests — ask the vendor for a new run of cards.
+   *
+   * One PENDING ask at a time: a second one while the first sits undecided is
+   * always a double-click or an impatient retry, and two pending rows for one
+   * academy would read as two separate orders on the owner's side.
+   */
+  requestCards: async ({ body, headers }: { body: { count: number; notes?: string | null }; headers: AuthHeaders }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'write')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureQrCardSchema();
+      const denied = await qrCardsDenied(context.companyId);
+      if (denied) return denied;
+
+      const count = Math.floor(Number(body?.count ?? 0));
+      if (!Number.isFinite(count) || count < 1 || count > MAX_BATCH) {
+        return apiError(400, 'ERRORS.QR_CARDS.BAD_COUNT', `Ask for between 1 and ${MAX_BATCH} cards`);
+      }
+
+      const pending = await queryOne<any>(
+        `SELECT id FROM qr_card_requests WHERE company_id = $1 AND status = 'PENDING'`,
+        [context.companyId],
+      );
+      if (pending) {
+        return apiError(409, 'ERRORS.QR_CARDS.REQUEST_PENDING', 'A card request is already awaiting a decision');
+      }
+
+      const notes = String(body?.notes ?? '').trim().slice(0, 500) || null;
+      const row = await queryOne<any>(
+        `INSERT INTO qr_card_requests (company_id, requested_by, count, notes)
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [context.companyId, context.userId ?? null, count, notes],
+      );
+      return { status: 201 as const, body: mapCardRequest(row) };
+    } catch (error) {
+      console.error('QR card request error:', error);
+      return mapThrownError(error, 'ERRORS.QR_CARDS.REQUEST_FAILED', 'Failed to send the card request', 400);
+    }
+  },
+
+  /** GET /api/qr-cards/requests — the tenant's own asks, newest first. */
+  listRequests: async ({ headers }: { headers: AuthHeaders }) => {
+    try {
+      const context = await extractTenantContext(headers.authorization);
+      if (!checkGranularPermission(context, 'students', 'read')) {
+        return apiError(403, 'ERRORS.PERMISSION.INSUFFICIENT', 'Insufficient permissions');
+      }
+      await ensureQrCardSchema();
+      const denied = await qrCardsDenied(context.companyId);
+      if (denied) return denied;
+
+      const rows = await query<any>(
+        `SELECT * FROM qr_card_requests WHERE company_id = $1 ORDER BY created_at DESC LIMIT 50`,
+        [context.companyId],
+      );
+      return { status: 200 as const, body: rows.map(mapCardRequest) };
+    } catch (error) {
+      console.error('QR card requests list error:', error);
+      return mapThrownError(error, 'ERRORS.QR_CARDS.LIST_FAILED', 'Failed to load the card requests');
+    }
+  },
 };
+
+function mapCardRequest(row: any) {
+  return {
+    id: row.id,
+    count: Number(row.count),
+    notes: row.notes ?? null,
+    status: row.status as 'PENDING' | 'ACCEPTED' | 'REFUSED',
+    createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+    decidedAt: row.decided_at
+      ? (row.decided_at instanceof Date ? row.decided_at.toISOString() : String(row.decided_at))
+      : null,
+  };
+}

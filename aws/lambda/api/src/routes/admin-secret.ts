@@ -1267,6 +1267,82 @@ const unguardedAdminSecretRoutes = {
       client.release();
     }
   },
+
+  /**
+   * GET /api/karim-admin-secret/card-requests?status=
+   *
+   * Every tenant's card asks in one list, for the console's requests inbox.
+   * Joined to the company (name, address) and the asker (email), because
+   * deciding an order means knowing who wants it and where it ships.
+   */
+  listCardRequests: async ({ query: q }: { query: { status?: string } }) => {
+    try {
+      await ensureQrCardSchema();
+      const status = String(q?.status ?? '').toUpperCase();
+      const filtered = ['PENDING', 'ACCEPTED', 'REFUSED'].includes(status);
+      const rows = await query<any>(
+        `SELECT r.*, c.name AS company_name, c.address AS company_address, u.email AS requested_by_email
+           FROM qr_card_requests r
+           JOIN companies c ON c.id = r.company_id
+           LEFT JOIN users u ON u.id = r.requested_by
+          ${filtered ? 'WHERE r.status = $1' : ''}
+          ORDER BY (r.status = 'PENDING') DESC, r.created_at DESC
+          LIMIT 200`,
+        filtered ? [status] : [],
+      );
+      return {
+        status: 200 as const,
+        body: rows.map((r: any) => ({
+          id: r.id,
+          companyId: r.company_id,
+          companyName: r.company_name ?? '',
+          companyAddress: r.company_address ?? null,
+          requestedByEmail: r.requested_by_email ?? null,
+          count: Number(r.count),
+          notes: r.notes ?? null,
+          status: r.status,
+          createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
+          decidedAt: r.decided_at
+            ? (r.decided_at instanceof Date ? r.decided_at.toISOString() : String(r.decided_at))
+            : null,
+        })),
+      };
+    } catch (error: any) {
+      console.error('karim-admin-secret list card requests failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'List card requests failed' } };
+    }
+  },
+
+  /**
+   * POST /api/karim-admin-secret/card-requests/:id/decide — accept or refuse.
+   *
+   * Guarded to PENDING rows so a double-click (or two people on the inbox) can't
+   * flip a decision that was already made; changing one's mind is a new request.
+   * Accepting records the answer — minting the run stays a separate, deliberate
+   * act on the client's cards sheet, where the serials and price are chosen.
+   */
+  decideCardRequest: async ({ params, body }: { params: { id: string }; body: { accept: boolean } }) => {
+    try {
+      await ensureQrCardSchema();
+      const row = await queryOne<any>(
+        `UPDATE qr_card_requests
+            SET status = $2, decided_at = NOW()
+          WHERE id = $1 AND status = 'PENDING'
+          RETURNING *`,
+        [params.id, body?.accept === true ? 'ACCEPTED' : 'REFUSED'],
+      );
+      if (!row) {
+        const exists = await queryOne<any>('SELECT id FROM qr_card_requests WHERE id = $1', [params.id]);
+        return exists
+          ? { status: 409 as const, body: { message: 'This request was already decided' } }
+          : { status: 404 as const, body: { message: 'Request not found' } };
+      }
+      return { status: 200 as const, body: { success: true, status: row.status } };
+    } catch (error: any) {
+      console.error('karim-admin-secret decide card request failed:', error);
+      return { status: 500 as const, body: { message: error?.message || 'Decide card request failed' } };
+    }
+  },
 };
 
 /**
@@ -1291,6 +1367,11 @@ const ADMIN_SECRET_PERMISSIONS: { [K in keyof typeof unguardedAdminSecretRoutes]
   // subscription, so it rides on the same grant.
   setSmsAccess: 'companies.write',
   setOnlineExamsEnabled: 'companies.write',
+
+  // The requests inbox is part of running the pool: reading asks rides the read
+  // grant, answering them is a write.
+  listCardRequests: 'cards.read',
+  decideCardRequest: 'cards.write',
 
   // Handing a batch of cards to an outside printer is part of running the pool.
   createPrintLink: 'cards.write',

@@ -22,35 +22,36 @@ export interface QrCardLinkResult extends QrCard {
   alreadyLinked: boolean;
 }
 
+/** One ask for a new run of cards, and where the vendor's decision stands. */
+export interface QrCardRequest {
+  id: string;
+  count: number;
+  notes: string | null;
+  status: 'PENDING' | 'ACCEPTED' | 'REFUSED';
+  createdAt: string;
+  decidedAt: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class QrCardService {
   private api = inject(ApiService);
-
-  /** Mint a batch of blank cards, numbered on from the last print run. */
-  /**
-   * Mint a run. `startFrom` is the PRINTED number the run begins at — 500 makes
-   * the first card read "0500"; null carries on from the last card.
-   */
-  generate(count: number, startFrom: number | null = null): Observable<QrCard[]> {
-    return this.api.post<QrCard[]>('qr-cards/generate', { count, startFrom });
-  }
 
   list(status?: 'free' | 'linked' | 'unprinted' | 'printed'): Observable<QrCard[]> {
     return this.api.get<QrCard[]>('qr-cards', status ? { status } : undefined);
   }
 
   /**
-   * Stamp a print run as sent to the printer. Always pass the exact ids that were
-   * downloaded — omitting them marks everything currently unprinted, which would
-   * wrongly swallow any cards generated since the download.
+   * Ask the vendor for a new run of cards. Minting, printing and print tracking
+   * all live on the vendor side now — the tenant's only lever is this request,
+   * and the server allows one PENDING ask at a time (409 REQUEST_PENDING).
    */
-  markPrinted(ids: string[]): Observable<{ marked: number }> {
-    return this.api.post<{ marked: number }>('qr-cards/mark-printed', { ids });
+  requestCards(count: number, notes: string | null): Observable<QrCardRequest> {
+    return this.api.post<QrCardRequest>('qr-cards/requests', { count, notes });
   }
 
-  /** Undo a mark, for a run that never actually reached the printer. */
-  unmarkPrinted(ids: string[]): Observable<{ marked: number }> {
-    return this.api.post<{ marked: number }>('qr-cards/unmark-printed', { ids });
+  /** The tenant's own asks, newest first, so the page can show where each stands. */
+  listRequests(): Observable<QrCardRequest[]> {
+    return this.api.get<QrCardRequest[]>('qr-cards/requests');
   }
 
   /** Hand a card to a student: by scanned token, or by the serial printed on it. */

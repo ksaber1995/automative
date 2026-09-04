@@ -29,6 +29,20 @@ export interface AdminCompany {
   course_count?: number | null;
 }
 
+/** One tenant's ask for a new run of cards, from /card-requests. */
+export interface CardRequestRow {
+  id: string;
+  companyId: string;
+  companyName: string;
+  companyAddress: string | null;
+  requestedByEmail: string | null;
+  count: number;
+  notes: string | null;
+  status: 'PENDING' | 'ACCEPTED' | 'REFUSED';
+  createdAt: string;
+  decidedAt: string | null;
+}
+
 /** Per-company QR pool stats from /companies/:id/qr-cards. */
 export interface QrCardStats {
   total?: number | null;

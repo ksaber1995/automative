@@ -9,6 +9,7 @@ import { KpiTileComponent } from './kpi-tile.component';
 import { PoolBarComponent } from './pool-bar.component';
 import { ClientTableComponent } from './client-table.component';
 import { ClientDrawerComponent } from './client-drawer.component';
+import { CardRequestsComponent } from './card-requests.component';
 import { boolParam, readBool, syncQueryParams } from '../shared/query-sync';
 
 /**
@@ -45,6 +46,7 @@ function parseSort(value: string | null): SortState {
   imports: [
     FormsModule, DecimalPipe,
     KpiTileComponent, PoolBarComponent, ClientTableComponent, ClientDrawerComponent,
+    CardRequestsComponent,
   ],
   template: `
     <div class="cards-scope">
@@ -83,6 +85,10 @@ function parseSort(value: string | null): SortState {
             <button class="refresh" [disabled]="loading()" (click)="load()">Refresh</button>
           </div>
         </header>
+
+        <!-- Tenants ask for cards from their own QR-cards page; the asks land
+             here. Accepting opens that client's sheet, where the run is minted. -->
+        <app-card-requests (openClient)="openClientById($event)" />
 
         @if (!loading() && !error()) {
           <section class="kpis">
@@ -380,6 +386,19 @@ export class CardsPageComponent {
       queryParams: { client: row.id },
       queryParamsHandling: 'merge',
       replaceUrl: false,
+    });
+  }
+
+  /**
+   * Open a client's sheet knowing only their id — the requests inbox has no
+   * ClientRow to hand over. Putting the id in the URL is enough: the query-param
+   * subscription resolves and opens it exactly as a pasted link would.
+   */
+  protected openClientById(id: string): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { client: id },
+      queryParamsHandling: 'merge',
     });
   }
 

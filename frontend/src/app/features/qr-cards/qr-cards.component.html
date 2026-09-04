@@ -5,70 +5,50 @@
       <p class="text-gray-500 mt-1">{{ 'QR_CARDS.SUBTITLE' | translate }}</p>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
-      <!-- Downloads the PENDING run only (unprinted, unhanded) — see downloadZip. -->
-      <p-button icon="pi pi-download" severity="secondary" [outlined]="true"
-        [label]="('QR_CARDS.DOWNLOAD' | translate) + (unprintedCount() ? ' (' + unprintedCount() + ')' : '')"
-        [pTooltip]="unprintedRange() ? (('QR_CARDS.DOWNLOAD_HINT' | translate) + ' ' + unprintedRange()) : ('QR_CARDS.DOWNLOAD_HINT' | translate)"
-        [disabled]="!unprintedCount() || exporting()" (onClick)="downloadZip()"></p-button>
-      <!-- The plain QR codes only — one PNG per card, no card template/design. -->
-      <p-button icon="pi pi-qrcode" severity="secondary" [text]="true"
-        [label]="'QR_CARDS.DOWNLOAD_RAW' | translate"
-        [pTooltip]="'QR_CARDS.DOWNLOAD_RAW_HINT' | translate"
-        [disabled]="!freeCount() || exporting()" (onClick)="downloadRawZip()"></p-button>
-      <!-- Explicit, never automatic on download: a downloaded ZIP is not proof it
-           reached a printer. -->
-      <p-button icon="pi pi-check-square" severity="success" [outlined]="true"
-        [label]="'QR_CARDS.MARK_PRINTED' | translate"
-        [pTooltip]="'QR_CARDS.MARK_PRINTED_HINT' | translate"
-        [loading]="markingPrinted()"
-        [disabled]="!unprintedCount() || exporting()" (onClick)="confirmMarkPrinted()"></p-button>
+      <!-- The tenant's one lever: ask the vendor for more cards. Disabled while
+           an ask is already awaiting a decision — the server refuses a second
+           PENDING one anyway. -->
+      <p-button icon="pi pi-send" [label]="'QR_CARDS.REQUEST_BUTTON' | translate"
+        [pTooltip]="hasPendingRequest() ? ('QR_CARDS.REQUEST_PENDING_HINT' | translate) : ''"
+        [disabled]="hasPendingRequest()"
+        (onClick)="openRequestDialog()"></p-button>
     </div>
   </div>
 
-  <!-- Print run -->
-  <p-card class="mb-4">
-    <ng-template pTemplate="header">
-      <div class="px-5 pt-5">
-        <h2 class="text-lg font-semibold text-gray-900">
-          <i class="pi pi-plus-circle mr-2 text-indigo-600"></i>{{ 'QR_CARDS.NEW_BATCH' | translate }}
-        </h2>
-        <p class="text-sm text-gray-500 mt-1">{{ 'QR_CARDS.NEW_BATCH_HINT' | translate }}</p>
-      </div>
-    </ng-template>
+  <!-- My requests -->
+  @if (requests().length) {
+    <p-card class="mb-4">
+      <ng-template pTemplate="header">
+        <div class="px-5 pt-5">
+          <h2 class="text-lg font-semibold text-gray-900">
+            <i class="pi pi-send mr-2 text-indigo-600"></i>{{ 'QR_CARDS.REQUESTS_TITLE' | translate }}
+          </h2>
+        </div>
+      </ng-template>
 
-    <div class="flex items-end gap-3 flex-wrap">
-      <div>
-        <label class="block text-sm text-gray-600 mb-1">{{ 'QR_CARDS.COUNT' | translate }}</label>
-        <input pInputText type="number" min="1" max="2000" class="w-32"
-          [(ngModel)]="count" (keyup.enter)="generate()" />
-      </div>
-      <div>
-        <label class="block text-sm text-gray-600 mb-1">{{ 'QR_CARDS.START_FROM' | translate }}</label>
-        <input pInputText type="number" min="1" max="999999" class="w-32"
-          [placeholder]="'QR_CARDS.START_FROM_PLACEHOLDER' | translate"
-          [(ngModel)]="startFrom" (keyup.enter)="generate()" />
-      </div>
-      <p-button icon="pi pi-qrcode" [label]="'QR_CARDS.GENERATE' | translate"
-        [loading]="generating()" (onClick)="generate()"></p-button>
-      <span class="text-xs text-gray-400 ms-2">{{ 'QR_CARDS.MAX_HINT' | translate }}</span>
-    </div>
-
-    @if (startPreview(); as range) {
-      <p class="text-xs text-gray-500 mt-2">{{ 'QR_CARDS.START_PREVIEW' | translate: { range } }}</p>
-    } @else {
-      <p class="text-xs text-gray-400 mt-2">{{ 'QR_CARDS.START_FROM_HINT' | translate }}</p>
-    }
-
-    @if (exporting()) {
-      <div class="mt-5">
-        <p class="text-sm font-medium text-gray-700 mb-2">
-          {{ 'QR_CARDS.RENDERING' | translate: { done: exportDone(), total: exportTotal() } }}
-        </p>
-        <p-progressBar [value]="exportPercent()"></p-progressBar>
-        <p class="text-xs text-gray-400 mt-2">{{ 'QR_CARDS.RENDERING_HINT' | translate }}</p>
-      </div>
-    }
-  </p-card>
+      <p-table [value]="requests()" [loading]="requestsLoading()" responsiveLayout="scroll">
+        <ng-template pTemplate="header">
+          <tr>
+            <th class="w-40">{{ 'QR_CARDS.REQ_COL_DATE' | translate }}</th>
+            <th class="w-28">{{ 'QR_CARDS.REQ_COL_COUNT' | translate }}</th>
+            <th>{{ 'QR_CARDS.REQ_COL_NOTES' | translate }}</th>
+            <th class="w-36">{{ 'QR_CARDS.REQ_COL_STATUS' | translate }}</th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-req>
+          <tr>
+            <td class="text-gray-600">{{ req.createdAt | date: 'MMM d, y' }}</td>
+            <td class="font-semibold text-gray-800">{{ req.count }}</td>
+            <td class="text-gray-500">{{ req.notes || '—' }}</td>
+            <td>
+              <p-tag [value]="('QR_CARDS.ST_' + req.status) | translate"
+                     [severity]="requestStatusSeverity(req.status)"></p-tag>
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+    </p-card>
+  }
 
   <!-- The pool -->
   <p-card>
@@ -84,7 +64,7 @@
           <span class="inline-flex items-center gap-1 rounded-full bg-indigo-100 text-indigo-700 text-sm font-semibold px-3 py-1">
             {{ 'QR_CARDS.LINKED_COUNT' | translate: { count: linkedCount() } }}
           </span>
-          <!-- The pending print run — the number the Download button exports. -->
+          <!-- Cards the vendor has not sent to a printer yet — read-only here. -->
           <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 text-sm font-semibold px-3 py-1"
                 [pTooltip]="unprintedRange()">
             <i class="pi pi-print"></i>{{ 'QR_CARDS.UNPRINTED_COUNT' | translate: { count: unprintedCount() } }}
@@ -137,12 +117,6 @@
             }
           </td>
           <td class="text-end">
-            <!-- Only for a free card: a linked one is physically out there, so
-                 "not printed" would be a lie. -->
-            @if (card.printed && !card.studentId) {
-              <p-button icon="pi pi-undo" severity="secondary" [text]="true" size="small"
-                [pTooltip]="'QR_CARDS.UNMARK_PRINTED' | translate" (onClick)="unmarkPrinted(card)"></p-button>
-            }
             @if (card.studentId) {
               <p-button icon="pi pi-times" severity="danger" [text]="true" size="small"
                 [pTooltip]="'QR_CARDS.UNLINK' | translate" (onClick)="confirmUnlink(card)"></p-button>
@@ -164,6 +138,34 @@
       </ng-template>
     </p-table>
   </p-card>
+
+  <!-- Request dialog: how many, and anything the vendor should know. -->
+  <p-dialog
+    [visible]="requestDialogOpen()"
+    (visibleChange)="requestDialogOpen.set($event)"
+    [modal]="true"
+    [draggable]="false"
+    [dismissableMask]="true"
+    [style]="{ width: '28rem', maxWidth: '95vw' }"
+    [header]="'QR_CARDS.REQUEST_TITLE' | translate"
+  >
+    <p class="text-sm text-gray-500 mb-3">{{ 'QR_CARDS.REQUEST_HINT' | translate }}</p>
+
+    <label class="block text-sm text-gray-600 mb-1">{{ 'QR_CARDS.REQUEST_COUNT' | translate }}</label>
+    <input pInputText type="number" min="1" max="2000" class="w-full mb-3"
+      [(ngModel)]="requestCount" (keyup.enter)="sendRequest()" />
+
+    <label class="block text-sm text-gray-600 mb-1">{{ 'QR_CARDS.REQUEST_NOTES' | translate }}</label>
+    <textarea pTextarea rows="3" class="w-full"
+      [(ngModel)]="requestNotes"
+      [placeholder]="'QR_CARDS.REQUEST_NOTES_PLACEHOLDER' | translate"></textarea>
+
+    <ng-template pTemplate="footer">
+      <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" [text]="true" (onClick)="requestDialogOpen.set(false)"></p-button>
+      <p-button icon="pi pi-send" [label]="'QR_CARDS.REQUEST_SEND' | translate"
+        [loading]="requesting()" (onClick)="sendRequest()"></p-button>
+    </ng-template>
+  </p-dialog>
 
   <p-confirmDialog></p-confirmDialog>
 </div>

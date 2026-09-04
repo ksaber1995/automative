@@ -2338,6 +2338,16 @@ const QrCardSchema = z.object({
 /** The pool types a print run can be stamped with. Mirrors qr_cards_pool_type_check. */
 const PoolTypeSchema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
 
+/** A tenant's ask for a new run of cards — decided by the owner, not minted by them. */
+const QrCardRequestSchema = z.object({
+  id: UUIDSchema,
+  count: z.number(),
+  notes: z.string().nullable(),
+  status: z.enum(['PENDING', 'ACCEPTED', 'REFUSED']),
+  createdAt: z.string(),
+  decidedAt: z.string().nullable(),
+});
+
 // CRM lists — named groups of leads (a lead can sit in many)
 const CrmListSchema = z.object({
   id: UUIDSchema,
@@ -4053,6 +4063,27 @@ export const contract = c.router({
         }),
         401: ApiErrorSchema,
       },
+    },
+    // Tenants don't mint runs any more — they ask for cards and the owner
+    // decides from the admin console. One pending ask at a time (409).
+    requestCards: {
+      method: 'POST',
+      path: '/api/qr-cards/requests',
+      body: z.object({
+        count: z.number().int().min(1).max(2000),
+        notes: z.string().max(500).nullable().optional(),
+      }),
+      responses: {
+        201: QrCardRequestSchema,
+        400: ApiErrorSchema,
+        403: ApiErrorSchema,
+        409: ApiErrorSchema,
+      },
+    },
+    listRequests: {
+      method: 'GET',
+      path: '/api/qr-cards/requests',
+      responses: { 200: z.array(QrCardRequestSchema), 403: ApiErrorSchema },
     },
   },
 
@@ -7421,6 +7452,40 @@ export const contract = c.router({
           remaining: z.number(),
         }),
         404: z.object({ message: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    // The requests inbox: every tenant's ask for cards, pending first.
+    listCardRequests: {
+      method: 'GET',
+      path: '/api/karim-admin-secret/card-requests',
+      query: z.object({ status: z.string().optional() }),
+      responses: {
+        200: z.array(z.object({
+          id: UUIDSchema,
+          companyId: UUIDSchema,
+          companyName: z.string(),
+          companyAddress: z.string().nullable(),
+          requestedByEmail: z.string().nullable(),
+          count: z.number(),
+          notes: z.string().nullable(),
+          status: z.enum(['PENDING', 'ACCEPTED', 'REFUSED']),
+          createdAt: z.string(),
+          decidedAt: z.string().nullable(),
+        })),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    // Accept or refuse one ask. Only a PENDING row can be decided (409 otherwise).
+    decideCardRequest: {
+      method: 'POST',
+      path: '/api/karim-admin-secret/card-requests/:id/decide',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({ accept: z.boolean() }),
+      responses: {
+        200: z.object({ success: z.boolean(), status: z.enum(['ACCEPTED', 'REFUSED']) }),
+        404: z.object({ message: z.string() }),
+        409: z.object({ message: z.string() }),
         500: z.object({ message: z.string() }),
       },
     },

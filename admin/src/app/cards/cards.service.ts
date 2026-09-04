@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, of, from } from 'rxjs';
 import { catchError, map, mergeMap, toArray } from 'rxjs/operators';
 import { ADMIN_ENDPOINT } from '../subscriptions.service';
-import { AdminCompany, AdminQrCard, CardStatus, ClientRow, GenerateCardsRequest, PrintLink, QrCardStats } from './models';
+import { AdminCompany, AdminQrCard, CardRequestRow, CardStatus, ClientRow, GenerateCardsRequest, PrintLink, QrCardStats } from './models';
 
 /**
  * How many per-client card-pool requests to have in flight at once. This fans
@@ -132,6 +132,22 @@ export class CardsService {
   /** Fresh pool numbers for one client, after minting or marking. */
   cardStats(companyId: string): Observable<QrCardStats> {
     return this.http.get<QrCardStats>(`${this.base}/companies/${companyId}/qr-cards`);
+  }
+
+  /** Every tenant's card asks — pending first, newest first within a status. */
+  listCardRequests(): Observable<CardRequestRow[]> {
+    return this.http.get<CardRequestRow[]>(`${this.base}/card-requests`);
+  }
+
+  /**
+   * Answer one ask. Accepting records the decision — minting the run is still
+   * done on the client's sheet, where serials and price are chosen.
+   */
+  decideCardRequest(id: string, accept: boolean): Observable<{ success: boolean; status: string }> {
+    return this.http.post<{ success: boolean; status: string }>(
+      `${this.base}/card-requests/${id}/decide`,
+      { accept },
+    );
   }
 
   /**
