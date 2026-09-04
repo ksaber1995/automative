@@ -3104,6 +3104,7 @@
       "PER_DAY_TIMES": "وقت لكل يوم",
       "PER_DAY_HINT": "حدّد وقت بدء وانتهاء لكل يوم مختار.",
       "DAY_TIMES_REQUIRED": "حدّد وقت بدء وانتهاء لكل يوم مختار.",
+      "FIX_ERRORS": "يرجى استكمال الحقول المحددة باللون الأحمر",
       "START_DATE_LABEL": "تاريخ البدء",
       "START_DATE_PLACEHOLDER": "اختر تاريخ البدء",
       "START_DATE_REQUIRED": "تاريخ البدء مطلوب",

@@ -270,6 +270,11 @@ export class ClassFormComponent implements OnInit {
     }
 
     const startDate = this.toLocalYmd(v.startDate);
+    if (!startDate) {
+      // A half-typed date in the picker — not a checkable schedule yet.
+      this.availabilityConflicts.set([]);
+      return;
+    }
 
     let endDate: string;
     if (v.numberOfSessions && v.numberOfSessions > 0) {
@@ -282,6 +287,10 @@ export class ClassFormComponent implements OnInit {
     } else if (v.endDate) {
       endDate = this.toLocalYmd(v.endDate);
     } else {
+      this.availabilityConflicts.set([]);
+      return;
+    }
+    if (!endDate) {
       this.availabilityConflicts.set([]);
       return;
     }
@@ -312,6 +321,11 @@ export class ClassFormComponent implements OnInit {
     }
 
     const startDate = this.toLocalYmd(v.startDate);
+    if (!startDate) {
+      // A half-typed date in the picker — not a checkable schedule yet.
+      this.roomConflicts.set([]);
+      return;
+    }
     let endDate: string;
     if (v.numberOfSessions && v.numberOfSessions > 0) {
       const calc = this.calculateEndDate(
@@ -323,6 +337,10 @@ export class ClassFormComponent implements OnInit {
     } else if (v.endDate) {
       endDate = this.toLocalYmd(v.endDate);
     } else {
+      this.roomConflicts.set([]);
+      return;
+    }
+    if (!endDate) {
       this.roomConflicts.set([]);
       return;
     }
@@ -590,6 +608,9 @@ export class ClassFormComponent implements OnInit {
    */
   private toLocalYmd(value: Date | string): string {
     if (!(value instanceof Date)) return value;
+    // An Invalid Date would format as "NaN-NaN-NaN"; hand back '' so every
+    // caller's empty-string guard catches it.
+    if (isNaN(value.getTime())) return '';
     const y = value.getFullYear();
     const m = String(value.getMonth() + 1).padStart(2, '0');
     const d = String(value.getDate()).padStart(2, '0');
@@ -611,12 +632,32 @@ export class ClassFormComponent implements OnInit {
       'SATURDAY': 6
     };
 
-    const selectedDayNumbers = daysOfWeek.map(day => dayMap[day]).sort((a, b) => a - b);
+    // Only days that map to a real weekday number. A stray value would put
+    // `undefined` in this list and the scans below would wait forever for a
+    // weekday that never comes up.
+    const selectedDayNumbers = daysOfWeek
+      .map(day => dayMap[day])
+      .filter((n): n is number => n !== undefined)
+      .sort((a, b) => a - b);
     let currentDate = new Date(startDate);
+
+    // An Invalid Date's getDay() is NaN, which equals no weekday — the scans
+    // below would never terminate and freeze the tab. Same story for an empty
+    // day list. This runs on every debounced form change, not just on submit,
+    // so a half-typed date must bail out here.
+    if (isNaN(currentDate.getTime()) || selectedDayNumbers.length === 0) {
+      return startDate;
+    }
+
+    // The date advances one day per iteration and hits a selected weekday at
+    // least once every 7 days, so this bounds both loops even against an
+    // absurd typed-in session count.
+    const maxIterations = Math.min(numberOfSessions, 1000) * 7 + 7;
+    let iterations = 0;
     let sessionsFound = 0;
 
     // Move to the first valid day if start date is not on a selected day
-    while (!selectedDayNumbers.includes(currentDate.getDay())) {
+    while (!selectedDayNumbers.includes(currentDate.getDay()) && iterations++ < maxIterations) {
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
@@ -624,7 +665,7 @@ export class ClassFormComponent implements OnInit {
     sessionsFound = 1;
 
     // Find the date of the last session
-    while (sessionsFound < numberOfSessions) {
+    while (sessionsFound < numberOfSessions && iterations++ < maxIterations) {
       currentDate.setDate(currentDate.getDate() + 1);
       if (selectedDayNumbers.includes(currentDate.getDay())) {
         sessionsFound++;
@@ -634,9 +675,26 @@ export class ClassFormComponent implements OnInit {
     return currentDate;
   }
 
+  /**
+   * Bring the first invalid control into view. On this form the offending
+   * field can sit a full screen above the save button, so the red highlight
+   * from markAllAsTouched is otherwise never seen. The timeout lets change
+   * detection paint the ng-invalid classes first.
+   */
+  private scrollToFirstInvalid() {
+    setTimeout(() => {
+      const el = document.querySelector<HTMLElement>('form .ng-invalid');
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }
+
   onSubmit() {
     if (this.classForm.invalid) {
+      // Returning without a word here made a blocked save look like a dead
+      // button — say what happened and bring the offending field on screen.
       this.classForm.markAllAsTouched();
+      this.notificationService.error(this.translate.instant('CLASSES.FORM.FIX_ERRORS'));
+      this.scrollToFirstInvalid();
       return;
     }
 
@@ -652,6 +710,13 @@ export class ClassFormComponent implements OnInit {
     }
 
     const startDate = this.toLocalYmd(formValue.startDate);
+    // An Invalid Date is truthy, so it sails past the required validator;
+    // toLocalYmd turns it into '' and it gets caught here instead.
+    if (!startDate) {
+      this.notificationService.error(this.translate.instant('CLASSES.FORM.START_DATE_REQUIRED'));
+      this.loading.set(false);
+      return;
+    }
 
     // Calculate end date if numberOfSessions is provided
     let endDate: string;
@@ -665,6 +730,13 @@ export class ClassFormComponent implements OnInit {
     } else if (formValue.endDate) {
       endDate = this.toLocalYmd(formValue.endDate);
     } else {
+      this.notificationService.error(this.translate.instant('CLASSES.END_DATE_OR_SESSIONS_REQUIRED'));
+      this.loading.set(false);
+      return;
+    }
+    // Both branches can still yield '' — an Invalid Date typed into either
+    // picker, or a session count whose end date could not be calculated.
+    if (!endDate) {
       this.notificationService.error(this.translate.instant('CLASSES.END_DATE_OR_SESSIONS_REQUIRED'));
       this.loading.set(false);
       return;

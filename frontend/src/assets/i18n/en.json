@@ -3104,6 +3104,7 @@
       "PER_DAY_TIMES": "Time per day",
       "PER_DAY_HINT": "Set a start and end time for each selected day.",
       "DAY_TIMES_REQUIRED": "Set a start and end time for every selected day.",
+      "FIX_ERRORS": "Please complete the highlighted fields",
       "START_DATE_LABEL": "Start Date",
       "START_DATE_PLACEHOLDER": "Select start date",
       "START_DATE_REQUIRED": "Start date is required",
