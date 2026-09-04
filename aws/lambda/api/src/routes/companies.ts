@@ -571,7 +571,9 @@ function mapCompanyProfile(row: any) {
     name: row.name,
     code: row.code,
     email: row.email,
-    phone: row.phone,
+    // The stored company phone, or the owner's registration mobile when none
+    // was ever set — see getProfile's join.
+    phone: row.phone || row.owner_mobile || null,
     address: row.address,
     city: row.city,
     state: row.state,
@@ -594,8 +596,16 @@ export const companiesRoutes = {
   getProfile: async ({ headers }: { headers: { authorization: string } }) => {
     try {
       const context = await extractTenantContext(headers.authorization);
+      // The owner's registration mobile rides along: companies.phone starts
+      // empty for every tenant (nobody fills it during signup), and a profile
+      // page whose phone reads "—" until someone re-types a number they already
+      // gave us is a page lying about what we know. Stored phone still wins —
+      // editing it on the profile overrides the fallback.
       const company = await queryOne<any>(
-        'SELECT * FROM companies WHERE id = $1',
+        `SELECT c.*, NULLIF(CONCAT('+', u.country_code, u.phone), '+') AS owner_mobile
+           FROM companies c
+           LEFT JOIN users u ON u.id = c.created_by
+          WHERE c.id = $1`,
         [context.companyId]
       );
       if (!company) {
