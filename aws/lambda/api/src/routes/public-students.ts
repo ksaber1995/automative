@@ -12,6 +12,7 @@ import { joinedBySession } from '../db/enrollment-start';
 import { resolveStatus } from './monthly-subscriptions';
 import { isRatingCompany, mapStudentExamRow, studentExamFeedSql } from './exams';
 import { getPushPublicKey, listParentNotifications, savePushSubscription } from '../utils/push';
+import { listParentVisibleNotes } from './student-notes';
 
 type AuthHeaders = { authorization?: string };
 
@@ -624,6 +625,13 @@ export const publicStudentsRoutes = {
             .reduce((t, p) => t + Math.max(0, p.amountDue - p.amountPaid), 0)
         + oneTimeDue.reduce((t, o) => t + o.remaining, 0);
 
+      // Teachers' follow-up notes marked for the family. A failure here must
+      // not take the whole profile down with it.
+      const notes = await listParentVisibleNotes(student.id, student.company_id).catch((e) => {
+        console.error('Public profile: notes failed (ignored):', e);
+        return [];
+      });
+
       return {
         status: 200 as const,
         body: {
@@ -689,6 +697,7 @@ export const publicStudentsRoutes = {
           // The parent reading this page should see the same words the teacher
           // picked — "Excellent", not a bare 5 — and the same gaps the office sees.
           exams: exams.map((row: any) => mapStudentExamRow(row, ratingCompany)),
+          notes,
         },
       };
     } catch (error) {

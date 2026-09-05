@@ -4299,6 +4299,32 @@
     "UPDATED": "Revenue updated successfully"
   },
   "STUDENTS": {
+    "TAB_DETAILS": "Details",
+    "TAB_FOLLOW_UP": "Follow-up",
+    "FOLLOW_UP": {
+      "TITLE": "Teacher follow-up",
+      "SUBTITLE": "Comments, notes and reviews about the student — whatever you mark visible, the parent sees in the app and when scanning the card",
+      "PLACEHOLDER": "Write a note about the student…",
+      "KIND_NOTE": "Note",
+      "KIND_PRAISE": "Praise",
+      "KIND_CONCERN": "Concern",
+      "VISIBLE_TO_PARENT": "Visible to parent",
+      "PRIVATE": "Staff only",
+      "ADD": "Add note",
+      "SAVE": "Save changes",
+      "EDIT": "Edit",
+      "DELETE": "Delete",
+      "HIDE": "Hide from parent",
+      "SHOW": "Show to parent",
+      "EMPTY": "No notes yet — write the first follow-up note about this student.",
+      "STAFF": "Academy staff",
+      "ADDED": "Note added",
+      "SAVED": "Note saved",
+      "DELETED": "Note deleted",
+      "FAILED": "Could not save the note",
+      "DELETE_TITLE": "Delete this note?",
+      "DELETE_MSG": "The note will be removed permanently and will no longer show to the parent."
+    },
     "EXPORT": {
       "EXCEL": "Excel",
       "PDF": "PDF",
@@ -5710,6 +5736,11 @@
     "NO_TIME_HINT": "These classes run on this day but have no start/end time, so they cannot be placed on the hour grid. Edit the class to add times."
   },
   "PUBLIC_PROFILE": {
+    "FOLLOW_UP": "Teacher follow-up",
+    "FOLLOW_UP_HINT": "Your child's teachers' notes and comments, as they wrote them.",
+    "NOTE_KIND_NOTE": "Note",
+    "NOTE_KIND_PRAISE": "Praise",
+    "NOTE_KIND_CONCERN": "Concern",
     "EXAM_ABSENT": "Absent",
     "HOMEWORK_NOT_DONE": "Not done",
     "LANGUAGE_TOGGLE": "العربية",

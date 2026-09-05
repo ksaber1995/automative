@@ -143,6 +143,15 @@ export interface PublicStudentExam {
   notMarked?: boolean;
 }
 
+/** A teacher's follow-up note the academy chose to show the family. */
+export interface PublicStudentNote {
+  id: string;
+  kind: 'NOTE' | 'PRAISE' | 'CONCERN';
+  body: string;
+  authorName: string;
+  createdAt: string;
+}
+
 export interface PublicStudentProfile {
   student: {
     name: string;
@@ -164,6 +173,7 @@ export interface PublicStudentProfile {
   };
   exams?: PublicStudentExam[];
   payments?: PublicStudentPayments;
+  notes?: PublicStudentNote[];
 }
 
 /**

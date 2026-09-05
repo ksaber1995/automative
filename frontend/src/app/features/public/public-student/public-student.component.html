@@ -312,6 +312,48 @@
         </div>
       }
 
+      <!-- Teachers' follow-up: comments, praise, concerns the academy chose to
+           share with the family. -->
+      @if (profile()?.notes?.length) {
+        <div class="bg-white rounded-xl shadow-sm p-5 mt-6">
+          <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-1">
+            <i class="pi pi-comments text-xs"></i> {{ 'PUBLIC_PROFILE.FOLLOW_UP' | translate }}
+          </h2>
+          <p class="text-xs text-gray-500 mb-3">{{ 'PUBLIC_PROFILE.FOLLOW_UP_HINT' | translate }}</p>
+          <div class="divide-y divide-gray-100">
+            @for (n of profile()!.notes!; track n.id) {
+              <div class="py-3 flex gap-3 items-start">
+                <span class="mt-0.5 inline-flex items-center justify-center w-8 h-8 rounded-full shrink-0"
+                  [ngClass]="{
+                    'bg-green-100 text-green-700': n.kind === 'PRAISE',
+                    'bg-amber-100 text-amber-700': n.kind === 'CONCERN',
+                    'bg-indigo-100 text-indigo-700': n.kind === 'NOTE'
+                  }">
+                  <i class="text-sm" [ngClass]="{
+                    'pi pi-star': n.kind === 'PRAISE',
+                    'pi pi-exclamation-triangle': n.kind === 'CONCERN',
+                    'pi pi-comment': n.kind === 'NOTE'
+                  }"></i>
+                </span>
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                    @if (n.authorName) { <span class="font-semibold text-gray-700">{{ n.authorName }}</span> <span>·</span> }
+                    <span>{{ formatDate(n.createdAt) }}</span>
+                    <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                      [ngClass]="{
+                        'bg-green-100 text-green-700': n.kind === 'PRAISE',
+                        'bg-amber-100 text-amber-700': n.kind === 'CONCERN',
+                        'bg-indigo-100 text-indigo-700': n.kind === 'NOTE'
+                      }">{{ ('PUBLIC_PROFILE.NOTE_KIND_' + n.kind) | translate }}</span>
+                  </div>
+                  <p class="m-0 mt-1 text-sm text-gray-800 whitespace-pre-line break-words">{{ n.body }}</p>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
       <!-- ── Payments ─────────────────────────────────────────────────────────
            What is still OWED, across every billing model the student is on. A
            settled bill is not listed: this page is read standing at a desk to

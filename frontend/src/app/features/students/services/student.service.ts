@@ -4,6 +4,29 @@ import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { Student, StudentCreateDto, StudentUpdateDto, StudentImportRow, StudentImportResult } from '@shared/interfaces/student.interface';
 
+/** What a teacher writes about a student on the Follow-up tab. */
+export type StudentNoteKind = 'NOTE' | 'PRAISE' | 'CONCERN';
+export const STUDENT_NOTE_KINDS: StudentNoteKind[] = ['NOTE', 'PRAISE', 'CONCERN'];
+
+export interface StudentNote {
+  id: string;
+  studentId: string;
+  authorUserId: string | null;
+  authorName: string;
+  kind: StudentNoteKind;
+  body: string;
+  /** Shown on the parent's card page and in the mobile app when true. */
+  visibleToParent: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StudentNoteDto {
+  body?: string;
+  kind?: StudentNoteKind;
+  visibleToParent?: boolean;
+}
+
 export interface EnrollmentDto {
   courseId: string;
   enrollmentDate: string;
@@ -99,6 +122,23 @@ export class StudentService {
 
   deleteStudent(id: string): Observable<Student> {
     return this.api.delete<Student>(`students/${id}`);
+  }
+
+  // ── Follow-up notes ──────────────────────────────────────────────────
+  listNotes(studentId: string): Observable<StudentNote[]> {
+    return this.api.get<StudentNote[]>(`students/${studentId}/notes`);
+  }
+
+  addNote(studentId: string, dto: StudentNoteDto): Observable<StudentNote> {
+    return this.api.post<StudentNote>(`students/${studentId}/notes`, dto);
+  }
+
+  updateNote(studentId: string, noteId: string, dto: StudentNoteDto): Observable<StudentNote> {
+    return this.api.patch<StudentNote>(`students/${studentId}/notes/${noteId}`, dto);
+  }
+
+  deleteNote(studentId: string, noteId: string): Observable<{ success: boolean }> {
+    return this.api.delete<{ success: boolean }>(`students/${studentId}/notes/${noteId}`);
   }
 
   reactivateStudent(id: string): Observable<Student> {

@@ -11,6 +11,7 @@ class ParentProfile {
     required this.attendance,
     required this.exams,
     required this.payments,
+    required this.notes,
   });
 
   final String studentName;
@@ -20,6 +21,10 @@ class ParentProfile {
   final AttendanceSummary attendance;
   final List<ExamRow> exams;
   final PaymentsSummary? payments;
+
+  /// Teachers' follow-up notes the academy chose to show the family, newest
+  /// first. Empty on an API build that predates them.
+  final List<NoteRow> notes;
 
   factory ParentProfile.fromJson(Map<String, dynamic> json) {
     final student = (json['student'] as Map<String, dynamic>?) ?? const {};
@@ -34,8 +39,34 @@ class ParentProfile {
       payments: json['payments'] is Map<String, dynamic>
           ? PaymentsSummary.fromJson(json['payments'] as Map<String, dynamic>)
           : null,
+      notes: _list(json['notes']).map(NoteRow.fromJson).toList(),
     );
   }
+}
+
+/// One follow-up note from a teacher. `kind` is NOTE | PRAISE | CONCERN.
+class NoteRow {
+  NoteRow({
+    required this.id,
+    required this.kind,
+    required this.body,
+    required this.authorName,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String kind;
+  final String body;
+  final String authorName;
+  final String createdAt;
+
+  factory NoteRow.fromJson(Map<String, dynamic> j) => NoteRow(
+        id: (j['id'] as String?) ?? '',
+        kind: (j['kind'] as String?) ?? 'NOTE',
+        body: (j['body'] as String?) ?? '',
+        authorName: (j['authorName'] as String?) ?? '',
+        createdAt: (j['createdAt'] as String?) ?? '',
+      );
 }
 
 List<Map<String, dynamic>> _list(dynamic v) =>

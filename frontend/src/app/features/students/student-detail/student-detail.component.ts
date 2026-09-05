@@ -33,7 +33,7 @@ import { LanguageService } from '../../../core/services/language.service';
 import { GlobalScanService } from '../../../core/services/global-scan.service';
 import { QrCard, QrCardService } from '../../qr-cards/qr-card.service';
 import { serialLabel } from '../../qr-cards/qr-cards.component';
-import { StudentService } from '../services/student.service';
+import { StudentService, StudentNote, StudentNoteKind, STUDENT_NOTE_KINDS } from '../services/student.service';
 import { CARD_SERIAL_BASE, formatStudentCode, normalizeStudentCode, shouldShowStudentCode } from '../../../core/utils/student-code.util';
 import { EnrollmentService, JoinDateImpact } from '../../enrollments/services/enrollment.service';
 import { CourseService } from '../../courses/services/course.service';
@@ -314,6 +314,21 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
    * actions — switched by `tabEnrollments()`.
    */
   enrollmentTab = signal<'active-courses' | 'withdrawn-courses' | 'finished-courses'>('active-courses');
+
+  // ── Page tabs: the record itself, and the teacher's follow-up notes ────
+  mainTab = signal<'details' | 'follow-up'>('details');
+
+  notes = signal<StudentNote[]>([]);
+  notesLoading = signal(false);
+  savingNote = signal(false);
+  /** Set while the composer is editing an existing note instead of adding one. */
+  editingNoteId = signal<string | null>(null);
+  noteDraft = '';
+  noteKind: StudentNoteKind = 'NOTE';
+  noteVisible = true;
+  noteKindOptions = signal<{ label: string; value: StudentNoteKind }[]>([]);
+  /** Notes are part of the student record: whoever may edit the student may write them. */
+  canWriteNotes = (): boolean => this.authService.canWrite('students');
 
   /**
    * The student left this course. Withdrawn wins over both other tabs, so a
@@ -794,12 +809,121 @@ export class StudentDetailComponent implements OnInit, OnDestroy {
     this.loadExamResults(id);
     this.loadLinkedCards(id);
     this.loadPortalCredentials(id);
+    this.loadNotes(id);
+  }
+
+  // ── Follow-up notes ─────────────────────────────────────────────────────
+
+  loadNotes(id: string) {
+    this.noteKindOptions.set(STUDENT_NOTE_KINDS.map((k) => ({
+      label: this.translate.instant(`STUDENTS.FOLLOW_UP.KIND_${k}`),
+      value: k,
+    })));
+    this.notesLoading.set(true);
+    this.studentService.listNotes(id).subscribe({
+      next: (rows) => { this.notes.set(rows); this.notesLoading.set(false); },
+      error: () => { this.notes.set([]); this.notesLoading.set(false); },
+    });
+  }
+
+  submitNote() {
+    const s = this.student();
+    const text = this.noteDraft.trim();
+    if (!s || !text || this.savingNote()) return;
+    this.savingNote.set(true);
+    const dto = { body: text, kind: this.noteKind, visibleToParent: this.noteVisible };
+    const editing = this.editingNoteId();
+    const req = editing
+      ? this.studentService.updateNote(s.id, editing, dto)
+      : this.studentService.addNote(s.id, dto);
+    req.subscribe({
+      next: (saved) => {
+        this.notes.update((list) => editing
+          ? list.map((n) => (n.id === saved.id ? saved : n))
+          : [saved, ...list]);
+        this.notificationService.success(
+          this.translate.instant(editing ? 'STUDENTS.FOLLOW_UP.SAVED' : 'STUDENTS.FOLLOW_UP.ADDED'));
+        this.cancelNoteEdit();
+        this.savingNote.set(false);
+      },
+      error: () => {
+        this.notificationService.error(this.translate.instant('STUDENTS.FOLLOW_UP.FAILED'));
+        this.savingNote.set(false);
+      },
+    });
+  }
+
+  startEditNote(n: StudentNote) {
+    this.editingNoteId.set(n.id);
+    this.noteDraft = n.body;
+    this.noteKind = n.kind;
+    this.noteVisible = n.visibleToParent;
+  }
+
+  cancelNoteEdit() {
+    this.editingNoteId.set(null);
+    this.noteDraft = '';
+    this.noteKind = 'NOTE';
+    this.noteVisible = true;
+  }
+
+  toggleNoteVisibility(n: StudentNote) {
+    const s = this.student();
+    if (!s) return;
+    this.studentService.updateNote(s.id, n.id, { visibleToParent: !n.visibleToParent }).subscribe({
+      next: (saved) => this.notes.update((list) => list.map((x) => (x.id === saved.id ? saved : x))),
+      error: () => this.notificationService.error(this.translate.instant('STUDENTS.FOLLOW_UP.FAILED')),
+    });
+  }
+
+  confirmDeleteNote(n: StudentNote) {
+    const s = this.student();
+    if (!s) return;
+    this.confirmationService.confirm({
+      header: this.translate.instant('STUDENTS.FOLLOW_UP.DELETE_TITLE'),
+      message: this.translate.instant('STUDENTS.FOLLOW_UP.DELETE_MSG'),
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: this.translate.instant('STUDENTS.FOLLOW_UP.DELETE'),
+      rejectLabel: this.translate.instant('STUDENTS.DETAIL.CANCEL'),
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => this.studentService.deleteNote(s.id, n.id).subscribe({
+        next: () => {
+          this.notes.update((list) => list.filter((x) => x.id !== n.id));
+          if (this.editingNoteId() === n.id) this.cancelNoteEdit();
+          this.notificationService.success(this.translate.instant('STUDENTS.FOLLOW_UP.DELETED'));
+        },
+        error: () => this.notificationService.error(this.translate.instant('STUDENTS.FOLLOW_UP.FAILED')),
+      }),
+    });
+  }
+
+  noteKindLabel(kind: StudentNoteKind): string {
+    return this.translate.instant(`STUDENTS.FOLLOW_UP.KIND_${kind}`);
+  }
+
+  /** Praise reads green, a concern amber, a plain note the exam indigo. */
+  noteKindClass(kind: StudentNoteKind): string {
+    switch (kind) {
+      case 'PRAISE': return 'bg-green-100 text-green-700';
+      case 'CONCERN': return 'bg-amber-100 text-amber-700';
+      default: return 'bg-indigo-100 text-indigo-700';
+    }
+  }
+
+  noteKindIcon(kind: StudentNoteKind): string {
+    switch (kind) {
+      case 'PRAISE': return 'pi pi-star';
+      case 'CONCERN': return 'pi pi-exclamation-triangle';
+      default: return 'pi pi-comment';
+    }
   }
 
   /** Clear per-student state so data from a previously-viewed student
    *  doesn't linger when navigating to a new id on the same component. */
   private resetStudentState() {
     this.student.set(null);
+    this.notes.set([]);
+    this.cancelNoteEdit();
     this.telegramParentUrl.set(null);
     this.enrollments.set([]);
     this.masterEnrollments.set([]);

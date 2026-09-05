@@ -471,6 +471,23 @@
       </ng-template>
     </p-dialog>
 
+    <!-- Two tabs: the record (enrollments, attendance, marks, money, books) and
+         the teacher's follow-up notes. The identity card above stays put. -->
+      <p-tabs [value]="mainTab()" (valueChange)="mainTab.set($any($event))" class="mt-6">
+        <p-tablist>
+          <p-tab value="details">
+            <i class="pi pi-id-card me-2"></i>{{ 'STUDENTS.TAB_DETAILS' | translate }}
+          </p-tab>
+          <p-tab value="follow-up">
+            <i class="pi pi-comments me-2"></i>{{ 'STUDENTS.TAB_FOLLOW_UP' | translate }}
+            @if (notes().length > 0) {
+              <span class="ms-2 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold">{{ notes().length }}</span>
+            }
+          </p-tab>
+        </p-tablist>
+        <p-tabpanels class="!p-0">
+          <p-tabpanel value="details">
+
     <!-- Master Course (Bundle) Enrollments — hidden for TEACHER companies -->
     @if (!isTeacher()) {
     <p-card class="mt-6">
@@ -1926,6 +1943,91 @@
         </ng-template>
       </p-table>
     </p-card>
+          </p-tabpanel>
+
+          <!-- Follow-up: what teachers write about the student. Parent-visible
+               notes also show on the card page and in the mobile app. -->
+          <p-tabpanel value="follow-up">
+    <p-card class="mt-6">
+      <ng-template pTemplate="header">
+        <div class="flex justify-between items-center p-4 flex-wrap gap-3">
+          <h3 class="text-xl font-bold flex items-center gap-2">
+            <i class="pi pi-comments text-indigo-600"></i>
+            {{ 'STUDENTS.FOLLOW_UP.TITLE' | translate }} ({{ notes().length }})
+          </h3>
+          <span class="text-sm text-gray-500">{{ 'STUDENTS.FOLLOW_UP.SUBTITLE' | translate }}</span>
+        </div>
+      </ng-template>
+
+      @if (canWriteNotes()) {
+        <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 mb-4">
+          <textarea pTextarea rows="3" class="w-full" [(ngModel)]="noteDraft"
+            [placeholder]="'STUDENTS.FOLLOW_UP.PLACEHOLDER' | translate" [disabled]="savingNote()"></textarea>
+          <div class="flex flex-wrap items-center gap-3 mt-3">
+            <p-select [(ngModel)]="noteKind" [options]="noteKindOptions()" optionLabel="label" optionValue="value"
+              appendTo="body" styleClass="text-sm"></p-select>
+            <label class="flex items-center gap-2 text-sm cursor-pointer">
+              <p-checkbox [(ngModel)]="noteVisible" [binary]="true"></p-checkbox>
+              {{ 'STUDENTS.FOLLOW_UP.VISIBLE_TO_PARENT' | translate }}
+            </label>
+            <span class="flex-1"></span>
+            @if (editingNoteId()) {
+              <p-button [label]="'STUDENTS.DETAIL.CANCEL' | translate" severity="secondary" [text]="true"
+                (onClick)="cancelNoteEdit()"></p-button>
+            }
+            <p-button [label]="(editingNoteId() ? 'STUDENTS.FOLLOW_UP.SAVE' : 'STUDENTS.FOLLOW_UP.ADD') | translate"
+              icon="pi pi-send" [loading]="savingNote()" [disabled]="!noteDraft.trim()" (onClick)="submitNote()"></p-button>
+          </div>
+        </div>
+      }
+
+      @if (notesLoading()) {
+        <div class="text-center py-6"><i class="pi pi-spin pi-spinner text-2xl text-gray-400"></i></div>
+      } @else if (notes().length === 0) {
+        <div class="text-center py-10 text-gray-500">
+          <i class="pi pi-comments text-4xl text-gray-300 block mb-2"></i>
+          {{ 'STUDENTS.FOLLOW_UP.EMPTY' | translate }}
+        </div>
+      } @else {
+        <div class="divide-y divide-gray-100">
+          @for (n of notes(); track n.id) {
+            <div class="py-3 flex gap-3 items-start" [class.opacity-60]="editingNoteId() && editingNoteId() !== n.id">
+              <span class="mt-1 inline-flex items-center justify-center w-9 h-9 rounded-full shrink-0" [ngClass]="noteKindClass(n.kind)">
+                <i [class]="noteKindIcon(n.kind)"></i>
+              </span>
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                  <span class="font-semibold text-gray-700">{{ n.authorName || ('STUDENTS.FOLLOW_UP.STAFF' | translate) }}</span>
+                  <span>·</span>
+                  <span>{{ n.createdAt | date: 'medium' }}</span>
+                  <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold" [ngClass]="noteKindClass(n.kind)">{{ noteKindLabel(n.kind) }}</span>
+                  @if (n.visibleToParent) {
+                    <span class="text-green-600" [pTooltip]="'STUDENTS.FOLLOW_UP.VISIBLE_TO_PARENT' | translate"><i class="pi pi-eye"></i></span>
+                  } @else {
+                    <span class="text-gray-400" [pTooltip]="'STUDENTS.FOLLOW_UP.PRIVATE' | translate"><i class="pi pi-eye-slash"></i></span>
+                  }
+                </div>
+                <p class="m-0 mt-1 text-sm text-gray-800 whitespace-pre-line break-words">{{ n.body }}</p>
+              </div>
+              @if (canWriteNotes()) {
+                <div class="flex items-center shrink-0">
+                  <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" severity="secondary"
+                    (onClick)="startEditNote(n)" [pTooltip]="'STUDENTS.FOLLOW_UP.EDIT' | translate"></p-button>
+                  <p-button [icon]="n.visibleToParent ? 'pi pi-eye-slash' : 'pi pi-eye'" [text]="true" [rounded]="true" severity="secondary"
+                    (onClick)="toggleNoteVisibility(n)"
+                    [pTooltip]="(n.visibleToParent ? 'STUDENTS.FOLLOW_UP.HIDE' : 'STUDENTS.FOLLOW_UP.SHOW') | translate"></p-button>
+                  <p-button icon="pi pi-trash" [text]="true" [rounded]="true" severity="danger"
+                    (onClick)="confirmDeleteNote(n)" [pTooltip]="'STUDENTS.FOLLOW_UP.DELETE' | translate"></p-button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    </p-card>
+          </p-tabpanel>
+        </p-tabpanels>
+      </p-tabs>
 
   } @else if (loading()) {
     <div class="flex justify-center items-center h-64">

@@ -6,13 +6,15 @@ import '../models/parent_profile.dart';
 import 'attendance_screen.dart';
 import 'children_store.dart';
 import 'exams_screen.dart';
+import 'follow_up_screen.dart';
 import 'payments_screen.dart';
 import 'widgets/attendance_ring.dart';
 import 'widgets/rows.dart';
 
 /// One child's front page. The header answers the first question ("هل حضر؟")
-/// at a glance; below it, three doors — attendance, exams & homework,
-/// payments — each carrying a one-line summary, each opening its own page.
+/// at a glance; below it, four doors — attendance, exams & homework,
+/// payments, the teacher's follow-up — each carrying a one-line summary, each
+/// opening its own page.
 /// The groups the child is enrolled in close the page. Nothing scrolls for
 /// ever here any more: the long lists live behind the doors.
 class ChildDashboard extends StatefulWidget {
@@ -74,6 +76,9 @@ class _ChildDashboardState extends State<ChildDashboard> {
     final dueCount =
         p.payments?.rows.where((r) => r.remaining > 0).length ?? 0;
     final lastSession = a.recent.isEmpty ? null : a.recent.first;
+    final concerns = p.notes.where((n) => n.kind == 'CONCERN').length;
+    final praise = p.notes.where((n) => n.kind == 'PRAISE').length;
+    final lastNote = p.notes.isEmpty ? null : p.notes.first;
 
     return Scaffold(
       body: RefreshIndicator(
@@ -141,6 +146,28 @@ class _ChildDashboardState extends State<ChildDashboard> {
                         ? null
                         : '${p.payments!.rows.length} فاتورة',
                     onTap: () => _open((p) => PaymentsScreen(profile: p)),
+                  ),
+                  const SizedBox(height: 12),
+                  _HubButton(
+                    icon: Icons.forum_outlined,
+                    color: concerns > 0 ? AppTheme.amber : AppTheme.exam,
+                    title: 'متابعة المدرّس',
+                    summary: p.notes.isEmpty
+                        ? 'لم يكتب المدرّسون ملاحظات بعد'
+                        : [
+                            '${p.notes.length} ملاحظة',
+                            if (praise > 0) '$praise إشادة',
+                            if (concerns > 0) '$concerns تنبيه',
+                          ].join(' · '),
+                    detail: lastNote == null
+                        ? null
+                        : '${lastNote.authorName.isEmpty ? 'المدرّس' : lastNote.authorName}: ${lastNote.body}',
+                    detailColor: lastNote?.kind == 'CONCERN'
+                        ? AppTheme.amberDeep
+                        : lastNote?.kind == 'PRAISE'
+                            ? AppTheme.green
+                            : null,
+                    onTap: () => _open((p) => FollowUpScreen(profile: p)),
                   ),
                   if (p.courses.isNotEmpty) ...[
                     const SectionTitle('الكورسات', icon: Icons.menu_book_outlined),

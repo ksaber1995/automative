@@ -984,6 +984,19 @@ const StudentSessionSchema = z.object({
   student: z.object({ name: z.string(), username: z.string() }),
 });
 
+const StudentNoteKindSchema = z.enum(['NOTE', 'PRAISE', 'CONCERN']);
+const StudentNoteSchema = z.object({
+  id: UUIDSchema,
+  studentId: UUIDSchema,
+  authorUserId: UUIDSchema.nullable(),
+  authorName: z.string(),
+  kind: StudentNoteKindSchema,
+  body: z.string(),
+  visibleToParent: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 const StudentMeSchema = z.object({
   name: z.string(),
   username: z.string(),
@@ -2781,6 +2794,48 @@ export const contract = c.router({
         403: ApiErrorSchema,
         404: ApiErrorSchema,
       },
+    },
+  },
+
+  /**
+   * Follow-up notes a teacher writes about a student. Parent-visible ones
+   * also surface on the public card page and in the mobile app.
+   */
+  studentNotes: {
+    list: {
+      method: 'GET',
+      path: '/api/students/:id/notes',
+      pathParams: z.object({ id: UUIDSchema }),
+      responses: { 200: z.array(StudentNoteSchema), 403: ApiErrorSchema, 404: ApiErrorSchema, 500: ApiErrorSchema },
+    },
+    create: {
+      method: 'POST',
+      path: '/api/students/:id/notes',
+      pathParams: z.object({ id: UUIDSchema }),
+      body: z.object({
+        body: z.string().min(1).max(4000),
+        kind: StudentNoteKindSchema.optional(),
+        visibleToParent: z.boolean().optional(),
+      }),
+      responses: { 201: StudentNoteSchema, 400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema, 500: ApiErrorSchema },
+    },
+    update: {
+      method: 'PATCH',
+      path: '/api/students/:id/notes/:noteId',
+      pathParams: z.object({ id: UUIDSchema, noteId: UUIDSchema }),
+      body: z.object({
+        body: z.string().min(1).max(4000).optional(),
+        kind: StudentNoteKindSchema.optional(),
+        visibleToParent: z.boolean().optional(),
+      }),
+      responses: { 200: StudentNoteSchema, 400: ApiErrorSchema, 403: ApiErrorSchema, 404: ApiErrorSchema, 500: ApiErrorSchema },
+    },
+    remove: {
+      method: 'DELETE',
+      path: '/api/students/:id/notes/:noteId',
+      pathParams: z.object({ id: UUIDSchema, noteId: UUIDSchema }),
+      body: z.object({}).optional(),
+      responses: { 200: z.object({ success: z.boolean() }), 403: ApiErrorSchema, 404: ApiErrorSchema, 500: ApiErrorSchema },
     },
   },
 
@@ -4850,6 +4905,14 @@ export const contract = c.router({
             totalOutstanding: z.number(),
             totalRefunded: z.number(),
           }).optional(),
+          /** Teachers' follow-up notes the academy chose to show the family. */
+          notes: z.array(z.object({
+            id: UUIDSchema,
+            kind: StudentNoteKindSchema,
+            body: z.string(),
+            authorName: z.string(),
+            createdAt: z.string(),
+          })).optional(),
         }),
         404: ApiErrorSchema,
         429: ApiErrorSchema,

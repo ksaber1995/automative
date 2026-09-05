@@ -63,6 +63,7 @@ import { debugRoutes } from './routes/debug';
 import { usersRoutes } from './routes/users';
 import { demoLeadsRoutes } from './routes/demo-leads';
 import { publicStudentsRoutes } from './routes/public-students';
+import { studentNotesRoutes } from './routes/student-notes';
 import { receiptsRoutes } from './routes/receipts';
 import { roomsRoutes } from './routes/rooms';
 import { sessionsRoutes } from './routes/sessions';
@@ -92,6 +93,7 @@ const router = {
   // `/students/:id` or it is captured as an id and rejected as an invalid uuid
   // (same trap as sessions' `/next-number`, see the note further down).
   students: studentsRoutes,
+  studentNotes: studentNotesRoutes,
   branches: branchesRoutes,
   courses: coursesRoutes,
   levels: levelsRoutes,
