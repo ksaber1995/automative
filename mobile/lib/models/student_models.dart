@@ -6,14 +6,39 @@ List<Map<String, dynamic>> _list(dynamic v) =>
     (v as List?)?.whereType<Map<String, dynamic>>().toList() ?? const [];
 
 class StudentInfo {
-  StudentInfo({required this.name, required this.username});
+  StudentInfo({
+    required this.name,
+    required this.username,
+    this.companyName,
+    this.branchName,
+    this.studentCode,
+    this.qrToken,
+  });
 
   final String name;
   final String username;
+  final String? companyName;
+  final String? branchName;
+
+  /// The student's own card — the short code read out to a teacher and the QR
+  /// the attendance scanner reads. Both come from /student-auth/me only; the
+  /// login response carries just name and username, so they are null until
+  /// the session refreshes itself.
+  final int? studentCode;
+  final String? qrToken;
+
+  /// The exact payload printed in every card's QR, so a phone screen scans
+  /// the same as the plastic.
+  String? get qrPayload =>
+      qrToken == null ? null : 'https://app.netrofit.com/p/s/$qrToken';
 
   factory StudentInfo.fromJson(Map<String, dynamic> j) => StudentInfo(
         name: (j['name'] as String?) ?? '',
         username: (j['username'] as String?) ?? '',
+        companyName: j['companyName'] as String?,
+        branchName: j['branchName'] as String?,
+        studentCode: (j['studentCode'] as num?)?.toInt(),
+        qrToken: j['qrToken'] as String?,
       );
 }
 

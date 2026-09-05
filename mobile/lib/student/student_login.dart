@@ -78,9 +78,11 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
               width: double.infinity,
               padding: EdgeInsets.only(
                   top: MediaQuery.of(context).padding.top + 16, bottom: 40),
+              // The web login page's sky gradient — the one screen on the web
+              // that is not grey chrome, and the one it mirrors here.
               decoration: const BoxDecoration(
-                gradient: AppTheme.headerGradient,
-                borderRadius: BorderRadius.vertical(bottom: Radius.circular(36)),
+                gradient: AppTheme.skyGradient,
+                borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
               ),
               child: Column(
                 children: [
@@ -156,7 +158,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text('أول مرة؟',
-                          style: TextStyle(color: Colors.grey[600])),
+                          style: TextStyle(color: AppTheme.muted)),
                     ),
                     const Expanded(child: Divider()),
                   ]),
@@ -166,13 +168,13 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                       minimumSize: const Size.fromHeight(52),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16)),
-                      side: const BorderSide(color: AppTheme.indigo),
+                      side: const BorderSide(color: AppTheme.primary),
                     ),
                     icon: const Icon(Icons.qr_code_scanner,
-                        color: AppTheme.indigo),
+                        color: AppTheme.primary),
                     label: const Text('امسح بطاقتك لتفعيل حسابك',
                         style: TextStyle(
-                            color: AppTheme.indigo,
+                            color: AppTheme.primary,
                             fontWeight: FontWeight.w700)),
                     onPressed: _scanCard,
                   ),
@@ -344,7 +346,7 @@ class _ClaimFinishScreenState extends State<_ClaimFinishScreen> {
     final firstTime = !widget.claim.hasCredentials;
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppTheme.indigo,
+        backgroundColor: AppTheme.chrome,
         title: const Text('تفعيل الحساب'),
       ),
       body: Padding(
@@ -362,7 +364,7 @@ class _ClaimFinishScreenState extends State<_ClaimFinishScreen> {
               firstTime
                   ? 'اختر اسم مستخدم وكلمة مرور لحسابك — ستستخدمهما في كل مرة.'
                   : 'هذا الحساب مفعّل من قبل — اكتب اسم المستخدم وكلمة المرور اللذين اخترتهما.',
-              style: TextStyle(color: Colors.grey[700]),
+              style: TextStyle(color: AppTheme.muted),
             ),
             const SizedBox(height: 24),
             TextField(

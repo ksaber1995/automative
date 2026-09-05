@@ -363,7 +363,8 @@ export const studentAuthRoutes = {
       await ensureStudentAuthSchema();
       const row = await queryOne<any>(
         `SELECT a.username, a.last_login_at,
-                s.name, b.name AS branch_name, c.name AS company_name
+                s.name, s.student_code, s.qr_token,
+                b.name AS branch_name, c.name AS company_name
            FROM student_auth a
            JOIN students  s ON s.id = a.student_id
            JOIN companies c ON c.id = a.company_id
@@ -383,6 +384,11 @@ export const studentAuthRoutes = {
           companyName: row.company_name,
           branchName: row.branch_name ?? null,
           lastLoginAt: row.last_login_at ? new Date(row.last_login_at).toISOString() : null,
+          // The student's own card: the short code they read out to a teacher
+          // and the QR the attendance scanner reads. Same values the printed
+          // card carries, so a phone screen stands in for a forgotten card.
+          studentCode: row.student_code === null || row.student_code === undefined ? null : Number(row.student_code),
+          qrToken: row.qr_token ?? null,
         },
       };
     } catch (error: any) {

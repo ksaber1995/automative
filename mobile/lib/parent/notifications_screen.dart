@@ -34,7 +34,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final ctrl = context.watch<NotificationsController>();
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppTheme.indigo,
+        backgroundColor: AppTheme.chrome,
         title: const Text('التنبيهات', style: TextStyle(fontWeight: FontWeight.w800)),
       ),
       body: RefreshIndicator(
@@ -47,7 +47,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     children: [
                       const SizedBox(height: 120),
                       const Icon(Icons.notifications_none,
-                          size: 64, color: Color(0xFFC9C9E2)),
+                          size: 64, color: AppTheme.lineStrong),
                       const SizedBox(height: 12),
                       Center(
                         child: Text('لا توجد تنبيهات بعد',
@@ -59,7 +59,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       Center(
                         child: Text(
                             'حضور وغياب ومدفوعات ونتائج أبنائك ستصل هنا.',
-                            style: TextStyle(color: Colors.grey[600])),
+                            style: TextStyle(color: AppTheme.muted)),
                       ),
                     ],
                   )
@@ -103,7 +103,7 @@ class _NotificationCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: isNew
-            ? const BorderSide(color: AppTheme.indigo, width: 1.4)
+            ? const BorderSide(color: AppTheme.primary, width: 1.4)
             : BorderSide.none,
       ),
       child: Padding(
@@ -114,10 +114,10 @@ class _NotificationCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppTheme.indigo.withValues(alpha: 0.08),
+                color: AppTheme.primary.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(_icon, color: AppTheme.indigo),
+              child: Icon(_icon, color: AppTheme.primary),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -135,7 +135,7 @@ class _NotificationCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppTheme.indigo,
+                            color: AppTheme.primary,
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: const Text('جديد',
@@ -149,7 +149,7 @@ class _NotificationCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     '${item.childName} · ${intl.DateFormat('d/M/yyyy – h:mm a').format(item.createdAt)}',
-                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                    style: TextStyle(color: AppTheme.muted, fontSize: 12),
                   ),
                 ],
               ),

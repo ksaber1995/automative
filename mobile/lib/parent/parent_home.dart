@@ -65,11 +65,11 @@ class ParentHome extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(28),
                       decoration: BoxDecoration(
-                        color: AppTheme.indigo.withValues(alpha: 0.08),
+                        color: AppTheme.primary.withValues(alpha: 0.08),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.qr_code_scanner,
-                          size: 64, color: AppTheme.indigo),
+                          size: 64, color: AppTheme.primary),
                     ),
                     const SizedBox(height: 20),
                     Text('امسح بطاقة ابنك لتتابع كل شيء',
@@ -83,7 +83,7 @@ class ParentHome extends StatelessWidget {
                       style: Theme.of(context)
                           .textTheme
                           .bodyMedium
-                          ?.copyWith(color: Colors.grey[600]),
+                          ?.copyWith(color: AppTheme.muted),
                     ),
                   ],
                 ),
@@ -111,8 +111,6 @@ class ParentHome extends StatelessWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppTheme.indigo,
-        foregroundColor: Colors.white,
         icon: const Icon(Icons.qr_code_scanner),
         label: const Text('إضافة ابن'),
         onPressed: () => Navigator.of(context)
@@ -171,7 +169,7 @@ class _ChildCard extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: const BoxDecoration(
-                  gradient: AppTheme.headerGradient,
+                  color: AppTheme.primary,
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -197,7 +195,7 @@ class _ChildCard extends StatelessWidget {
                         style: Theme.of(context)
                             .textTheme
                             .bodySmall
-                            ?.copyWith(color: Colors.grey[600])),
+                            ?.copyWith(color: AppTheme.muted)),
                   ],
                 ),
               ),
@@ -205,7 +203,7 @@ class _ChildCard extends StatelessWidget {
                 icon: const Icon(Icons.delete_outline, color: Colors.grey),
                 onPressed: onRemove,
               ),
-              const Icon(Icons.chevron_left, color: AppTheme.indigo),
+              const Icon(Icons.chevron_left, color: AppTheme.primary),
             ],
           ),
         ),

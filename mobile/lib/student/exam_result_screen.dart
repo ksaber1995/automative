@@ -81,7 +81,7 @@ class ExamResultScreen extends StatelessWidget {
                 child: Text(
                   'أجوبة هذا الامتحان غير متاحة للمراجعة.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey[600]),
+                  style: TextStyle(color: AppTheme.muted),
                 ),
               ),
             ),
@@ -137,7 +137,7 @@ class _ReviewCard extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppTheme.indigo.withValues(alpha: 0.06),
+                  color: AppTheme.primary.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text('التفسير: ${q.explanation}',
@@ -174,7 +174,7 @@ class _ReviewCard extends StatelessWidget {
             child: Text(
               o.text,
               style: TextStyle(
-                color: color == Colors.grey ? Colors.grey[700] : color,
+                color: color == Colors.grey ? AppTheme.muted : color,
                 fontWeight:
                     o.isCorrect || chosen ? FontWeight.w700 : FontWeight.w400,
               ),

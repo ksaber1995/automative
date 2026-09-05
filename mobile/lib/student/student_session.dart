@@ -75,6 +75,20 @@ class StudentSession extends ChangeNotifier {
   /// Called by screens when any student call answers 401 mid-session.
   Future<void> expire() => logout();
 
+  /// Re-read /me — the only endpoint carrying the student's code and QR
+  /// token. Silent on failure: the name from login is still on screen, and
+  /// the card tab shows its own "unavailable" state.
+  Future<void> refreshMe() async {
+    if (api.token == null) return;
+    try {
+      final me = await api.get('/student-auth/me') as Map<String, dynamic>;
+      _student = StudentInfo.fromJson(me);
+      notifyListeners();
+    } on ApiException catch (e) {
+      if (e.isUnauthorized) await expire();
+    } catch (_) {}
+  }
+
   Future<void> _setSession(Map<String, dynamic> res) async {
     api.token = res['token'] as String?;
     _student = StudentInfo.fromJson(
@@ -82,6 +96,7 @@ class StudentSession extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kTokenKey, api.token ?? '');
     notifyListeners();
+    await refreshMe();
   }
 
   Future<void> _clear() async {

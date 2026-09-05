@@ -130,7 +130,7 @@ class _AddChildScreenState extends State<AddChildScreen> {
                     style: Theme.of(context)
                         .textTheme
                         .bodySmall
-                        ?.copyWith(color: Colors.grey[600])),
+                        ?.copyWith(color: AppTheme.muted)),
                 const SizedBox(height: 10),
                 Row(
                   children: [

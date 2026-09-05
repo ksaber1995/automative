@@ -6,10 +6,12 @@ import '../core/api.dart';
 import '../core/theme.dart';
 import '../models/student_models.dart';
 import 'exam_sit_screen.dart';
+import 'student_card_tab.dart';
 import 'student_session.dart';
 
 /// The signed-in student's home: available exams first (that is what they came
-/// for), all past results behind the second tab.
+/// for), all past results behind the second tab, and the student's own card —
+/// QR plus short code — behind the third.
 class StudentHome extends StatefulWidget {
   const StudentHome({super.key});
 
@@ -61,14 +63,13 @@ class _StudentHomeState extends State<StudentHome> {
     final session = context.watch<StudentSession>();
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppTheme.indigo,
         title: Column(
           children: [
-            const Text('بوابة الطالب',
-                style: TextStyle(fontWeight: FontWeight.w800)),
+            const Text('بوابة الطالب'),
             if (session.student != null)
               Text(session.student!.name,
-                  style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                  style: const TextStyle(
+                      fontSize: 12, color: Color(0xFFB3B3B3))),
           ],
         ),
         actions: [
@@ -85,8 +86,12 @@ class _StudentHomeState extends State<StudentHome> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _load,
-        child: _tab == 0 ? _examsBody() : _resultsBody(),
+        onRefresh: _tab == 2 ? session.refreshMe : _load,
+        child: switch (_tab) {
+          0 => _examsBody(),
+          1 => _resultsBody(),
+          _ => const StudentCardTab(),
+        },
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
@@ -96,6 +101,7 @@ class _StudentHomeState extends State<StudentHome> {
               icon: Icon(Icons.assignment_outlined), label: 'الامتحانات'),
           NavigationDestination(
               icon: Icon(Icons.emoji_events_outlined), label: 'نتائجي'),
+          NavigationDestination(icon: Icon(Icons.qr_code_2), label: 'بطاقتي'),
         ],
       ),
     );
@@ -159,7 +165,7 @@ class _StudentHomeState extends State<StudentHome> {
           Center(
               child: Text(title,
                   style: const TextStyle(fontWeight: FontWeight.w800))),
-          Center(child: Text(hint, style: TextStyle(color: Colors.grey[600]))),
+          Center(child: Text(hint, style: TextStyle(color: AppTheme.muted))),
         ],
       );
 }
@@ -175,7 +181,7 @@ class _ExamCard extends StatelessWidget {
     final (chipText, chipColor) = switch (item.state) {
       'IN_PROGRESS' => ('مستمر — أكمل الحل', AppTheme.amber),
       'DONE' => ('تم التسليم', AppTheme.green),
-      _ => ('متاح الآن', AppTheme.indigo),
+      _ => ('متاح الآن', AppTheme.primary),
     };
 
     return Card(
@@ -210,7 +216,7 @@ class _ExamCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 4),
-            Text(item.courseName, style: TextStyle(color: Colors.grey[600])),
+            Text(item.courseName, style: TextStyle(color: AppTheme.muted)),
             const SizedBox(height: 10),
             Wrap(
               spacing: 14,
@@ -327,10 +333,10 @@ class _Fact extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: Colors.grey[600]),
+        Icon(icon, size: 16, color: AppTheme.muted),
         const SizedBox(width: 4),
         Text(text,
-            style: TextStyle(color: Colors.grey[700], fontSize: 13)),
+            style: TextStyle(color: AppTheme.muted, fontSize: 13)),
       ],
     );
   }
@@ -353,18 +359,18 @@ class _ResultTile extends StatelessWidget {
       color = Colors.grey;
     } else if (row.isRating || row.maxGrade == null) {
       mark = row.grade;
-      color = AppTheme.indigo;
+      color = AppTheme.exam;
     } else {
       final max = row.maxGrade!;
       final maxText =
           max.truncateToDouble() == max ? max.toInt().toString() : '$max';
       mark = '${row.grade}/$maxText';
-      color = AppTheme.indigo;
+      color = AppTheme.exam;
     }
     return ListTile(
       leading: Icon(
           row.isHomework ? Icons.edit_note : Icons.emoji_events_outlined,
-          color: AppTheme.violet),
+          color: AppTheme.exam),
       title:
           Text(row.examName, style: const TextStyle(fontWeight: FontWeight.w600)),
       subtitle: Text(row.courseName),

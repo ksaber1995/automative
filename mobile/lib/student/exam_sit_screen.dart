@@ -183,7 +183,7 @@ class _ExamSitScreenState extends State<ExamSitScreen> {
     if (attempt == null) {
       return Scaffold(
         appBar:
-            AppBar(backgroundColor: AppTheme.indigo, title: const Text('الامتحان')),
+            AppBar(backgroundColor: AppTheme.chrome, title: const Text('الامتحان')),
         body: Center(
           child: _error == null
               ? const CircularProgressIndicator()
@@ -211,7 +211,7 @@ class _ExamSitScreenState extends State<ExamSitScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          backgroundColor: AppTheme.indigo,
+          backgroundColor: AppTheme.chrome,
           title: Text(attempt.examName,
               style:
                   const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
@@ -279,7 +279,7 @@ class _ExamSitScreenState extends State<ExamSitScreen> {
                     const Spacer(),
                     Text('${_page + 1} / $total',
                         style: TextStyle(
-                            color: Colors.grey[600],
+                            color: AppTheme.muted,
                             fontWeight: FontWeight.w700)),
                     const Spacer(),
                     if (_page < total - 1)
@@ -330,7 +330,7 @@ class _QuestionPage extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       children: [
         Text('سؤال ${index + 1} من $total',
-            style: TextStyle(color: Colors.grey[600])),
+            style: TextStyle(color: AppTheme.muted)),
         const SizedBox(height: 8),
         Text(question.questionText,
             style: Theme.of(context)
@@ -365,7 +365,7 @@ class _OptionCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Material(
-        color: selected ? AppTheme.indigo.withValues(alpha: 0.08) : Colors.white,
+        color: selected ? AppTheme.primary.withValues(alpha: 0.08) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
@@ -375,7 +375,7 @@ class _OptionCard extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: selected ? AppTheme.indigo : const Color(0xFFE3E3F0),
+                color: selected ? AppTheme.primary : AppTheme.line,
                 width: selected ? 2 : 1,
               ),
             ),
@@ -385,7 +385,7 @@ class _OptionCard extends StatelessWidget {
                   selected
                       ? Icons.radio_button_checked
                       : Icons.radio_button_unchecked,
-                  color: selected ? AppTheme.indigo : Colors.grey,
+                  color: selected ? AppTheme.primary : Colors.grey,
                 ),
                 const SizedBox(width: 12),
                 Expanded(

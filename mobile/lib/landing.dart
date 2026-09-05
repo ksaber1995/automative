@@ -10,6 +10,9 @@ import 'student/student_session.dart';
 /// The front door: one app, two audiences. A parent follows their children; a
 /// student sits exams. Neither mode locks the other out — the same phone in a
 /// household can serve both.
+///
+/// Painted as the web app's chrome: the grey of its header and sidebar, with
+/// the logo's green as the only accent.
 class LandingScreen extends StatelessWidget {
   const LandingScreen({super.key});
 
@@ -18,6 +21,7 @@ class LandingScreen extends StatelessWidget {
     final session = context.watch<StudentSession>();
 
     return Scaffold(
+      backgroundColor: AppTheme.chrome,
       body: Container(
         decoration: const BoxDecoration(gradient: AppTheme.headerGradient),
         child: SafeArea(
@@ -29,11 +33,19 @@ class LandingScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(22),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.14),
+                    color: AppTheme.accent.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
+                    border: Border.all(
+                        color: AppTheme.accent.withValues(alpha: 0.4)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.accent.withValues(alpha: 0.35),
+                        blurRadius: 24,
+                      ),
+                    ],
                   ),
-                  child:
-                      const Icon(Icons.auto_awesome, size: 56, color: Colors.white),
+                  child: const Icon(Icons.auto_awesome,
+                      size: 56, color: AppTheme.accent),
                 ),
                 const SizedBox(height: 20),
                 Text('نتروفت',
@@ -43,7 +55,7 @@ class LandingScreen extends StatelessWidget {
                     style: Theme.of(context)
                         .textTheme
                         .titleMedium
-                        ?.copyWith(color: Colors.white70)),
+                        ?.copyWith(color: const Color(0xFFB3B3B3))),
                 const Spacer(),
                 _ModeCard(
                   icon: Icons.family_restroom,
@@ -91,10 +103,10 @@ class _ModeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(22),
+      color: AppTheme.card,
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(18),
@@ -103,8 +115,8 @@ class _ModeCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  gradient: AppTheme.headerGradient,
-                  borderRadius: BorderRadius.circular(16),
+                  color: AppTheme.primary,
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: Colors.white, size: 28),
               ),
@@ -122,11 +134,11 @@ class _ModeCard extends StatelessWidget {
                         style: Theme.of(context)
                             .textTheme
                             .bodySmall
-                            ?.copyWith(color: Colors.grey[600])),
+                            ?.copyWith(color: AppTheme.muted)),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_left, color: AppTheme.indigo),
+              const Icon(Icons.chevron_left, color: AppTheme.primary),
             ],
           ),
         ),

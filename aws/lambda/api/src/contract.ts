@@ -990,6 +990,10 @@ const StudentMeSchema = z.object({
   companyName: z.string(),
   branchName: z.string().nullable(),
   lastLoginAt: z.string().nullable(),
+  // The student's own card, for showing on a phone: the short code and the
+  // QR token the printed card carries (`/p/s/<qrToken>`).
+  studentCode: z.number().nullable(),
+  qrToken: z.string().nullable(),
 });
 
 // =============================================

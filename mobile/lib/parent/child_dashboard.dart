@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart' as intl;
 import 'package:provider/provider.dart';
 
 import '../core/theme.dart';
 import '../models/parent_profile.dart';
+import 'attendance_screen.dart';
 import 'children_store.dart';
+import 'exams_screen.dart';
+import 'payments_screen.dart';
 import 'widgets/attendance_ring.dart';
+import 'widgets/rows.dart';
 
-/// Everything a parent can know about one child, on one scrolling page:
-/// attendance front and centre, then money, groups, recent sessions and marks.
-/// Same data as the web card page — organised around the questions a parent
-/// actually opens the app to answer ("هل حضر؟ هل عليّ فلوس؟ جاب كام؟").
+/// One child's front page. The header answers the first question ("هل حضر؟")
+/// at a glance; below it, three doors — attendance, exams & homework,
+/// payments — each carrying a one-line summary, each opening its own page.
+/// The groups the child is enrolled in close the page. Nothing scrolls for
+/// ever here any more: the long lists live behind the doors.
 class ChildDashboard extends StatefulWidget {
   const ChildDashboard({super.key, required this.token, this.initial});
 
@@ -43,9 +47,10 @@ class _ChildDashboardState extends State<ChildDashboard> {
     }
   }
 
-  String _day(String iso) {
-    final d = DateTime.tryParse(iso);
-    return d == null ? iso : intl.DateFormat('d/M/yyyy').format(d);
+  void _open(Widget Function(ParentProfile) build) {
+    final p = _profile;
+    if (p == null) return;
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => build(p)));
   }
 
   @override
@@ -53,9 +58,7 @@ class _ChildDashboardState extends State<ChildDashboard> {
     final p = _profile;
     if (p == null) {
       return Scaffold(
-        appBar: AppBar(
-            backgroundColor: AppTheme.indigo,
-            title: const Text('جاري التحميل…')),
+        appBar: AppBar(title: const Text('جاري التحميل…')),
         body: Center(
           child: _error == null
               ? const CircularProgressIndicator()
@@ -64,7 +67,13 @@ class _ChildDashboardState extends State<ChildDashboard> {
       );
     }
 
+    final a = p.attendance;
+    final exams = p.exams.where((e) => !e.isHomework).length;
+    final homework = p.exams.length - exams;
     final outstanding = p.payments?.totalOutstanding ?? 0;
+    final dueCount =
+        p.payments?.rows.where((r) => r.remaining > 0).length ?? 0;
+    final lastSession = a.recent.isEmpty ? null : a.recent.first;
 
     return Scaffold(
       body: RefreshIndicator(
@@ -74,52 +83,68 @@ class _ChildDashboardState extends State<ChildDashboard> {
           slivers: [
             SliverToBoxAdapter(child: _Header(profile: p)),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-                  if (outstanding > 0) _OutstandingBanner(amount: outstanding),
-                  if (p.attendance.byClass.isNotEmpty) ...[
-                    const SectionTitle('الحضور حسب المجموعة',
-                        icon: Icons.groups_outlined),
-                    ...p.attendance.byClass.map((c) => _ByClassRow(row: c)),
-                  ],
-                  if (p.attendance.recent.isNotEmpty) ...[
-                    const SectionTitle('آخر الحصص', icon: Icons.history),
-                    Card(
-                      child: Column(
-                        children: [
-                          for (final r in p.attendance.recent.take(10))
-                            _SessionTile(row: r, day: _day),
-                        ],
-                      ),
+                  if (outstanding > 0) ...[
+                    _OutstandingBanner(
+                      amount: outstanding,
+                      onTap: () => _open((p) => PaymentsScreen(profile: p)),
                     ),
+                    const SizedBox(height: 14),
                   ],
+                  _HubButton(
+                    icon: Icons.fact_check_outlined,
+                    color: AppTheme.green,
+                    title: 'الحضور والغياب',
+                    summary: a.totalSessions == 0
+                        ? 'لا توجد حصص مسجّلة بعد'
+                        : '${a.attendanceRate.round()}٪ حضور · ${a.absentCount} غياب من ${a.totalSessions} حصة',
+                    detail: lastSession == null
+                        ? null
+                        : 'آخر حصة ${fmtDay(lastSession.date)} — ${switch (lastSession.status) {
+                            'PRESENT' => 'حضر',
+                            'SUBSTITUTED' => 'حصة بديلة',
+                            _ => 'غاب',
+                          }}',
+                    detailColor: lastSession == null
+                        ? null
+                        : switch (lastSession.status) {
+                            'PRESENT' => AppTheme.green,
+                            'SUBSTITUTED' => AppTheme.amberDeep,
+                            _ => AppTheme.red,
+                          },
+                    onTap: () => _open((p) => AttendanceScreen(profile: p)),
+                  ),
+                  const SizedBox(height: 12),
+                  _HubButton(
+                    icon: Icons.emoji_events_outlined,
+                    color: AppTheme.exam,
+                    title: 'الامتحانات والواجبات',
+                    summary: p.exams.isEmpty
+                        ? 'لا توجد نتائج بعد'
+                        : '$exams امتحان · $homework واجب',
+                    detail: p.exams.isEmpty ? null : _lastMark(p.exams.first),
+                    onTap: () => _open((p) => ExamsScreen(profile: p)),
+                  ),
+                  const SizedBox(height: 12),
+                  _HubButton(
+                    icon: Icons.payments_outlined,
+                    color: outstanding > 0 ? AppTheme.amber : AppTheme.info,
+                    title: 'المدفوعات',
+                    summary: p.payments == null || p.payments!.rows.isEmpty
+                        ? 'لا توجد فواتير بعد'
+                        : outstanding > 0
+                            ? 'متبقي ${fmtAmount(outstanding)} على $dueCount ${dueCount == 1 ? 'فاتورة' : 'فواتير'}'
+                            : 'كل الفواتير مدفوعة ✓',
+                    detail: p.payments == null
+                        ? null
+                        : '${p.payments!.rows.length} فاتورة',
+                    onTap: () => _open((p) => PaymentsScreen(profile: p)),
+                  ),
                   if (p.courses.isNotEmpty) ...[
                     const SectionTitle('الكورسات', icon: Icons.menu_book_outlined),
                     ...p.courses.map((c) => _CourseCard(row: c)),
-                  ],
-                  if (p.exams.isNotEmpty) ...[
-                    const SectionTitle('النتائج والواجبات',
-                        icon: Icons.emoji_events_outlined),
-                    Card(
-                      child: Column(
-                        children: [
-                          for (final e in p.exams.take(15))
-                            _ExamTile(row: e, day: _day),
-                        ],
-                      ),
-                    ),
-                  ],
-                  if ((p.payments?.rows.isNotEmpty ?? false)) ...[
-                    const SectionTitle('المدفوعات', icon: Icons.payments_outlined),
-                    Card(
-                      child: Column(
-                        children: [
-                          for (final r in p.payments!.rows.take(20))
-                            _PaymentTile(row: r),
-                        ],
-                      ),
-                    ),
                   ],
                 ]),
               ),
@@ -128,6 +153,17 @@ class _ChildDashboardState extends State<ChildDashboard> {
         ),
       ),
     );
+  }
+
+  String _lastMark(ExamRow e) {
+    final what = e.isHomework ? 'آخر واجب' : 'آخر امتحان';
+    if (e.isAbsent) return '$what: ${e.examName} — غائب';
+    if (e.notMarked) return '$what: ${e.examName} — لم يُصحح';
+    final max = e.maxGrade;
+    final mark = e.isRating || max == null
+        ? e.grade
+        : '${e.grade}/${max.truncateToDouble() == max ? max.toInt() : max}';
+    return '$what: ${e.examName} — $mark';
   }
 }
 
@@ -142,10 +178,10 @@ class _Header extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: AppTheme.headerGradient,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(
-          top: MediaQuery.of(context).padding.top + 8, bottom: 24),
+          top: MediaQuery.of(context).padding.top + 8, bottom: 22),
       child: Column(
         children: [
           Row(
@@ -167,7 +203,7 @@ class _Header extends StatelessWidget {
                       style: Theme.of(context)
                           .textTheme
                           .bodySmall
-                          ?.copyWith(color: Colors.white70),
+                          ?.copyWith(color: const Color(0xFFB3B3B3)),
                     ),
                   ],
                 ),
@@ -220,111 +256,127 @@ class _HeaderStat extends StatelessWidget {
             style: Theme.of(context)
                 .textTheme
                 .bodySmall
-                ?.copyWith(color: Colors.white70)),
+                ?.copyWith(color: const Color(0xFFB3B3B3))),
       ],
     );
   }
 }
 
-class _OutstandingBanner extends StatelessWidget {
-  const _OutstandingBanner({required this.amount});
+/// One of the three doors: an icon on its colour, a title, a one-line summary,
+/// and optionally the most recent fact under it.
+class _HubButton extends StatelessWidget {
+  const _HubButton({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.summary,
+    required this.onTap,
+    this.detail,
+    this.detailColor,
+  });
 
-  final double amount;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(top: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.amber.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.amber.withValues(alpha: 0.5)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.info_outline, color: Color(0xFFB45309)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'مبالغ مستحقة: ${amount.toStringAsFixed(amount.truncateToDouble() == amount ? 0 : 2)}',
-              style: const TextStyle(
-                  color: Color(0xFF92400E), fontWeight: FontWeight.w800),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ByClassRow extends StatelessWidget {
-  const _ByClassRow({required this.row});
-
-  final ClassAttendance row;
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String summary;
+  final String? detail;
+  final Color? detailColor;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final rate = row.attendanceRate.clamp(0, 100).toDouble();
-    final color = rate >= 80
-        ? AppTheme.green
-        : rate >= 60
-            ? AppTheme.amber
-            : AppTheme.red;
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(row.className,
-                      style: const TextStyle(fontWeight: FontWeight.w700)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                Text('${rate.round()}٪ · ${row.presentCount}/${row.totalSessions}',
-                    style: TextStyle(color: color, fontWeight: FontWeight.w800)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(
-                value: rate / 100,
-                minHeight: 8,
-                backgroundColor: const Color(0xFFEDEDF7),
-                valueColor: AlwaysStoppedAnimation(color),
+                alignment: Alignment.center,
+                child: Icon(icon, color: color, size: 28),
               ),
-            ),
-          ],
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text(summary,
+                        style: const TextStyle(
+                            color: AppTheme.ink,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13)),
+                    if (detail != null) ...[
+                      const SizedBox(height: 2),
+                      Text(detail!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: detailColor ?? AppTheme.muted,
+                              fontSize: 12)),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_left, color: AppTheme.muted),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _SessionTile extends StatelessWidget {
-  const _SessionTile({required this.row, required this.day});
+class _OutstandingBanner extends StatelessWidget {
+  const _OutstandingBanner({required this.amount, required this.onTap});
 
-  final AttendanceRow row;
-  final String Function(String) day;
+  final double amount;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final (icon, color, label) = switch (row.status) {
-      'PRESENT' => (Icons.check_circle, AppTheme.green, 'حضر'),
-      'SUBSTITUTED' => (Icons.swap_horiz, AppTheme.amber, 'حصة بديلة'),
-      _ => (Icons.cancel, AppTheme.red, 'غاب'),
-    };
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(row.className,
-          style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text(day(row.date)),
-      trailing: Text(label,
-          style: TextStyle(color: color, fontWeight: FontWeight.w800)),
+    return Material(
+      color: AppTheme.amber.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.amber.withValues(alpha: 0.5)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline, color: AppTheme.amberDeep),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'مبالغ مستحقة: ${fmtAmount(amount)}',
+                  style: const TextStyle(
+                      color: AppTheme.amberDeep, fontWeight: FontWeight.w800),
+                ),
+              ),
+              const Icon(Icons.chevron_left, color: AppTheme.amberDeep),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -343,10 +395,10 @@ class _CourseCard extends StatelessWidget {
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: AppTheme.indigo.withValues(alpha: 0.09),
-            borderRadius: BorderRadius.circular(12),
+            color: AppTheme.primary.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(10),
           ),
-          child: const Icon(Icons.school_outlined, color: AppTheme.indigo),
+          child: const Icon(Icons.school_outlined, color: AppTheme.primary),
         ),
         title: Text(row.courseName,
             style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -354,75 +406,9 @@ class _CourseCard extends StatelessWidget {
         trailing: Text(
           active ? 'مستمر' : 'انسحب',
           style: TextStyle(
-              color: active ? AppTheme.green : Colors.grey,
+              color: active ? AppTheme.green : AppTheme.muted,
               fontWeight: FontWeight.w700),
         ),
-      ),
-    );
-  }
-}
-
-class _ExamTile extends StatelessWidget {
-  const _ExamTile({required this.row, required this.day});
-
-  final ExamRow row;
-  final String Function(String) day;
-
-  @override
-  Widget build(BuildContext context) {
-    final String mark;
-    final Color color;
-    if (row.isAbsent) {
-      mark = 'غائب';
-      color = AppTheme.red;
-    } else if (row.notMarked) {
-      mark = 'لم يُصحح';
-      color = Colors.grey;
-    } else if (row.isRating || row.maxGrade == null) {
-      mark = row.grade;
-      color = AppTheme.indigo;
-    } else {
-      mark = '${row.grade}/${_trim(row.maxGrade!)}';
-      color = AppTheme.indigo;
-    }
-    return ListTile(
-      leading: Icon(
-        row.isHomework ? Icons.edit_note : Icons.emoji_events_outlined,
-        color: AppTheme.violet,
-      ),
-      title:
-          Text(row.examName, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text('${row.courseName} · ${day(row.examDate)}'),
-      trailing:
-          Text(mark, style: TextStyle(color: color, fontWeight: FontWeight.w800)),
-    );
-  }
-
-  String _trim(double v) =>
-      v.truncateToDouble() == v ? v.toInt().toString() : v.toString();
-}
-
-class _PaymentTile extends StatelessWidget {
-  const _PaymentTile({required this.row});
-
-  final PaymentRow row;
-
-  @override
-  Widget build(BuildContext context) {
-    final settled = row.remaining <= 0;
-    return ListTile(
-      leading: Icon(
-        settled ? Icons.check_circle_outline : Icons.hourglass_bottom,
-        color: settled ? AppTheme.green : AppTheme.amber,
-      ),
-      title:
-          Text(row.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text(row.subtitle),
-      trailing: Text(
-        settled ? 'مدفوع' : 'متبقي ${row.remaining.toStringAsFixed(0)}',
-        style: TextStyle(
-            color: settled ? AppTheme.green : const Color(0xFFB45309),
-            fontWeight: FontWeight.w800),
       ),
     );
   }
