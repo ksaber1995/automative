@@ -410,7 +410,7 @@
       "EDIT": "Edit evaluation",
       "BY_CODE": "Record by trainee code",
       "BY_CODE_PLACEHOLDER": "Enter trainee code, then Enter",
-      "MARKED_ABSENT_COUNT": "{{count}} trainee(s) marked absent",
+      "MARKED_ABSENT_COUNT": "{{count}} trainee(s) marked as didn't take the evaluation",
       "LOAD_FAILED": "Failed to load evaluation",
       "SCAN_HINT": "Enter a grade, then scan a trainee's QR to record it. Scanning again updates the grade.",
       "MANUAL_ENTRY": "Trainee code or QR",
@@ -1457,7 +1457,7 @@
     "TARGET_STUDENT": "Trainee only",
     "TEMPLATES_HELP": "Attendance: {studentName} {className} {courseName} {sessionNumber} {date} {academyName} · Evaluation: {studentName} {examName} {courseName} {grade} {maxGrade} {percentage} {academyName}",
     "TPL_EXAM_RESULT": "Evaluation result message",
-    "TPL_EXAM_ABSENT": "Evaluation absence message"
+    "TPL_EXAM_ABSENT": "Didn't-take-the-evaluation message"
   },
   "TELEGRAM_CONNECT": {
     "STUDENT": "Trainee"

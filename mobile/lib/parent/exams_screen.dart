@@ -66,7 +66,7 @@ class _ExamsScreenState extends State<ExamsScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: StatChip(
-                  label: absent > 0 ? 'غياب' : 'لم يُصحح',
+                  label: absent > 0 ? 'لم يقدّم' : 'لم يُصحح',
                   value: '${absent > 0 ? absent : pending}',
                   color: absent > 0 ? AppTheme.red : AppTheme.muted,
                 ),

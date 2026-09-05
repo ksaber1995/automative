@@ -377,7 +377,7 @@
       "EDIT": "تعديل التقييم",
       "BY_CODE": "تسجيل بكود المتدرب",
       "BY_CODE_PLACEHOLDER": "أدخل كود المتدرب ثم اضغط Enter",
-      "MARKED_ABSENT_COUNT": "تم تعليم {{count}} متدرب كغائب",
+      "MARKED_ABSENT_COUNT": "تم تعليم {{count}} متدرب: لم يقدّم التقييم",
       "LOAD_FAILED": "تعذّر تحميل التقييم",
       "SCAN_HINT": "أدخل درجة ثم امسح رمز QR للمتدرب لتسجيلها. المسح مرة أخرى يُحدّث الدرجة.",
       "MANUAL_ENTRY": "كود المتدرب أو رمز QR",
@@ -1372,7 +1372,7 @@
     "TARGET_STUDENT": "المتدرب فقط",
     "TEMPLATES_HELP": "الحضور: {studentName} {className} {courseName} {sessionNumber} {date} {academyName} · التقييم: {studentName} {examName} {courseName} {grade} {maxGrade} {percentage} {academyName}",
     "TPL_EXAM_RESULT": "رسالة نتيجة التقييم",
-    "TPL_EXAM_ABSENT": "رسالة الغياب عن التقييم"
+    "TPL_EXAM_ABSENT": "رسالة عدم تقديم التقييم"
   },
   "TELEGRAM_CONNECT": {
     "STUDENT": "المتدرب"

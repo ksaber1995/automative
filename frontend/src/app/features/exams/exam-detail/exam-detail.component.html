@@ -291,7 +291,7 @@
       <div class="flex items-center gap-2 flex-wrap">
         @if (canWrite()) {
           <p-button
-            [label]="'EXAMS.DETAIL.MARK_REMAINING_ABSENT' | translate"
+            [label]="absentKey('MARK_REMAINING_ABSENT') | translate"
             icon="pi pi-user-minus"
             severity="danger"
             [outlined]="true"
@@ -329,7 +329,7 @@
             @if (canWrite()) {
               <div class="flex items-center gap-2">
                 @if (row.isAbsent) {
-                  <p-tag severity="danger" [value]="'EXAMS.DETAIL.ABSENT' | translate" class="flex-1"></p-tag>
+                  <p-tag severity="danger" [value]="absentKey('ABSENT') | translate" class="flex-1"></p-tag>
                 } @else if (useRating()) {
                   <!-- A dropdown here rather than five buttons per row: the roster
                        is the long list, and buttons on every row would bury it.
@@ -359,12 +359,12 @@
                 <p-button [text]="true" size="small" [rounded]="true"
                   [icon]="row.isAbsent ? 'pi pi-undo' : 'pi pi-user-minus'"
                   [severity]="row.isAbsent ? 'secondary' : 'danger'"
-                  [pTooltip]="(row.isAbsent ? 'EXAMS.DETAIL.UNMARK_ABSENT' : 'EXAMS.DETAIL.MARK_ABSENT') | translate"
+                  [pTooltip]="absentKey(row.isAbsent ? 'UNMARK_ABSENT' : 'MARK_ABSENT') | translate"
                   (onClick)="toggleAbsent(row)"></p-button>
               </div>
             } @else {
               @if (row.isAbsent) {
-                <p-tag severity="danger" [value]="'EXAMS.DETAIL.ABSENT' | translate"></p-tag>
+                <p-tag severity="danger" [value]="absentKey('ABSENT') | translate"></p-tag>
               } @else {
                 @if (useRating()) {
                   <span>{{ row.grade ? ratingLabel(row.grade) : '—' }}</span>

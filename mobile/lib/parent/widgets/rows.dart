@@ -111,7 +111,7 @@ class ExamTile extends StatelessWidget {
     final String mark;
     final Color color;
     if (row.isAbsent) {
-      mark = 'غائب';
+      mark = row.isHomework ? 'لم يحل الواجب' : 'لم يقدّم الامتحان';
       color = AppTheme.red;
     } else if (row.notMarked) {
       mark = 'لم يُصحح';

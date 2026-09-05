@@ -41,7 +41,7 @@ import { StudentExamsService, ResultRow } from './student-exams.service';
         </div>
         <div style="text-align:end; white-space:nowrap;">
           @if (row.isAbsent) {
-            <span class="mark mark-absent">{{ i18n.t('RESULTS.ABSENT') }}</span>
+            <span class="mark mark-absent">{{ i18n.t(row.isHomework ? 'RESULTS.NOT_DONE' : 'RESULTS.ABSENT') }}</span>
           } @else if (row.notMarked) {
             <span class="mark mark-pending">{{ i18n.t('RESULTS.NOT_MARKED') }}</span>
           } @else {

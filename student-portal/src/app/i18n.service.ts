@@ -92,7 +92,8 @@ const DICT: Record<string, { ar: string; en: string }> = {
 
   'RESULTS.HEADING': { ar: 'نتايجي', en: 'My results' },
   'RESULTS.EMPTY': { ar: 'مفيش نتايج لسه', en: 'No results yet' },
-  'RESULTS.ABSENT': { ar: 'غايب', en: 'Absent' },
+  'RESULTS.ABSENT': { ar: 'لم تقدّم الامتحان', en: "Didn't take the exam" },
+  'RESULTS.NOT_DONE': { ar: 'لم تحل الواجب', en: "Didn't do the homework" },
   'RESULTS.NOT_MARKED': { ar: 'لسه متصححش', en: 'Not marked yet' },
   'RESULTS.HOMEWORK': { ar: 'واجب', en: 'Homework' },
   'RESULTS.BACK': { ar: 'رجوع لامتحاناتي', en: 'Back to my exams' },

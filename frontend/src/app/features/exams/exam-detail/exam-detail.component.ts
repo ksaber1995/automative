@@ -84,6 +84,15 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   manualEntry = signal('');
   /** A card-derived code reads "05", not 900005 — same rule as every other screen. */
   code = formatStudentCode;
+
+  /**
+   * Nobody is "absent" from homework, and a parent reading "absent" on an exam
+   * hears a day skipped at school. The row says what actually happened —
+   * didn't take the exam / didn't do the homework — so the key follows the kind.
+   */
+  absentKey(base: string): string {
+    return `EXAMS.DETAIL.${base}${this.exam()?.isHomework ? '_HW' : ''}`;
+  }
   resolvingCode = signal(false);
   /** Grade applied to the next scanned/entered student. */
   currentGrade = signal('');
@@ -694,7 +703,7 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     this.service.markRemainingAbsent(this.examId).subscribe({
       next: (res) => {
         this.markingAbsent.set(false);
-        this.notifications.success(this.translate.instant('EXAMS.DETAIL.MARKED_ABSENT_COUNT', { count: res.count }));
+        this.notifications.success(this.translate.instant(this.absentKey('MARKED_ABSENT_COUNT'), { count: res.count }));
         this.loadRoster();
       },
       error: () => this.markingAbsent.set(false),

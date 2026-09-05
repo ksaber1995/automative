@@ -184,7 +184,7 @@ class _ChildDashboardState extends State<ChildDashboard> {
 
   String _lastMark(ExamRow e) {
     final what = e.isHomework ? 'آخر واجب' : 'آخر امتحان';
-    if (e.isAbsent) return '$what: ${e.examName} — غائب';
+    if (e.isAbsent) return '$what: ${e.examName} — ${e.isHomework ? 'لم يحل' : 'لم يقدّم'}';
     if (e.notMarked) return '$what: ${e.examName} — لم يُصحح';
     final max = e.maxGrade;
     final mark = e.isRating || max == null

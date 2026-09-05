@@ -28,7 +28,7 @@ const DEFAULT_TELEGRAM_TEMPLATES: Record<TemplateType, string> = {
   EXAM_RESULT:
     'رسالة من {academyName}:\n\n📝 نتيجة {studentName} في امتحان {examName} ({courseName}): {grade}/{maxGrade} ({percentage}%).',
   EXAM_ABSENT:
-    'رسالة من {academyName}:\n\n📝 تغيّب {studentName} عن امتحان {examName} ({courseName}).',
+    'رسالة من {academyName}:\n\n📝 لم يقدّم {studentName} امتحان {examName} ({courseName}).',
 };
 
 @Component({
