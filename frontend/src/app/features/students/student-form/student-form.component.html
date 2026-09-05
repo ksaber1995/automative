@@ -86,7 +86,7 @@
                         </div>
                         <!-- Enough to recognise the row without opening it. -->
                         <div class="text-[11px] text-gray-500 truncate">
-                          @if (s.studentCode != null) { #{{ s.studentCode }} }
+                          @if (s.studentCode != null) { #{{ code(s.studentCode) }} }
                           @if (s.phone) { · {{ s.phone }} }
                           @else if (s.parentPhone) { · {{ s.parentPhone }} }
                           <!-- The branch name is already in the tag when it is a

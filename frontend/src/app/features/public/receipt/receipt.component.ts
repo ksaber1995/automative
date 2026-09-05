@@ -6,6 +6,7 @@ import QRCode from 'qrcode';
 import { ApiService } from '../../../core/services/api.service';
 import { LanguageService } from '../../../core/services/language.service';
 import { openWhatsappChat } from '../../../core/utils/whatsapp.util';
+import { formatStudentCode } from '../../../core/utils/student-code.util';
 
 export interface PaymentReceipt {
   id: string;
@@ -64,6 +65,8 @@ export class ReceiptComponent implements OnInit {
   private translate = inject(TranslateService);
   languageService = inject(LanguageService);
 
+  /** A card-derived code prints "05", not 900005. */
+  code = formatStudentCode;
   loading = signal(true);
   error = signal(false);
   receipt = signal<PaymentReceipt | null>(null);

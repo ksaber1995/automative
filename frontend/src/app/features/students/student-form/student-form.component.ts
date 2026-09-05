@@ -19,6 +19,7 @@ import { BranchStateService } from '../../../core/services/branch-state.service'
 import { AuthService } from '../../../core/services/auth.service';
 import { ACQUISITION_CHANNELS } from '@shared/interfaces/student.interface';
 import { toLocalYmd } from '../../../core/utils/date.util';
+import { formatStudentCode } from '../../../core/utils/student-code.util';
 
 @Component({
   selector: 'app-student-form',
@@ -51,6 +52,8 @@ export class StudentFormComponent implements OnInit, OnDestroy {
   private authService = inject(AuthService);
 
   studentForm: FormGroup;
+  /** A card-derived code prints "05", not 900005. */
+  code = formatStudentCode;
   loading = signal(false);
   isEditMode = signal(false);
   studentId: string | null = null;

@@ -127,7 +127,7 @@
             <tr>
               <td class="font-medium">
                 {{ row.name }}
-                @if (row.code != null) { <span class="text-gray-400 text-sm ms-1">#{{ row.code }}</span> }
+                @if (row.code != null) { <span class="text-gray-400 text-sm ms-1">#{{ code(row.code) }}</span> }
               </td>
               @if (hasModels()) {
                 <td>

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../core/student_code.dart';
 import '../core/theme.dart';
 import 'student_session.dart';
 
@@ -140,7 +141,8 @@ class _CodeBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = code?.toString();
+    // 900005 is how the card is stored; "05" is what is printed on it.
+    final text = code == null ? null : formatStudentCode(code);
     return Material(
       color: AppTheme.ground,
       borderRadius: BorderRadius.circular(12),

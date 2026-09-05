@@ -26,6 +26,7 @@ import { openWhatsappChat, renderWhatsappTemplate } from '../../../core/utils/wh
 import { CompanyService } from '../../../core/services/company.service';
 import { HOMEWORK_RATINGS, HOMEWORK_RATING_MAX, ratingLabelKey } from '../homework-rating.util';
 import { ExamAttemptRow, ExamModel, ExamResultRow } from '@shared/interfaces/exam.interface';
+import { formatStudentCode } from '../../../core/utils/student-code.util';
 
 @Component({
   selector: 'app-exam-detail',
@@ -81,6 +82,8 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
   // Unified manual entry: a short value (< 6 chars) is treated as a student code,
   // anything longer as a QR token. Routes to record-by-code / record-by-qr.
   manualEntry = signal('');
+  /** A card-derived code reads "05", not 900005 — same rule as every other screen. */
+  code = formatStudentCode;
   resolvingCode = signal(false);
   /** Grade applied to the next scanned/entered student. */
   currentGrade = signal('');
@@ -137,7 +140,7 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     if (!q) return list;
     return list.filter((a) =>
       a.name.toLowerCase().includes(q) ||
-      (a.code != null && String(a.code).toLowerCase().includes(q)));
+      (a.code != null && formatStudentCode(a.code).toLowerCase().includes(q)));
   });
 
   filteredRoster = computed(() => {
@@ -146,7 +149,7 @@ export class ExamDetailComponent implements OnInit, OnDestroy {
     if (!q) return list;
     return list.filter((s) =>
       s.name.toLowerCase().includes(q) ||
-      (s.code != null && String(s.code).toLowerCase().includes(q)));
+      (s.code != null && formatStudentCode(s.code).toLowerCase().includes(q)));
   });
 
   gradedCount = computed(() => this.roster().filter((s) => s.grade != null && s.grade !== '').length);

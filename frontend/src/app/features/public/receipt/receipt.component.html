@@ -30,7 +30,7 @@
           <strong>{{ r.studentName || '—' }}</strong>
         </div>
         @if (r.studentCode) {
-          <div class="row"><span>{{ 'RECEIPT.CODE' | translate }}</span><strong>{{ r.studentCode }}</strong></div>
+          <div class="row"><span>{{ 'RECEIPT.CODE' | translate }}</span><strong>{{ code(r.studentCode) }}</strong></div>
         }
         @if (r.studentPhone) {
           <div class="row"><span>{{ 'RECEIPT.PHONE' | translate }}</span><strong dir="ltr">{{ r.studentPhone }}</strong></div>
